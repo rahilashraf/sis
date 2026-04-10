@@ -19,6 +19,31 @@ type AuthUser = {
   role: UserRole;
 };
 
+type SessionClassWithClass = {
+  classId: string;
+  class: unknown;
+};
+
+type RecordWithSessionClasses = {
+  attendanceSession: {
+    classes: SessionClassWithClass[];
+  };
+};
+
+type SessionRecordWithStudent = {
+  studentId: string;
+  student: unknown;
+};
+
+type AttendanceSessionWithClassesAndRecords = {
+  classes: SessionClassWithClass[];
+  records: SessionRecordWithStudent[];
+};
+
+type AttendanceSessionWithClassLinks = {
+  classes: { classId: string }[];
+};
+
 @Injectable()
 export class AttendanceService {
   constructor(private readonly prisma: PrismaService) {}
@@ -72,7 +97,10 @@ export class AttendanceService {
     }
   }
 
-  private async ensureParentLinkedToStudent(parentId: string, studentId: string) {
+  private async ensureParentLinkedToStudent(
+    parentId: string,
+    studentId: string,
+  ) {
     const link = await this.prisma.studentParentLink.findUnique({
       where: {
         parentId_studentId: {
@@ -87,7 +115,10 @@ export class AttendanceService {
     }
   }
 
-  private async ensureTeacherCanAccessStudent(user: AuthUser, studentId: string) {
+  private async ensureTeacherCanAccessStudent(
+    user: AuthUser,
+    studentId: string,
+  ) {
     if (this.isAdminLike(user.role)) {
       return;
     }
@@ -115,6 +146,218 @@ export class AttendanceService {
     if (!enrollment) {
       throw new ForbiddenException('You do not have access to this student');
     }
+  }
+
+  private async ensureUserCanAccessStudentAttendance(
+    user: AuthUser,
+    studentId: string,
+  ) {
+    if (user.role === 'STUDENT') {
+      if (user.id !== studentId) {
+        throw new ForbiddenException('You can only view your own attendance');
+      }
+
+      return;
+    }
+
+    if (user.role === 'PARENT') {
+      await this.ensureParentLinkedToStudent(user.id, studentId);
+      return;
+    }
+
+    if (!this.isAdminLike(user.role)) {
+      await this.ensureTeacherCanAccessStudent(user, studentId);
+    }
+  }
+
+  private normalizeDateRange(startDate: string, endDate: string) {
+    if (!startDate) {
+      throw new BadRequestException('startDate is required');
+    }
+
+    if (!endDate) {
+      throw new BadRequestException('endDate is required');
+    }
+
+    const normalizedStartDate = this.normalizeDateOnly(startDate);
+    const normalizedEndDate = this.normalizeDateOnly(endDate);
+
+    if (normalizedStartDate > normalizedEndDate) {
+      throw new BadRequestException('startDate cannot be after endDate');
+    }
+
+    return { normalizedStartDate, normalizedEndDate };
+  }
+
+  private async getTeacherAssignedClassIds(
+    teacherId: string,
+    classIds: string[],
+  ): Promise<Set<string>> {
+    const uniqueClassIds = [...new Set(classIds)];
+
+    if (uniqueClassIds.length === 0) {
+      return new Set<string>();
+    }
+
+    const assignments = await this.prisma.teacherClassAssignment.findMany({
+      where: {
+        teacherId,
+        classId: { in: uniqueClassIds },
+      },
+      select: {
+        classId: true,
+      },
+    });
+
+    return new Set(assignments.map((assignment) => assignment.classId));
+  }
+
+  private async getStudentIdsForClasses(
+    classIds: string[],
+  ): Promise<Set<string>> {
+    const uniqueClassIds = [...new Set(classIds)];
+
+    if (uniqueClassIds.length === 0) {
+      return new Set<string>();
+    }
+
+    const enrollments = await this.prisma.studentClassEnrollment.findMany({
+      where: {
+        classId: { in: uniqueClassIds },
+      },
+      select: {
+        studentId: true,
+      },
+    });
+
+    return new Set(enrollments.map((enrollment) => enrollment.studentId));
+  }
+
+  private async sanitizeAttendanceRecordForTeacher<
+    T extends RecordWithSessionClasses,
+  >(teacherId: string, record: T): Promise<T> {
+    const assignedClassIds = await this.getTeacherAssignedClassIds(
+      teacherId,
+      record.attendanceSession.classes.map(
+        (sessionClass) => sessionClass.classId,
+      ),
+    );
+
+    if (assignedClassIds.size === 0) {
+      throw new ForbiddenException(
+        'You do not have access to this attendance record',
+      );
+    }
+
+    return {
+      ...record,
+      attendanceSession: {
+        ...record.attendanceSession,
+        classes: record.attendanceSession.classes.filter((sessionClass) =>
+          assignedClassIds.has(sessionClass.classId),
+        ),
+      },
+    };
+  }
+
+  private async sanitizeAttendanceRecordsForTeacher<
+    T extends RecordWithSessionClasses,
+  >(teacherId: string, records: T[]): Promise<T[]> {
+    const assignedClassIds = await this.getTeacherAssignedClassIds(
+      teacherId,
+      records.flatMap((record) =>
+        record.attendanceSession.classes.map(
+          (sessionClass) => sessionClass.classId,
+        ),
+      ),
+    );
+
+    return records
+      .map((record) => ({
+        ...record,
+        attendanceSession: {
+          ...record.attendanceSession,
+          classes: record.attendanceSession.classes.filter((sessionClass) =>
+            assignedClassIds.has(sessionClass.classId),
+          ),
+        },
+      }))
+      .filter((record) => record.attendanceSession.classes.length > 0);
+  }
+
+  private async sanitizeAttendanceSessionsForTeacher<
+    T extends AttendanceSessionWithClassesAndRecords,
+  >(teacherId: string, sessions: T[]): Promise<T[]> {
+    const assignedClassIds = await this.getTeacherAssignedClassIds(
+      teacherId,
+      sessions.flatMap((session) =>
+        session.classes.map((sessionClass) => sessionClass.classId),
+      ),
+    );
+
+    const allowedStudentIds = await this.getStudentIdsForClasses(
+      Array.from(assignedClassIds),
+    );
+
+    return sessions
+      .map((session) => ({
+        ...session,
+        classes: session.classes.filter((sessionClass) =>
+          assignedClassIds.has(sessionClass.classId),
+        ),
+        records: session.records.filter((record) =>
+          allowedStudentIds.has(record.studentId),
+        ),
+      }))
+      .filter((session) => session.classes.length > 0);
+  }
+
+  private async sanitizeAttendanceSessionForTeacher<
+    T extends AttendanceSessionWithClassesAndRecords,
+  >(teacherId: string, session: T): Promise<T> {
+    const [sanitized] = await this.sanitizeAttendanceSessionsForTeacher(
+      teacherId,
+      [session],
+    );
+
+    if (!sanitized) {
+      throw new ForbiddenException(
+        'You do not have access to this attendance session',
+      );
+    }
+
+    return sanitized;
+  }
+
+  private async getAttendanceSessionOrThrow(sessionId: string) {
+    const session = await this.prisma.attendanceSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        school: true,
+        schoolYear: true,
+        takenBy: true,
+        classes: {
+          include: {
+            class: true,
+          },
+        },
+        records: {
+          include: {
+            student: true,
+          },
+          orderBy: [
+            { student: { lastName: 'asc' } },
+            { student: { firstName: 'asc' } },
+          ],
+        },
+      },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Attendance session not found');
+    }
+
+    return session;
   }
 
   async getStudentsForClasses(user: AuthUser, classIds: string[]) {
@@ -197,7 +440,7 @@ export class AttendanceService {
 
   async create(user: AuthUser, dto: CreateAttendanceDto) {
     const normalizedDate = this.normalizeDateOnly(dto.date);
-    const uniqueClassIds = [...new Set(dto.classIds)];
+    const uniqueClassIds: string[] = [...new Set(dto.classIds)];
 
     await this.ensureUserCanAccessClasses(user, uniqueClassIds);
 
@@ -307,7 +550,10 @@ export class AttendanceService {
           include: {
             student: true,
           },
-          orderBy: [{ student: { lastName: 'asc' } }, { student: { firstName: 'asc' } }],
+          orderBy: [
+            { student: { lastName: 'asc' } },
+            { student: { firstName: 'asc' } },
+          ],
         },
       },
     });
@@ -341,7 +587,10 @@ export class AttendanceService {
             include: {
               student: true,
             },
-            orderBy: [{ student: { lastName: 'asc' } }, { student: { firstName: 'asc' } }],
+            orderBy: [
+              { student: { lastName: 'asc' } },
+              { student: { firstName: 'asc' } },
+            ],
           },
         },
         orderBy: {
@@ -351,10 +600,12 @@ export class AttendanceService {
     }
 
     if (!this.isTeacherLike(user.role)) {
-      throw new ForbiddenException('You do not have access to attendance sessions');
+      throw new ForbiddenException(
+        'You do not have access to attendance sessions',
+      );
     }
 
-    return this.prisma.attendanceSession.findMany({
+    const sessions = await this.prisma.attendanceSession.findMany({
       where: {
         schoolId,
         date: normalizedDate,
@@ -381,29 +632,46 @@ export class AttendanceService {
           include: {
             student: true,
           },
-          orderBy: [{ student: { lastName: 'asc' } }, { student: { firstName: 'asc' } }],
+          orderBy: [
+            { student: { lastName: 'asc' } },
+            { student: { firstName: 'asc' } },
+          ],
         },
       },
       orderBy: {
         createdAt: 'desc',
       },
     });
+
+    return this.sanitizeAttendanceSessionsForTeacher(user.id, sessions);
   }
 
-  async getStudentAttendanceByDate(user: AuthUser, studentId: string, date: string) {
+  async getSessionById(user: AuthUser, sessionId: string) {
+    const session = await this.getAttendanceSessionOrThrow(sessionId);
+
+    if (this.isAdminLike(user.role)) {
+      return session;
+    }
+
+    if (!this.isTeacherLike(user.role)) {
+      throw new ForbiddenException(
+        'You do not have access to attendance sessions',
+      );
+    }
+
+    return this.sanitizeAttendanceSessionForTeacher(user.id, session);
+  }
+
+  async getStudentAttendanceByDate(
+    user: AuthUser,
+    studentId: string,
+    date: string,
+  ) {
     if (!date) {
       throw new BadRequestException('date is required');
     }
 
-    if (user.role === 'STUDENT') {
-      if (user.id !== studentId) {
-        throw new ForbiddenException('You can only view your own attendance');
-      }
-    } else if (user.role === 'PARENT') {
-      await this.ensureParentLinkedToStudent(user.id, studentId);
-    } else if (!this.isAdminLike(user.role)) {
-      await this.ensureTeacherCanAccessStudent(user, studentId);
-    }
+    await this.ensureUserCanAccessStudentAttendance(user, studentId);
 
     const normalizedDate = this.normalizeDateOnly(date);
 
@@ -432,24 +700,22 @@ export class AttendanceService {
     });
 
     if (!record) {
-      throw new NotFoundException('Attendance not found for this student and date');
+      throw new NotFoundException(
+        'Attendance not found for this student and date',
+      );
+    }
+
+    if (this.isTeacherLike(user.role)) {
+      return this.sanitizeAttendanceRecordForTeacher(user.id, record);
     }
 
     return record;
   }
 
   async getStudentHistory(user: AuthUser, studentId: string) {
-    if (user.role === 'STUDENT') {
-      if (user.id !== studentId) {
-        throw new ForbiddenException('You can only view your own attendance');
-      }
-    } else if (user.role === 'PARENT') {
-      await this.ensureParentLinkedToStudent(user.id, studentId);
-    } else if (!this.isAdminLike(user.role)) {
-      await this.ensureTeacherCanAccessStudent(user, studentId);
-    }
+    await this.ensureUserCanAccessStudentAttendance(user, studentId);
 
-    return this.prisma.attendanceRecord.findMany({
+    const records = await this.prisma.attendanceRecord.findMany({
       where: { studentId },
       include: {
         attendanceSession: {
@@ -470,9 +736,88 @@ export class AttendanceService {
         date: 'desc',
       },
     });
+
+    if (this.isTeacherLike(user.role)) {
+      return this.sanitizeAttendanceRecordsForTeacher(user.id, records);
+    }
+
+    return records;
   }
 
-  async updateRecord(user: AuthUser, recordId: string, dto: UpdateAttendanceRecordDto) {
+  async getStudentSummary(
+    user: AuthUser,
+    studentId: string,
+    startDate: string,
+    endDate: string,
+  ) {
+    await this.ensureUserCanAccessStudentAttendance(user, studentId);
+
+    const { normalizedStartDate, normalizedEndDate } = this.normalizeDateRange(
+      startDate,
+      endDate,
+    );
+
+    const records = await this.prisma.attendanceRecord.findMany({
+      where: {
+        studentId,
+        date: {
+          gte: normalizedStartDate,
+          lte: normalizedEndDate,
+        },
+      },
+      select: {
+        status: true,
+      },
+      orderBy: {
+        date: 'asc',
+      },
+    });
+
+    const summary = {
+      totalDays: records.length,
+      presentCount: 0,
+      absentCount: 0,
+      lateCount: 0,
+      excusedCount: 0,
+    };
+
+    for (const record of records) {
+      switch (record.status) {
+        case AttendanceStatus.PRESENT:
+          summary.presentCount += 1;
+          break;
+        case AttendanceStatus.ABSENT:
+          summary.absentCount += 1;
+          break;
+        case AttendanceStatus.LATE:
+          summary.lateCount += 1;
+          break;
+        case AttendanceStatus.EXCUSED:
+          summary.excusedCount += 1;
+          break;
+      }
+    }
+
+    const attendedDays = summary.presentCount + summary.lateCount;
+    const attendancePercentage =
+      summary.totalDays === 0
+        ? 0
+        : Number(((attendedDays / summary.totalDays) * 100).toFixed(2));
+
+    return {
+      studentId,
+      startDate: normalizedStartDate.toISOString().slice(0, 10),
+      endDate: normalizedEndDate.toISOString().slice(0, 10),
+      ...summary,
+      attendancePercentage,
+    };
+  }
+
+  async updateRecord(
+    user: AuthUser,
+    recordId: string,
+    dto: UpdateAttendanceRecordDto,
+  ) {
     const existing = await this.prisma.attendanceRecord.findUnique({
       where: { id: recordId },
       include: {
@@ -508,6 +853,47 @@ export class AttendanceService {
             },
             takenBy: true,
           },
+        },
+      },
+    });
+  }
+
+  async deleteSession(user: AuthUser, sessionId: string) {
+    const existing = await this.prisma.attendanceSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        classes: true,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Attendance session not found');
+    }
+
+    const classIds = existing.classes.map(
+      (sessionClass) => sessionClass.classId,
+    );
+    await this.ensureUserCanAccessClasses(user, classIds);
+
+    return this.prisma.attendanceSession.delete({
+      where: { id: sessionId },
+      include: {
+        school: true,
+        schoolYear: true,
+        takenBy: true,
+        classes: {
+          include: {
+            class: true,
+          },
+        },
+        records: {
+          include: {
+            student: true,
+          },
+          orderBy: [
+            { student: { lastName: 'asc' } },
+            { student: { firstName: 'asc' } },
+          ],
         },
       },
     });

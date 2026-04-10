@@ -6,6 +6,10 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "prisma:generate": "npm --prefix ../.. run prisma:generate",
+    "prisma:migrate:dev": "npm --prefix ../.. run prisma:migrate:dev",
+    "prisma:migrate:deploy": "npm --prefix ../.. run prisma:migrate:deploy",
+    "prebuild": "npm run prisma:generate",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

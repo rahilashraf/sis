@@ -9,6 +9,10 @@ import { AuthModule } from './auth/auth.module';
 import { LinksModule } from './links/links.module';
 import { ClassesModule } from './classes/classes.module';
 import { AttendanceModule } from './attendance/attendance.module';
+import { ParentsModule } from './parents/parents.module';
+import { StudentsModule } from './students/students.module';
+import { SchoolYearsModule } from './school-years/school-years.module';
+import { GradesModule } from './grades/grades.module';
 
 @Module({
   imports: [
@@ -21,7 +25,11 @@ import { AttendanceModule } from './attendance/attendance.module';
     AuthModule,
     LinksModule,
     ClassesModule,
-    AttendanceModule
+    AttendanceModule,
+    ParentsModule,
+    StudentsModule,
+    SchoolYearsModule,
+    GradesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -47,24 +47,24 @@ export class AuthService {
   }
 
   async validateUser(userId: string) {
-  console.log('validateUser called with:', userId);
+    console.log('validateUser called with:', userId);
 
-  const user = await this.prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      memberships: {
-        include: { school: true },
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        memberships: {
+          include: { school: true },
+        },
       },
-    },
-  });
+    });
 
-  console.log('user found:', user);
+    console.log('user found:', user);
 
-  if (!user) {
-    throw new UnauthorizedException('User not found');
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const { passwordHash, ...safeUser } = user;
+    return safeUser;
   }
-
-  const { passwordHash, ...safeUser } = user;
-  return safeUser;
-}
 }

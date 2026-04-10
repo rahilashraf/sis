@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Patch,
   Post,
@@ -12,6 +13,9 @@ import {
 import { AttendanceService } from './attendance.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { UpdateAttendanceRecordDto } from './dto/update-attendance-record.dto';
+import { GetAttendanceSessionsQueryDto } from './dto/get-attendance-sessions-query.dto';
+import { GetStudentAttendanceByDateQueryDto } from './dto/get-student-attendance-by-date-query.dto';
+import { GetStudentSummaryQueryDto } from './dto/get-student-summary-query.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -42,10 +46,19 @@ export class AttendanceController {
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
   getSessionsByDate(
     @Req() req: any,
-    @Query('schoolId') schoolId: string,
-    @Query('date') date: string,
+    @Query() query: GetAttendanceSessionsQueryDto,
   ) {
-    return this.attendanceService.getSessionsByDate(req.user, schoolId, date);
+    return this.attendanceService.getSessionsByDate(
+      req.user,
+      query.schoolId,
+      query.date,
+    );
+  }
+
+  @Get('sessions/:sessionId')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  getSessionById(@Req() req: any, @Param('sessionId') sessionId: string) {
+    return this.attendanceService.getSessionById(req.user, sessionId);
   }
 
   @Get('students/:studentId/by-date')
@@ -62,12 +75,12 @@ export class AttendanceController {
   getStudentAttendanceByDate(
     @Req() req: any,
     @Param('studentId') studentId: string,
-    @Query('date') date: string,
+    @Query() query: GetStudentAttendanceByDateQueryDto,
   ) {
     return this.attendanceService.getStudentAttendanceByDate(
       req.user,
       studentId,
-      date,
+      query.date,
     );
   }
 
@@ -86,6 +99,30 @@ export class AttendanceController {
     return this.attendanceService.getStudentHistory(req.user, studentId);
   }
 
+  @Get('students/:studentId/summary')
+  @Roles(
+    'OWNER',
+    'SUPER_ADMIN',
+    'ADMIN',
+    'STAFF',
+    'TEACHER',
+    'SUPPLY_TEACHER',
+    'PARENT',
+    'STUDENT',
+  )
+  getStudentSummary(
+    @Req() req: any,
+    @Param('studentId') studentId: string,
+    @Query() query: GetStudentSummaryQueryDto,
+  ) {
+    return this.attendanceService.getStudentSummary(
+      req.user,
+      studentId,
+      query.startDate,
+      query.endDate,
+    );
+  }
+
   @Patch('records/:recordId')
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
   updateRecord(
@@ -94,5 +131,11 @@ export class AttendanceController {
     @Body() body: UpdateAttendanceRecordDto,
   ) {
     return this.attendanceService.updateRecord(req.user, recordId, body);
+  }
+
+  @Delete('sessions/:sessionId')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  removeSession(@Req() req: any, @Param('sessionId') sessionId: string) {
+    return this.attendanceService.deleteSession(req.user, sessionId);
   }
 }

@@ -1,5 +1,11 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+generator api_client {
+  provider = "prisma-client-js"
+  output   = "../apps/api/node_modules/.prisma/client"
 }
 
 datasource db {
@@ -54,6 +60,7 @@ model User {
 
   takenAttendanceSessions AttendanceSession[] @relation("AttendanceTakenBy")
   attendanceRecords       AttendanceRecord[]  @relation("AttendanceStudent")
+  studentGradeRecords     GradeRecord[]       @relation("StudentGradeRecords")
 }
 
 model School {
@@ -130,6 +137,7 @@ model Class {
 
   teachers TeacherClassAssignment[]
   students StudentClassEnrollment[]
+  gradeRecords GradeRecord[]
 
   attendanceSessionClasses AttendanceSessionClass[]
 
@@ -212,4 +220,24 @@ model AttendanceRecord {
   @@unique([attendanceSessionId, studentId])
   @@index([date])
   @@index([studentId, date])
+}
+
+model GradeRecord {
+  id        String   @id @default(cuid())
+  classId   String
+  studentId String
+  title     String
+  score     Float
+  maxScore  Float
+  gradedAt  DateTime
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  class   Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student User  @relation("StudentGradeRecords", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([classId, gradedAt])
+  @@index([studentId, gradedAt])
+  @@index([classId, studentId])
 }
