@@ -44,4 +44,25 @@ export class GradesController {
   findByStudent(@Req() req: any, @Param('studentId') studentId: string) {
     return this.gradesService.findByStudent(req.user, studentId);
   }
+
+  @Get('students/:studentId/summary')
+  @Roles(
+    'OWNER',
+    'SUPER_ADMIN',
+    'ADMIN',
+    'STAFF',
+    'TEACHER',
+    'SUPPLY_TEACHER',
+    'PARENT',
+    'STUDENT',
+  )
+  getStudentSummary(@Req() req: any, @Param('studentId') studentId: string) {
+    return this.gradesService.getStudentSummary(req.user, studentId);
+  }
+
+  @Get('classes/:classId/summary')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  getClassSummary(@Req() req: any, @Param('classId') classId: string) {
+    return this.gradesService.getClassSummary(req.user, classId);
+  }
 }

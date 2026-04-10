@@ -13,6 +13,21 @@ type AuthUser = {
   role: UserRole;
 };
 
+type GradeRecordWithClassAndStudent = {
+  score: number;
+  maxScore: number;
+  class: {
+    id: string;
+    name: string;
+  };
+  student: {
+    id: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    username?: string | null;
+  };
+};
+
 @Injectable()
 export class GradesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -41,6 +56,83 @@ export class GradesService {
     if (score > maxScore) {
       throw new BadRequestException('score must be less than or equal to maxScore');
     }
+  }
+
+  private formatPercentage(totalScore: number, totalMaxScore: number) {
+    if (totalMaxScore === 0) {
+      return null;
+    }
+
+    return Math.round((totalScore / totalMaxScore) * 10000) / 100;
+  }
+
+  private getDisplayName(person: {
+    firstName?: string | null;
+    lastName?: string | null;
+    username?: string | null;
+    id: string;
+  }) {
+    const parts = [person.firstName?.trim(), person.lastName?.trim()].filter(
+      Boolean,
+    );
+
+    if (parts.length > 0) {
+      return parts.join(' ');
+    }
+
+    if (person.username?.trim()) {
+      return person.username.trim();
+    }
+
+    return person.id;
+  }
+
+  private buildStudentGradesWhere(user: AuthUser, studentId: string) {
+    if (this.isTeacherLike(user.role) && !this.isAdminLike(user.role)) {
+      return {
+        studentId,
+        class: {
+          teachers: {
+            some: {
+              teacherId: user.id,
+            },
+          },
+        },
+      };
+    }
+
+    return {
+      studentId,
+    };
+  }
+
+  private buildSummary(
+    records: Array<{
+      score: number;
+      maxScore: number;
+    }>,
+  ) {
+    const totals = records.reduce(
+      (acc, record) => {
+        acc.totalScore += record.score;
+        acc.totalMaxScore += record.maxScore;
+        return acc;
+      },
+      {
+        totalScore: 0,
+        totalMaxScore: 0,
+      },
+    );
+
+    return {
+      gradeCount: records.length,
+      totalScore: totals.totalScore,
+      totalMaxScore: totals.totalMaxScore,
+      percentage: this.formatPercentage(
+        totals.totalScore,
+        totals.totalMaxScore,
+      ),
+    };
   }
 
   private async ensureClassExists(classId: string) {
@@ -201,25 +293,130 @@ export class GradesService {
   async findByStudent(user: AuthUser, studentId: string) {
     await this.ensureUserCanReadStudentGrades(user, studentId);
 
-    const where = this.isTeacherLike(user.role) && !this.isAdminLike(user.role)
-      ? {
-          studentId,
-          class: {
-            teachers: {
-              some: {
-                teacherId: user.id,
-              },
-            },
-          },
-        }
-      : {
-          studentId,
-        };
+    const where = this.buildStudentGradesWhere(user, studentId);
 
     return this.prisma.gradeRecord.findMany({
       where,
       orderBy: [{ gradedAt: 'desc' }, { createdAt: 'desc' }],
       include: this.buildInclude(),
     });
+  }
+
+  async getStudentSummary(user: AuthUser, studentId: string) {
+    await this.ensureUserCanReadStudentGrades(user, studentId);
+
+    const records = await this.prisma.gradeRecord.findMany({
+      where: this.buildStudentGradesWhere(user, studentId),
+      orderBy: [{ gradedAt: 'desc' }, { createdAt: 'desc' }],
+      include: {
+        class: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    const classMap = new Map<
+      string,
+      {
+        classId: string;
+        className: string;
+        records: GradeRecordWithClassAndStudent[];
+      }
+    >();
+
+    for (const record of records as GradeRecordWithClassAndStudent[]) {
+      const existing = classMap.get(record.class.id);
+
+      if (existing) {
+        existing.records.push(record);
+        continue;
+      }
+
+      classMap.set(record.class.id, {
+        classId: record.class.id,
+        className: record.class.name,
+        records: [record],
+      });
+    }
+
+    return {
+      studentId,
+      ...this.buildSummary(records),
+      classes: [...classMap.values()].map((entry) => ({
+        classId: entry.classId,
+        className: entry.className,
+        ...this.buildSummary(entry.records),
+      })),
+    };
+  }
+
+  async getClassSummary(user: AuthUser, classId: string) {
+    await this.ensureClassExists(classId);
+    await this.ensureUserCanManageClass(user, classId);
+
+    const records = await this.prisma.gradeRecord.findMany({
+      where: {
+        classId,
+      },
+      orderBy: [{ gradedAt: 'desc' }, { createdAt: 'desc' }],
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    const studentMap = new Map<
+      string,
+      {
+        studentId: string;
+        studentName: string;
+        records: Array<{
+          score: number;
+          maxScore: number;
+        }>;
+      }
+    >();
+
+    for (const record of records as GradeRecordWithClassAndStudent[]) {
+      const existing = studentMap.get(record.student.id);
+
+      if (existing) {
+        existing.records.push(record);
+        continue;
+      }
+
+      studentMap.set(record.student.id, {
+        studentId: record.student.id,
+        studentName: this.getDisplayName(record.student),
+        records: [record],
+      });
+    }
+
+    return {
+      classId,
+      ...this.buildSummary(records),
+      students: [...studentMap.values()].map((entry) => ({
+        studentId: entry.studentId,
+        studentName: entry.studentName,
+        ...this.buildSummary(entry.records),
+      })),
+    };
   }
 }
