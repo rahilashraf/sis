@@ -1,37 +1,35 @@
 import { Type } from 'class-transformer';
 import {
-  IsBoolean,
   IsDateString,
-  IsInt,
+  IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
   Min,
 } from 'class-validator';
 
-export class UpdateReportingPeriodDto {
+export class UpdateGradeRecordDto {
   @IsOptional()
   @IsString()
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  key?: string;
+  title?: string;
 
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  order?: number;
+  @IsNumber()
+  @Min(0)
+  score?: number;
 
   @IsOptional()
-  @IsBoolean()
-  isLocked?: boolean;
+  @Type(() => Number)
+  @IsNumber()
+  @IsPositive()
+  maxScore?: number;
 
   @IsOptional()
   @IsDateString()
-  startsAt?: string;
+  gradedAt?: string;
 
   @IsOptional()
-  @IsDateString()
-  endsAt?: string;
+  @IsString()
+  comment?: string;
 }

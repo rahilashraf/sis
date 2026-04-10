@@ -269,6 +269,7 @@ export class ReportingPeriodsService {
           ...(data.name !== undefined ? { name: data.name } : {}),
           ...(data.key !== undefined ? { key: data.key } : {}),
           ...(data.order !== undefined ? { order: data.order } : {}),
+          ...(data.isLocked !== undefined ? { isLocked: data.isLocked } : {}),
           ...(data.startsAt !== undefined ? { startsAt } : {}),
           ...(data.endsAt !== undefined ? { endsAt } : {}),
         },

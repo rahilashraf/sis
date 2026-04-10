@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -11,6 +12,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CreateGradeRecordDto } from './dto/create-grade-record.dto';
+import { UpdateGradeRecordDto } from './dto/update-grade-record.dto';
 import { GradesService } from './grades.service';
 
 @Controller('grades')
@@ -22,6 +24,16 @@ export class GradesController {
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
   create(@Req() req: any, @Body() body: CreateGradeRecordDto) {
     return this.gradesService.create(req.user, body);
+  }
+
+  @Patch(':id')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  update(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: UpdateGradeRecordDto,
+  ) {
+    return this.gradesService.update(req.user, id, body);
   }
 
   @Get('classes/:classId')

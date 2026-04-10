@@ -1,0 +1,2 @@
+ALTER TABLE "ReportingPeriod"
+ADD COLUMN "isLocked" BOOLEAN NOT NULL DEFAULT false;

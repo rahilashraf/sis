@@ -7,6 +7,7 @@ import {
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateGradeRecordDto } from './dto/create-grade-record.dto';
+import { UpdateGradeRecordDto } from './dto/update-grade-record.dto';
 
 type AuthUser = {
   id: string;
@@ -23,6 +24,10 @@ export class GradesService {
 
   private isTeacherLike(role: UserRole) {
     return ['TEACHER', 'SUPPLY_TEACHER'].includes(role);
+  }
+
+  private canOverrideReportingPeriodLock(role: UserRole) {
+    return ['OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(role);
   }
 
   private buildInclude() {
@@ -51,6 +56,74 @@ export class GradesService {
 
     if (!existingClass) {
       throw new NotFoundException('Class not found');
+    }
+  }
+
+  private parseGradedAt(gradedAt: string) {
+    const parsedDate = new Date(gradedAt);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw new BadRequestException('gradedAt must be a valid date');
+    }
+
+    return parsedDate;
+  }
+
+  private async findReportingPeriodForDate(classId: string, gradedAt: Date) {
+    const existingClass = await this.prisma.class.findUnique({
+      where: { id: classId },
+      select: {
+        id: true,
+        schoolId: true,
+        schoolYearId: true,
+      },
+    });
+
+    if (!existingClass) {
+      throw new NotFoundException('Class not found');
+    }
+
+    const reportingPeriod = await this.prisma.reportingPeriod.findFirst({
+      where: {
+        schoolId: existingClass.schoolId,
+        schoolYearId: existingClass.schoolYearId,
+        startsAt: {
+          lte: gradedAt,
+        },
+        endsAt: {
+          gte: gradedAt,
+        },
+      },
+      select: {
+        id: true,
+        isLocked: true,
+      },
+    });
+
+    if (!reportingPeriod) {
+      throw new BadRequestException(
+        'gradedAt must fall within a reporting period',
+      );
+    }
+
+    return reportingPeriod;
+  }
+
+  private async ensureUserCanWriteGradeForDate(
+    user: AuthUser,
+    classId: string,
+    gradedAt: Date,
+  ) {
+    const reportingPeriod = await this.findReportingPeriodForDate(
+      classId,
+      gradedAt,
+    );
+
+    if (
+      reportingPeriod.isLocked &&
+      !this.canOverrideReportingPeriodLock(user.role)
+    ) {
+      throw new ForbiddenException('Reporting period is locked');
     }
   }
 
@@ -167,9 +240,12 @@ export class GradesService {
   async create(user: AuthUser, data: CreateGradeRecordDto) {
     this.validateScoreRange(data.score, data.maxScore);
 
+    const gradedAt = this.parseGradedAt(data.gradedAt);
+
     await this.ensureClassExists(data.classId);
     await this.ensureUserCanManageClass(user, data.classId);
     await this.ensureStudentEnrolledInClass(data.studentId, data.classId);
+    await this.ensureUserCanWriteGradeForDate(user, data.classId, gradedAt);
 
     return this.prisma.gradeRecord.create({
       data: {
@@ -178,8 +254,56 @@ export class GradesService {
         title: data.title,
         score: data.score,
         maxScore: data.maxScore,
-        gradedAt: new Date(data.gradedAt),
+        gradedAt,
         comment: data.comment,
+      },
+      include: this.buildInclude(),
+    });
+  }
+
+  async update(user: AuthUser, id: string, data: UpdateGradeRecordDto) {
+    const existingGrade = await this.prisma.gradeRecord.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        classId: true,
+        score: true,
+        maxScore: true,
+        gradedAt: true,
+      },
+    });
+
+    if (!existingGrade) {
+      throw new NotFoundException('Grade record not found');
+    }
+
+    await this.ensureUserCanManageClass(user, existingGrade.classId);
+
+    if (!this.canOverrideReportingPeriodLock(user.role)) {
+      await this.ensureUserCanWriteGradeForDate(
+        user,
+        existingGrade.classId,
+        existingGrade.gradedAt,
+      );
+    }
+
+    const gradedAt = data.gradedAt
+      ? this.parseGradedAt(data.gradedAt)
+      : existingGrade.gradedAt;
+    const score = data.score ?? existingGrade.score;
+    const maxScore = data.maxScore ?? existingGrade.maxScore;
+
+    this.validateScoreRange(score, maxScore);
+    await this.ensureUserCanWriteGradeForDate(user, existingGrade.classId, gradedAt);
+
+    return this.prisma.gradeRecord.update({
+      where: { id: existingGrade.id },
+      data: {
+        ...(data.title !== undefined ? { title: data.title } : {}),
+        ...(data.score !== undefined ? { score: data.score } : {}),
+        ...(data.maxScore !== undefined ? { maxScore: data.maxScore } : {}),
+        ...(data.gradedAt !== undefined ? { gradedAt } : {}),
+        ...(data.comment !== undefined ? { comment: data.comment } : {}),
       },
       include: this.buildInclude(),
     });

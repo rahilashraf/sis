@@ -55,19 +55,31 @@ describe('GradesController (HTTP)', () => {
   let app: INestApplication;
   let prisma: {
     class: { findUnique: jest.Mock };
+    reportingPeriod: { findFirst: jest.Mock };
     teacherClassAssignment: { findFirst: jest.Mock };
     studentClassEnrollment: { findFirst: jest.Mock };
     studentParentLink: { findUnique: jest.Mock };
-    gradeRecord: { create: jest.Mock; findMany: jest.Mock };
+    gradeRecord: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+    };
   };
 
   beforeEach(async () => {
     prisma = {
       class: { findUnique: jest.fn() },
+      reportingPeriod: { findFirst: jest.fn() },
       teacherClassAssignment: { findFirst: jest.fn() },
       studentClassEnrollment: { findFirst: jest.fn() },
       studentParentLink: { findUnique: jest.fn() },
-      gradeRecord: { create: jest.fn(), findMany: jest.fn() },
+      gradeRecord: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -103,8 +115,16 @@ describe('GradesController (HTTP)', () => {
   });
 
   it('creates a grade record for admin-like access', async () => {
-    prisma.class.findUnique.mockResolvedValue({ id: 'class-1' });
+    prisma.class.findUnique.mockResolvedValue({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
     prisma.studentClassEnrollment.findFirst.mockResolvedValue({ id: 'enrollment-1' });
+    prisma.reportingPeriod.findFirst.mockResolvedValue({
+      id: 'period-1',
+      isLocked: false,
+    });
     prisma.gradeRecord.create.mockResolvedValue({
       id: 'grade-1',
       title: 'Quiz 1',
@@ -150,6 +170,56 @@ describe('GradesController (HTTP)', () => {
     );
   });
 
+  it('creates a grade record for a teacher in an unlocked reporting period', async () => {
+    prisma.class.findUnique.mockResolvedValue({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.studentClassEnrollment.findFirst.mockResolvedValue({ id: 'enrollment-1' });
+    prisma.reportingPeriod.findFirst.mockResolvedValue({
+      id: 'period-1',
+      isLocked: false,
+    });
+    prisma.gradeRecord.create.mockResolvedValue({
+      id: 'grade-1',
+      title: 'Quiz 1',
+      score: 8,
+      maxScore: 10,
+    });
+
+    await request(app.getHttpServer())
+      .post('/grades')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .send({
+        classId: 'class-1',
+        studentId: 'student-1',
+        title: 'Quiz 1',
+        score: 8,
+        maxScore: 10,
+        gradedAt: '2026-04-10T00:00:00.000Z',
+      })
+      .expect(201)
+      .expect({
+        id: 'grade-1',
+        title: 'Quiz 1',
+        score: 8,
+        maxScore: 10,
+      });
+
+    expect(prisma.teacherClassAssignment.findFirst).toHaveBeenCalled();
+    expect(prisma.reportingPeriod.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          schoolId: 'school-1',
+          schoolYearId: 'year-1',
+        }),
+      }),
+    );
+  });
+
   it('returns 403 when a student attempts to create a grade record', async () => {
     await request(app.getHttpServer())
       .post('/grades')
@@ -187,6 +257,63 @@ describe('GradesController (HTTP)', () => {
       .expect(403);
 
     expect(prisma.studentClassEnrollment.findFirst).not.toHaveBeenCalled();
+    expect(prisma.reportingPeriod.findFirst).not.toHaveBeenCalled();
+    expect(prisma.gradeRecord.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when a teacher creates a grade record in a locked reporting period', async () => {
+    prisma.class.findUnique.mockResolvedValue({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.studentClassEnrollment.findFirst.mockResolvedValue({ id: 'enrollment-1' });
+    prisma.reportingPeriod.findFirst.mockResolvedValue({
+      id: 'period-1',
+      isLocked: true,
+    });
+
+    await request(app.getHttpServer())
+      .post('/grades')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .send({
+        classId: 'class-1',
+        studentId: 'student-1',
+        title: 'Quiz 1',
+        score: 8,
+        maxScore: 10,
+        gradedAt: '2026-04-10T00:00:00.000Z',
+      })
+      .expect(403);
+
+    expect(prisma.gradeRecord.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when gradedAt does not fall within a reporting period', async () => {
+    prisma.class.findUnique.mockResolvedValue({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
+    prisma.studentClassEnrollment.findFirst.mockResolvedValue({ id: 'enrollment-1' });
+    prisma.reportingPeriod.findFirst.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .post('/grades')
+      .set('x-test-user-id', 'admin-1')
+      .set('x-test-role', UserRole.ADMIN)
+      .send({
+        classId: 'class-1',
+        studentId: 'student-1',
+        title: 'Quiz 1',
+        score: 8,
+        maxScore: 10,
+        gradedAt: '2026-08-10T00:00:00.000Z',
+      })
+      .expect(400);
+
     expect(prisma.gradeRecord.create).not.toHaveBeenCalled();
   });
 
@@ -224,6 +351,123 @@ describe('GradesController (HTTP)', () => {
       .expect(400);
 
     expect(prisma.class.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('allows an admin to update a grade record in a locked reporting period', async () => {
+    prisma.gradeRecord.findUnique.mockResolvedValue({
+      id: 'grade-1',
+      classId: 'class-1',
+      score: 8,
+      maxScore: 10,
+      gradedAt: new Date('2026-04-10T00:00:00.000Z'),
+    });
+    prisma.class.findUnique.mockResolvedValue({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
+    prisma.reportingPeriod.findFirst.mockResolvedValue({
+      id: 'period-1',
+      isLocked: true,
+    });
+    prisma.gradeRecord.update.mockResolvedValue({
+      id: 'grade-1',
+      title: 'Updated Quiz 1',
+      score: 8,
+      maxScore: 10,
+    });
+
+    await request(app.getHttpServer())
+      .patch('/grades/grade-1')
+      .set('x-test-user-id', 'admin-1')
+      .set('x-test-role', UserRole.ADMIN)
+      .send({
+        title: 'Updated Quiz 1',
+      })
+      .expect(200)
+      .expect({
+        id: 'grade-1',
+        title: 'Updated Quiz 1',
+        score: 8,
+        maxScore: 10,
+      });
+
+    expect(prisma.gradeRecord.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'grade-1' },
+        data: { title: 'Updated Quiz 1' },
+      }),
+    );
+  });
+
+  it('returns 403 when a teacher updates a grade record from a locked reporting period', async () => {
+    prisma.gradeRecord.findUnique.mockResolvedValue({
+      id: 'grade-1',
+      classId: 'class-1',
+      score: 8,
+      maxScore: 10,
+      gradedAt: new Date('2026-04-10T00:00:00.000Z'),
+    });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.class.findUnique.mockResolvedValue({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
+    prisma.reportingPeriod.findFirst.mockResolvedValueOnce({
+      id: 'period-1',
+      isLocked: true,
+    });
+
+    await request(app.getHttpServer())
+      .patch('/grades/grade-1')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .send({
+        gradedAt: '2026-02-10T00:00:00.000Z',
+        title: 'Updated Quiz 1',
+      })
+      .expect(403);
+
+    expect(prisma.gradeRecord.update).not.toHaveBeenCalled();
+    expect(prisma.reportingPeriod.findFirst).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 403 when a teacher updates gradedAt into a locked reporting period', async () => {
+    prisma.gradeRecord.findUnique.mockResolvedValue({
+      id: 'grade-1',
+      classId: 'class-1',
+      score: 8,
+      maxScore: 10,
+      gradedAt: new Date('2026-02-10T00:00:00.000Z'),
+    });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.class.findUnique.mockResolvedValue({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
+    prisma.reportingPeriod.findFirst
+      .mockResolvedValueOnce({
+        id: 'period-1',
+        isLocked: false,
+      })
+      .mockResolvedValueOnce({
+        id: 'period-2',
+        isLocked: true,
+      });
+
+    await request(app.getHttpServer())
+      .patch('/grades/grade-1')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .send({
+        gradedAt: '2026-04-10T00:00:00.000Z',
+      })
+      .expect(403);
+
+    expect(prisma.gradeRecord.update).not.toHaveBeenCalled();
+    expect(prisma.reportingPeriod.findFirst).toHaveBeenCalledTimes(2);
   });
 
   it('returns class grades for an assigned teacher', async () => {

@@ -116,6 +116,7 @@ model ReportingPeriod {
   name         String
   key          String
   order        Int
+  isLocked     Boolean  @default(false)
   startsAt     DateTime
   endsAt       DateTime
   createdAt    DateTime @default(now())
