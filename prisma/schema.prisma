@@ -75,6 +75,7 @@ model School {
   schoolYears       SchoolYear[]
   classes           Class[]
   attendanceSessions AttendanceSession[]
+  reportingPeriods  ReportingPeriod[]
 }
 
 model UserSchoolMembership {
@@ -103,8 +104,28 @@ model SchoolYear {
   school             School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   classes            Class[]
   attendanceSessions AttendanceSession[]
+  reportingPeriods   ReportingPeriod[]
 
   @@unique([schoolId, name])
+}
+
+model ReportingPeriod {
+  id           String   @id @default(cuid())
+  schoolId     String
+  schoolYearId String
+  name         String
+  key          String
+  order        Int
+  startsAt     DateTime
+  endsAt       DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  school     School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolYear SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, schoolYearId, key])
+  @@unique([schoolId, schoolYearId, order])
 }
 
 model StudentParentLink {

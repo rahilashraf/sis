@@ -13,6 +13,7 @@ import { ParentsModule } from './parents/parents.module';
 import { StudentsModule } from './students/students.module';
 import { SchoolYearsModule } from './school-years/school-years.module';
 import { GradesModule } from './grades/grades.module';
+import { ReportingPeriodsModule } from './reporting-periods/reporting-periods.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { GradesModule } from './grades/grades.module';
     StudentsModule,
     SchoolYearsModule,
     GradesModule,
+    ReportingPeriodsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
