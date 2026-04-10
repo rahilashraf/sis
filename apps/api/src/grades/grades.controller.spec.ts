@@ -913,4 +913,215 @@ describe('GradesController (HTTP)', () => {
       }),
     );
   });
+
+  it('returns a student grade summary for self access', async () => {
+    prisma.gradeRecord.findMany.mockResolvedValue([
+      {
+        score: 8,
+        maxScore: 10,
+        class: { id: 'class-1', name: 'Math' },
+        student: { id: 'student-1', firstName: 'Ada', lastName: 'Lovelace' },
+      },
+      {
+        score: 16,
+        maxScore: 20,
+        class: { id: 'class-2', name: 'Science' },
+        student: { id: 'student-1', firstName: 'Ada', lastName: 'Lovelace' },
+      },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/grades/students/student-1/summary')
+      .set('x-test-user-id', 'student-1')
+      .set('x-test-role', UserRole.STUDENT)
+      .expect(200)
+      .expect({
+        studentId: 'student-1',
+        gradeCount: 2,
+        totalScore: 24,
+        totalMaxScore: 30,
+        percentage: 80,
+        classes: [
+          {
+            classId: 'class-1',
+            className: 'Math',
+            gradeCount: 1,
+            totalScore: 8,
+            totalMaxScore: 10,
+            percentage: 80,
+          },
+          {
+            classId: 'class-2',
+            className: 'Science',
+            gradeCount: 1,
+            totalScore: 16,
+            totalMaxScore: 20,
+            percentage: 80,
+          },
+        ],
+      });
+  });
+
+  it('returns zeroed student summary when no grades are present', async () => {
+    prisma.gradeRecord.findMany.mockResolvedValue([]);
+
+    await request(app.getHttpServer())
+      .get('/grades/students/student-1/summary')
+      .set('x-test-user-id', 'student-1')
+      .set('x-test-role', UserRole.STUDENT)
+      .expect(200)
+      .expect({
+        studentId: 'student-1',
+        gradeCount: 0,
+        totalScore: 0,
+        totalMaxScore: 0,
+        percentage: null,
+        classes: [],
+      });
+  });
+
+  it('returns 403 when a parent requests an unlinked student summary', async () => {
+    prisma.studentParentLink.findUnique.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .get('/grades/students/student-1/summary')
+      .set('x-test-user-id', 'parent-1')
+      .set('x-test-role', UserRole.PARENT)
+      .expect(403);
+
+    expect(prisma.gradeRecord.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns teacher-filtered student summary for an assigned teacher', async () => {
+    prisma.studentClassEnrollment.findFirst.mockResolvedValue({ id: 'enrollment-1' });
+    prisma.gradeRecord.findMany.mockResolvedValue([
+      {
+        score: 17,
+        maxScore: 20,
+        class: { id: 'class-1', name: 'Math' },
+        student: { id: 'student-1', firstName: 'Ada', lastName: 'Lovelace' },
+      },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/grades/students/student-1/summary')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(200)
+      .expect({
+        studentId: 'student-1',
+        gradeCount: 1,
+        totalScore: 17,
+        totalMaxScore: 20,
+        percentage: 85,
+        classes: [
+          {
+            classId: 'class-1',
+            className: 'Math',
+            gradeCount: 1,
+            totalScore: 17,
+            totalMaxScore: 20,
+            percentage: 85,
+          },
+        ],
+      });
+
+    expect(prisma.gradeRecord.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          studentId: 'student-1',
+          class: {
+            teachers: {
+              some: {
+                teacherId: 'teacher-1',
+              },
+            },
+          },
+        },
+      }),
+    );
+  });
+
+  it('returns a class grade summary for an assigned teacher', async () => {
+    prisma.class.findUnique.mockResolvedValue({ id: 'class-1' });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.gradeRecord.findMany.mockResolvedValue([
+      {
+        score: 8,
+        maxScore: 10,
+        student: { id: 'student-1', firstName: 'Ada', lastName: 'Lovelace' },
+      },
+      {
+        score: 7,
+        maxScore: 10,
+        student: { id: 'student-2', firstName: 'Alan', lastName: 'Turing' },
+      },
+      {
+        score: 9,
+        maxScore: 10,
+        student: { id: 'student-1', firstName: 'Ada', lastName: 'Lovelace' },
+      },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/grades/classes/class-1/summary')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(200)
+      .expect({
+        classId: 'class-1',
+        gradeCount: 3,
+        totalScore: 24,
+        totalMaxScore: 30,
+        percentage: 80,
+        students: [
+          {
+            studentId: 'student-1',
+            studentName: 'Ada Lovelace',
+            gradeCount: 2,
+            totalScore: 17,
+            totalMaxScore: 20,
+            percentage: 85,
+          },
+          {
+            studentId: 'student-2',
+            studentName: 'Alan Turing',
+            gradeCount: 1,
+            totalScore: 7,
+            totalMaxScore: 10,
+            percentage: 70,
+          },
+        ],
+      });
+  });
+
+  it('returns zeroed class summary when no grades are present', async () => {
+    prisma.class.findUnique.mockResolvedValue({ id: 'class-1' });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.gradeRecord.findMany.mockResolvedValue([]);
+
+    await request(app.getHttpServer())
+      .get('/grades/classes/class-1/summary')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(200)
+      .expect({
+        classId: 'class-1',
+        gradeCount: 0,
+        totalScore: 0,
+        totalMaxScore: 0,
+        percentage: null,
+        students: [],
+      });
+  });
+
+  it('returns 403 when a student requests class summary', async () => {
+    await request(app.getHttpServer())
+      .get('/grades/classes/class-1/summary')
+      .set('x-test-user-id', 'student-1')
+      .set('x-test-role', UserRole.STUDENT)
+      .expect(403);
+
+    expect(prisma.gradeRecord.findMany).not.toHaveBeenCalled();
+  });
 });

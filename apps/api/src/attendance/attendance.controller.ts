@@ -133,6 +133,12 @@ export class AttendanceController {
     );
   }
 
+  @Get('classes/:classId/summary')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  getClassSummary(@Req() req: any, @Param('classId') classId: string) {
+    return this.attendanceService.getClassSummary(req.user, classId);
+  }
+
   @Patch('records/:recordId')
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
   updateRecord(

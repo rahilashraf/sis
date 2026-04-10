@@ -40,6 +40,7 @@ class TestRolesGuard implements CanActivate {
 describe('AttendanceController (HTTP)', () => {
   let app: INestApplication;
   let prisma: {
+    class: { findUnique: jest.Mock };
     teacherClassAssignment: { findMany: jest.Mock };
     studentParentLink: { findUnique: jest.Mock };
     studentClassEnrollment: { findFirst: jest.Mock; findMany: jest.Mock };
@@ -49,6 +50,7 @@ describe('AttendanceController (HTTP)', () => {
 
   beforeEach(async () => {
     prisma = {
+      class: { findUnique: jest.fn() },
       teacherClassAssignment: { findMany: jest.fn() },
       studentParentLink: { findUnique: jest.fn() },
       studentClassEnrollment: { findFirst: jest.fn(), findMany: jest.fn() },
@@ -159,6 +161,47 @@ describe('AttendanceController (HTTP)', () => {
     expect(prisma.attendanceRecord.findMany).not.toHaveBeenCalled();
   });
 
+  it('returns all-time student summary over HTTP when no date range is provided', async () => {
+    prisma.attendanceRecord.findMany.mockResolvedValue([
+      { status: AttendanceStatus.PRESENT },
+      { status: AttendanceStatus.ABSENT },
+      { status: AttendanceStatus.LATE },
+      { status: AttendanceStatus.PRESENT },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/attendance/students/student-1/summary')
+      .set('x-test-user-id', 'student-1')
+      .set('x-test-role', UserRole.STUDENT)
+      .expect(200)
+      .expect({
+        studentId: 'student-1',
+        totalSessions: 4,
+        presentCount: 2,
+        absentCount: 1,
+        lateCount: 1,
+        attendanceRate: 50,
+      });
+  });
+
+  it('returns zeroed all-time student summary over HTTP when no records exist', async () => {
+    prisma.attendanceRecord.findMany.mockResolvedValue([]);
+
+    await request(app.getHttpServer())
+      .get('/attendance/students/student-1/summary')
+      .set('x-test-user-id', 'student-1')
+      .set('x-test-role', UserRole.STUDENT)
+      .expect(200)
+      .expect({
+        studentId: 'student-1',
+        totalSessions: 0,
+        presentCount: 0,
+        absentCount: 0,
+        lateCount: 0,
+        attendanceRate: null,
+      });
+  });
+
   it('returns 400 over HTTP when endDate is invalid', async () => {
     await request(app.getHttpServer())
       .get('/attendance/students/student-1/summary')
@@ -167,6 +210,19 @@ describe('AttendanceController (HTTP)', () => {
       .query({
         startDate: '2026-04-01',
         endDate: 'not-a-date',
+      })
+      .expect(400);
+
+    expect(prisma.attendanceRecord.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 over HTTP when only startDate is provided', async () => {
+    await request(app.getHttpServer())
+      .get('/attendance/students/student-1/summary')
+      .set('x-test-user-id', 'student-1')
+      .set('x-test-role', UserRole.STUDENT)
+      .query({
+        startDate: '2026-04-01',
       })
       .expect(400);
 
@@ -243,6 +299,67 @@ describe('AttendanceController (HTTP)', () => {
           },
         ],
       });
+  });
+
+  it('returns class summary over HTTP for allowed teacher access', async () => {
+    prisma.class.findUnique.mockResolvedValue({ id: 'class-a' });
+    prisma.teacherClassAssignment.findMany.mockResolvedValue([
+      { classId: 'class-a' },
+    ]);
+    prisma.attendanceRecord.findMany.mockResolvedValue([
+      { status: AttendanceStatus.PRESENT },
+      { status: AttendanceStatus.ABSENT },
+      { status: AttendanceStatus.LATE },
+      { status: AttendanceStatus.PRESENT },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/attendance/classes/class-a/summary')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(200)
+      .expect({
+        classId: 'class-a',
+        totalSessions: 4,
+        presentCount: 2,
+        absentCount: 1,
+        lateCount: 1,
+        attendanceRate: 50,
+      });
+  });
+
+  it('returns zeroed class summary over HTTP when no records exist', async () => {
+    prisma.class.findUnique.mockResolvedValue({ id: 'class-a' });
+    prisma.teacherClassAssignment.findMany.mockResolvedValue([
+      { classId: 'class-a' },
+    ]);
+    prisma.attendanceRecord.findMany.mockResolvedValue([]);
+
+    await request(app.getHttpServer())
+      .get('/attendance/classes/class-a/summary')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(200)
+      .expect({
+        classId: 'class-a',
+        totalSessions: 0,
+        presentCount: 0,
+        absentCount: 0,
+        lateCount: 0,
+        attendanceRate: null,
+      });
+  });
+
+  it('returns 403 over HTTP when a parent requests class summary', async () => {
+    prisma.class.findUnique.mockResolvedValue({ id: 'class-a' });
+
+    await request(app.getHttpServer())
+      .get('/attendance/classes/class-a/summary')
+      .set('x-test-user-id', 'parent-1')
+      .set('x-test-role', UserRole.PARENT)
+      .expect(403);
+
+    expect(prisma.attendanceRecord.findMany).not.toHaveBeenCalled();
   });
 
   it('returns 403 over HTTP when a teacher cannot access a session', async () => {
