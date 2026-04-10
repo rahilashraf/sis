@@ -28,6 +28,17 @@ type GradeRecordWithClassAndStudent = {
   };
 };
 
+type GradeRecordWithStudentOnly = {
+  score: number;
+  maxScore: number;
+  student: {
+    id: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    username?: string | null;
+  };
+};
+
 @Injectable()
 export class GradesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -394,7 +405,7 @@ export class GradesService {
       }
     >();
 
-    for (const record of records as GradeRecordWithClassAndStudent[]) {
+    for (const record of records as GradeRecordWithStudentOnly[]) {
       const existing = studentMap.get(record.student.id);
 
       if (existing) {

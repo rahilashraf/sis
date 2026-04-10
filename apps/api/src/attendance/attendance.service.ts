@@ -44,6 +44,10 @@ type AttendanceSessionWithClassLinks = {
   classes: { classId: string }[];
 };
 
+type AttendanceStatusOnly = {
+  status: AttendanceStatus;
+};
+
 @Injectable()
 export class AttendanceService {
   constructor(private readonly prisma: PrismaService) {}
@@ -66,6 +70,54 @@ export class AttendanceService {
 
   private isTeacherLike(role: UserRole) {
     return ['TEACHER', 'SUPPLY_TEACHER'].includes(role);
+  }
+
+  private roundPercentage(value: number) {
+    return Math.round(value * 100) / 100;
+  }
+
+  private buildAttendanceSummary(records: AttendanceStatusOnly[]) {
+    const summary = {
+      totalSessions: records.length,
+      presentCount: 0,
+      absentCount: 0,
+      lateCount: 0,
+    };
+
+    for (const record of records) {
+      switch (record.status) {
+        case AttendanceStatus.PRESENT:
+          summary.presentCount += 1;
+          break;
+        case AttendanceStatus.ABSENT:
+          summary.absentCount += 1;
+          break;
+        case AttendanceStatus.LATE:
+          summary.lateCount += 1;
+          break;
+      }
+    }
+
+    return {
+      ...summary,
+      attendanceRate:
+        summary.totalSessions === 0
+          ? null
+          : this.roundPercentage(
+              (summary.presentCount / summary.totalSessions) * 100,
+            ),
+    };
+  }
+
+  private async ensureClassExists(classId: string) {
+    const existingClass = await this.prisma.class.findUnique({
+      where: { id: classId },
+      select: { id: true },
+    });
+
+    if (!existingClass) {
+      throw new NotFoundException('Class not found');
+    }
   }
 
   private async ensureUserCanAccessClasses(user: AuthUser, classIds: string[]) {
@@ -747,14 +799,39 @@ export class AttendanceService {
   async getStudentSummary(
     user: AuthUser,
     studentId: string,
-    startDate: string,
-    endDate: string,
+    startDate?: string,
+    endDate?: string,
   ) {
     await this.ensureUserCanAccessStudentAttendance(user, studentId);
 
+    if ((startDate && !endDate) || (!startDate && endDate)) {
+      throw new BadRequestException(
+        'startDate and endDate must both be provided or both be omitted',
+      );
+    }
+
+    if (!startDate && !endDate) {
+      const records = await this.prisma.attendanceRecord.findMany({
+        where: {
+          studentId,
+        },
+        select: {
+          status: true,
+        },
+        orderBy: {
+          date: 'asc',
+        },
+      });
+
+      return {
+        studentId,
+        ...this.buildAttendanceSummary(records),
+      };
+    }
+
     const { normalizedStartDate, normalizedEndDate } = this.normalizeDateRange(
-      startDate,
-      endDate,
+      startDate!,
+      endDate!,
     );
 
     const records = await this.prisma.attendanceRecord.findMany({
@@ -802,7 +879,7 @@ export class AttendanceService {
     const attendancePercentage =
       summary.totalDays === 0
         ? 0
-        : Number(((attendedDays / summary.totalDays) * 100).toFixed(2));
+        : this.roundPercentage((attendedDays / summary.totalDays) * 100);
 
     return {
       studentId,
@@ -810,6 +887,41 @@ export class AttendanceService {
       endDate: normalizedEndDate.toISOString().slice(0, 10),
       ...summary,
       attendancePercentage,
+    };
+  }
+
+  async getClassSummary(user: AuthUser, classId: string) {
+    await this.ensureClassExists(classId);
+    await this.ensureUserCanAccessClasses(user, [classId]);
+
+    const records = await this.prisma.attendanceRecord.findMany({
+      where: {
+        attendanceSession: {
+          classes: {
+            some: {
+              classId,
+            },
+          },
+        },
+        student: {
+          studentClasses: {
+            some: {
+              classId,
+            },
+          },
+        },
+      },
+      select: {
+        status: true,
+      },
+      orderBy: {
+        date: 'asc',
+      },
+    });
+
+    return {
+      classId,
+      ...this.buildAttendanceSummary(records),
     };
   }
 
