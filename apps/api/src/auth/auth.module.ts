@@ -7,6 +7,21 @@ import { JwtStrategy } from './jwt.strategy';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RolesGuard } from './roles.guard';
+import type { StringValue } from 'ms';
+
+function getJwtSecret(configService: ConfigService) {
+  const jwtSecret = configService.get<string>('JWT_SECRET');
+
+  if (jwtSecret) {
+    return jwtSecret;
+  }
+
+  if (configService.get<string>('NODE_ENV') === 'test') {
+    return 'test-jwt-secret';
+  }
+
+  throw new Error('JWT_SECRET is required');
+}
 
 @Module({
   imports: [
@@ -17,9 +32,11 @@ import { RolesGuard } from './roles.guard';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret:
-          configService.get<string>('JWT_SECRET') || 'dev-secret-change-this',
-        signOptions: { expiresIn: '1d' },
+        secret: getJwtSecret(configService),
+        signOptions: {
+          expiresIn: (configService.get<string>('JWT_EXPIRES_IN') ??
+            '1d') as StringValue,
+        },
       }),
     }),
   ],

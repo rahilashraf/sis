@@ -15,6 +15,9 @@ import { RolesGuard } from '../auth/roles.guard';
 import { CreateGradeRecordDto } from './dto/create-grade-record.dto';
 import { UpdateGradeRecordDto } from './dto/update-grade-record.dto';
 import { GradesService } from './grades.service';
+import type { AuthenticatedRequest } from '../common/auth/auth-user';
+import { NonEmptyStringPipe } from '../common/pipes/non-empty-string.pipe';
+import { PeriodKeyQueryDto } from '../common/dto/period-key-query.dto';
 
 @Controller('grades')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -23,15 +26,15 @@ export class GradesController {
 
   @Post()
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
-  create(@Req() req: any, @Body() body: CreateGradeRecordDto) {
+  create(@Req() req: AuthenticatedRequest, @Body() body: CreateGradeRecordDto) {
     return this.gradesService.create(req.user, body);
   }
 
   @Patch(':id')
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
   update(
-    @Req() req: any,
-    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
     @Body() body: UpdateGradeRecordDto,
   ) {
     return this.gradesService.update(req.user, id, body);
@@ -39,18 +42,25 @@ export class GradesController {
 
   @Get('classes/:classId')
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
-  findByClass(@Req() req: any, @Param('classId') classId: string) {
+  findByClass(
+    @Req() req: AuthenticatedRequest,
+    @Param('classId', NonEmptyStringPipe) classId: string,
+  ) {
     return this.gradesService.findByClass(req.user, classId);
   }
 
   @Get('classes/:classId/summary')
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
   getClassSummary(
-    @Req() req: any,
-    @Param('classId') classId: string,
-    @Query('periodKey') periodKey?: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('classId', NonEmptyStringPipe) classId: string,
+    @Query() query: PeriodKeyQueryDto,
   ) {
-    return this.gradesService.getClassSummary(req.user, classId, periodKey);
+    return this.gradesService.getClassSummary(
+      req.user,
+      classId,
+      query.periodKey,
+    );
   }
 
   @Get('students/:studentId')
@@ -64,7 +74,10 @@ export class GradesController {
     'PARENT',
     'STUDENT',
   )
-  findByStudent(@Req() req: any, @Param('studentId') studentId: string) {
+  findByStudent(
+    @Req() req: AuthenticatedRequest,
+    @Param('studentId', NonEmptyStringPipe) studentId: string,
+  ) {
     return this.gradesService.findByStudent(req.user, studentId);
   }
 
@@ -80,10 +93,14 @@ export class GradesController {
     'STUDENT',
   )
   getStudentSummary(
-    @Req() req: any,
-    @Param('studentId') studentId: string,
-    @Query('periodKey') periodKey?: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('studentId', NonEmptyStringPipe) studentId: string,
+    @Query() query: PeriodKeyQueryDto,
   ) {
-    return this.gradesService.getStudentSummary(req.user, studentId, periodKey);
+    return this.gradesService.getStudentSummary(
+      req.user,
+      studentId,
+      query.periodKey,
+    );
   }
 }

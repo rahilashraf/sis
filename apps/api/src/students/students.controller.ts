@@ -4,6 +4,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AttendanceService } from '../attendance/attendance.service';
 import { GetStudentSummaryQueryDto } from '../attendance/dto/get-student-summary-query.dto';
+import type { AuthenticatedRequest } from '../common/auth/auth-user';
 
 @Controller('students')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -13,7 +14,7 @@ export class StudentsController {
 
   @Get('me/attendance/summary')
   getMyAttendanceSummary(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query() query: GetStudentSummaryQueryDto,
   ) {
     return this.attendanceService.getStudentSummary(

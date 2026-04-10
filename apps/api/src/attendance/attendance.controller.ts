@@ -19,6 +19,9 @@ import { GetStudentSummaryQueryDto } from './dto/get-student-summary-query.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import type { AuthenticatedRequest } from '../common/auth/auth-user';
+import { NonEmptyStringPipe } from '../common/pipes/non-empty-string.pipe';
+import { GetAttendanceStudentsQueryDto } from './dto/get-attendance-students-query.dto';
 
 @Controller('attendance')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -27,25 +30,26 @@ export class AttendanceController {
 
   @Get('students')
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
-  getStudents(@Req() req: any, @Query('classIds') classIds: string) {
-    const ids = (classIds || '')
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
-
-    return this.attendanceService.getStudentsForClasses(req.user, ids);
+  getStudents(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: GetAttendanceStudentsQueryDto,
+  ) {
+    return this.attendanceService.getStudentsForClasses(
+      req.user,
+      query.classIds,
+    );
   }
 
   @Post('sessions')
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
-  create(@Req() req: any, @Body() body: CreateAttendanceDto) {
+  create(@Req() req: AuthenticatedRequest, @Body() body: CreateAttendanceDto) {
     return this.attendanceService.create(req.user, body);
   }
 
   @Get('sessions')
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
   getSessionsByDate(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query() query: GetAttendanceSessionsQueryDto,
   ) {
     return this.attendanceService.getSessionsByDate(
@@ -57,7 +61,10 @@ export class AttendanceController {
 
   @Get('sessions/:sessionId')
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
-  getSessionById(@Req() req: any, @Param('sessionId') sessionId: string) {
+  getSessionById(
+    @Req() req: AuthenticatedRequest,
+    @Param('sessionId', NonEmptyStringPipe) sessionId: string,
+  ) {
     return this.attendanceService.getSessionById(req.user, sessionId);
   }
 
@@ -73,8 +80,8 @@ export class AttendanceController {
     'STUDENT',
   )
   getStudentAttendanceByDate(
-    @Req() req: any,
-    @Param('studentId') studentId: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('studentId', NonEmptyStringPipe) studentId: string,
     @Query() query: GetStudentAttendanceByDateQueryDto,
   ) {
     return this.attendanceService.getStudentAttendanceByDate(
@@ -95,7 +102,10 @@ export class AttendanceController {
     'PARENT',
     'STUDENT',
   )
-  getStudentHistory(@Req() req: any, @Param('studentId') studentId: string) {
+  getStudentHistory(
+    @Req() req: AuthenticatedRequest,
+    @Param('studentId', NonEmptyStringPipe) studentId: string,
+  ) {
     return this.attendanceService.getStudentHistory(req.user, studentId);
   }
 
@@ -111,8 +121,8 @@ export class AttendanceController {
     'STUDENT',
   )
   getStudentSummary(
-    @Req() req: any,
-    @Param('studentId') studentId: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('studentId', NonEmptyStringPipe) studentId: string,
     @Query() query: GetStudentSummaryQueryDto,
   ) {
     return this.attendanceService.getStudentSummary(
@@ -126,8 +136,8 @@ export class AttendanceController {
   @Patch('records/:recordId')
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
   updateRecord(
-    @Req() req: any,
-    @Param('recordId') recordId: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('recordId', NonEmptyStringPipe) recordId: string,
     @Body() body: UpdateAttendanceRecordDto,
   ) {
     return this.attendanceService.updateRecord(req.user, recordId, body);
@@ -135,7 +145,10 @@ export class AttendanceController {
 
   @Delete('sessions/:sessionId')
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
-  removeSession(@Req() req: any, @Param('sessionId') sessionId: string) {
+  removeSession(
+    @Req() req: AuthenticatedRequest,
+    @Param('sessionId', NonEmptyStringPipe) sessionId: string,
+  ) {
     return this.attendanceService.deleteSession(req.user, sessionId);
   }
 }

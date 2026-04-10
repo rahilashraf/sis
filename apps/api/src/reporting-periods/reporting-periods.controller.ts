@@ -17,6 +17,8 @@ import { CreateReportingPeriodDto } from './dto/create-reporting-period.dto';
 import { QueryReportingPeriodsDto } from './dto/query-reporting-periods.dto';
 import { UpdateReportingPeriodDto } from './dto/update-reporting-period.dto';
 import { ReportingPeriodsService } from './reporting-periods.service';
+import type { AuthenticatedRequest } from '../common/auth/auth-user';
+import { NonEmptyStringPipe } from '../common/pipes/non-empty-string.pipe';
 
 @Controller('reporting-periods')
 @UseGuards(JwtAuthGuard)
@@ -28,17 +30,26 @@ export class ReportingPeriodsController {
   @UseGuards(RolesGuard)
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
   @Post()
-  create(@Req() req: any, @Body() body: CreateReportingPeriodDto) {
+  create(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: CreateReportingPeriodDto,
+  ) {
     return this.reportingPeriodsService.create(req.user, body);
   }
 
   @Get()
-  findAll(@Req() req: any, @Query() query: QueryReportingPeriodsDto) {
+  findAll(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: QueryReportingPeriodsDto,
+  ) {
     return this.reportingPeriodsService.findAll(req.user, query);
   }
 
   @Get(':id')
-  findOne(@Req() req: any, @Param('id') id: string) {
+  findOne(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
     return this.reportingPeriodsService.findOne(req.user, id);
   }
 
@@ -46,8 +57,8 @@ export class ReportingPeriodsController {
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
   @Patch(':id')
   update(
-    @Req() req: any,
-    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
     @Body() body: UpdateReportingPeriodDto,
   ) {
     return this.reportingPeriodsService.update(req.user, id, body);
@@ -56,7 +67,10 @@ export class ReportingPeriodsController {
   @UseGuards(RolesGuard)
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
   @Delete(':id')
-  remove(@Req() req: any, @Param('id') id: string) {
+  remove(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
     return this.reportingPeriodsService.remove(req.user, id);
   }
 }

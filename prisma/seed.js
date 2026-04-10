@@ -1,54 +1,136 @@
+const bcrypt = require("bcrypt");
 const { PrismaClient, UserRole } = require("@prisma/client");
-const { PrismaPg } = require("@prisma/adapter-pg");
 
-const connectionString =
-  "postgresql://sis_user:sis_password@127.0.0.1:5433/sis_db?sslmode=disable";
+const prisma = new PrismaClient();
 
-const adapter = new PrismaPg({ connectionString });
+function getEnv(name, fallback) {
+  const value = process.env[name];
 
-const prisma = new PrismaClient({
-  adapter,
-});
+  if (value) {
+    return value;
+  }
+
+  if (fallback !== undefined) {
+    return fallback;
+  }
+
+  throw new Error(`${name} is required`);
+}
+
+function getOwnerPassword() {
+  const configuredPassword = process.env.SEED_OWNER_PASSWORD;
+
+  if (configuredPassword) {
+    return configuredPassword;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SEED_OWNER_PASSWORD is required in production");
+  }
+
+  return "ChangeMe123!";
+}
 
 async function main() {
-  console.log("Starting seed...");
+  const schoolName = getEnv("SEED_SCHOOL_NAME", "Demo School");
+  const schoolShortName = process.env.SEED_SCHOOL_SHORT_NAME || "DEMO";
+  const ownerUsername = getEnv("SEED_OWNER_USERNAME", "owner");
+  const ownerEmail = getEnv("SEED_OWNER_EMAIL", "owner@example.com");
+  const ownerFirstName = getEnv("SEED_OWNER_FIRST_NAME", "System");
+  const ownerLastName = getEnv("SEED_OWNER_LAST_NAME", "Owner");
+  const schoolYearName = getEnv("SEED_SCHOOL_YEAR_NAME", "2025-2026");
+  const schoolYearStartDate = new Date(
+    getEnv("SEED_SCHOOL_YEAR_START_DATE", "2025-09-01"),
+  );
+  const schoolYearEndDate = new Date(
+    getEnv("SEED_SCHOOL_YEAR_END_DATE", "2026-06-30"),
+  );
+  const ownerPasswordHash = await bcrypt.hash(getOwnerPassword(), 10);
 
-  const school = await prisma.school.create({
-    data: {
-      name: "IOK Islamic School",
-      shortName: "IOK",
+  const school =
+    (await prisma.school.findFirst({
+      where: schoolShortName
+        ? {
+            shortName: schoolShortName,
+          }
+        : {
+            name: schoolName,
+          },
+      select: {
+        id: true,
+      },
+    })) ||
+    (await prisma.school.create({
+      data: {
+        name: schoolName,
+        shortName: schoolShortName || null,
+      },
+      select: {
+        id: true,
+      },
+    }));
+
+  const owner = await prisma.user.upsert({
+    where: {
+      username: ownerUsername,
     },
-  });
-
-  const owner = await prisma.user.create({
-    data: {
-      username: "owner",
-      email: "owner@iok.com",
-      passwordHash: "hashed_password_here",
-      firstName: "System",
-      lastName: "Owner",
+    update: {
+      email: ownerEmail,
+      firstName: ownerFirstName,
+      lastName: ownerLastName,
+      role: UserRole.OWNER,
+      isActive: true,
+      passwordHash: ownerPasswordHash,
+    },
+    create: {
+      username: ownerUsername,
+      email: ownerEmail,
+      passwordHash: ownerPasswordHash,
+      firstName: ownerFirstName,
+      lastName: ownerLastName,
       role: UserRole.OWNER,
     },
+    select: {
+      id: true,
+    },
   });
 
-  await prisma.userSchoolMembership.create({
-    data: {
+  await prisma.userSchoolMembership.upsert({
+    where: {
+      userId_schoolId: {
+        userId: owner.id,
+        schoolId: school.id,
+      },
+    },
+    update: {
+      isActive: true,
+    },
+    create: {
       userId: owner.id,
       schoolId: school.id,
     },
   });
 
-  await prisma.schoolYear.create({
-    data: {
+  await prisma.schoolYear.upsert({
+    where: {
+      schoolId_name: {
+        schoolId: school.id,
+        name: schoolYearName,
+      },
+    },
+    update: {
+      startDate: schoolYearStartDate,
+      endDate: schoolYearEndDate,
+      isActive: true,
+    },
+    create: {
       schoolId: school.id,
-      name: "2025-2026",
-      startDate: new Date("2025-09-01"),
-      endDate: new Date("2026-06-30"),
+      name: schoolYearName,
+      startDate: schoolYearStartDate,
+      endDate: schoolYearEndDate,
       isActive: true,
     },
   });
-
-  console.log("Seed complete ✅");
 }
 
 main()

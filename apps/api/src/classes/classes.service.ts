@@ -1,28 +1,140 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
 import { EnrollStudentDto } from './dto/enroll-student.dto';
-
-type AuthUser = {
-  id: string;
-  role: string;
-};
+import { AuthenticatedUser } from '../common/auth/auth-user';
+import {
+  ensureUserHasSchoolAccess,
+  getAccessibleSchoolIds,
+  isBypassRole,
+  isSchoolAdminRole,
+  isTeacherRole,
+} from '../common/access/school-access.util';
+import {
+  safeUserSelect,
+  schoolSummarySelect,
+  schoolYearSummarySelect,
+} from '../common/prisma/safe-user-response';
 
 @Injectable()
 export class ClassesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private isAdminLike(role: string) {
-    return ['OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF'].includes(role);
+  private isAdminLike(role: UserRole) {
+    return isBypassRole(role) || isSchoolAdminRole(role);
   }
 
-  private isTeacherLike(role: string) {
-    return ['TEACHER', 'SUPPLY_TEACHER'].includes(role);
+  private isTeacherLike(role: UserRole) {
+    return isTeacherRole(role);
+  }
+
+  private buildTeacherAssignmentSelect() {
+    return {
+      id: true,
+      classId: true,
+      teacherId: true,
+      createdAt: true,
+      teacher: {
+        select: safeUserSelect,
+      },
+    } as const;
+  }
+
+  private buildStudentEnrollmentSelect() {
+    return {
+      id: true,
+      classId: true,
+      studentId: true,
+      createdAt: true,
+      student: {
+        select: safeUserSelect,
+      },
+    } as const;
+  }
+
+  private buildClassSelect(includeStudents = true) {
+    return {
+      id: true,
+      schoolId: true,
+      schoolYearId: true,
+      name: true,
+      subject: true,
+      isHomeroom: true,
+      isActive: true,
+      createdAt: true,
+      updatedAt: true,
+      school: {
+        select: schoolSummarySelect,
+      },
+      schoolYear: {
+        select: schoolYearSummarySelect,
+      },
+      teachers: {
+        select: this.buildTeacherAssignmentSelect(),
+      },
+      ...(includeStudents
+        ? {
+            students: {
+              select: this.buildStudentEnrollmentSelect(),
+            },
+          }
+        : {}),
+    } as const;
+  }
+
+  private async getClassOrThrow(classId: string) {
+    const existingClass = await this.prisma.class.findUnique({
+      where: { id: classId },
+      select: {
+        id: true,
+        schoolId: true,
+        schoolYearId: true,
+      },
+    });
+
+    if (!existingClass) {
+      throw new NotFoundException('Class not found');
+    }
+
+    return existingClass;
+  }
+
+  private async getUserSchoolIdsOrThrow(
+    userId: string,
+    expectedRole?: UserRole,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        role: true,
+        memberships: {
+          where: {
+            isActive: true,
+          },
+          select: {
+            schoolId: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (expectedRole && user.role !== expectedRole) {
+      throw new BadRequestException(`User must have role ${expectedRole}`);
+    }
+
+    return user.memberships.map((membership) => membership.schoolId);
   }
 
   private async ensureTeacherAssignedToClass(
@@ -44,9 +156,37 @@ export class ClassesService {
     }
   }
 
-  private async ensureUserCanReadClassRoster(user: AuthUser, classId: string) {
-    if (this.isAdminLike(user.role)) {
+  private async ensureAdminLikeCanAccessStudent(
+    user: AuthenticatedUser,
+    studentId: string,
+  ) {
+    if (isBypassRole(user.role)) {
       return;
+    }
+
+    const studentSchoolIds = await this.getUserSchoolIdsOrThrow(
+      studentId,
+      UserRole.STUDENT,
+    );
+    const accessibleSchoolIds = new Set(getAccessibleSchoolIds(user));
+    const hasAccess = studentSchoolIds.some((schoolId) =>
+      accessibleSchoolIds.has(schoolId),
+    );
+
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have student access');
+    }
+  }
+
+  private async ensureUserCanReadClassRoster(
+    user: AuthenticatedUser,
+    classId: string,
+  ) {
+    const existingClass = await this.getClassOrThrow(classId);
+
+    if (this.isAdminLike(user.role)) {
+      ensureUserHasSchoolAccess(user, existingClass.schoolId);
+      return existingClass;
     }
 
     if (!this.isTeacherLike(user.role)) {
@@ -54,6 +194,7 @@ export class ClassesService {
     }
 
     await this.ensureTeacherAssignedToClass(user.id, classId);
+    return existingClass;
   }
 
   private async ensureParentLinkedToStudent(
@@ -78,7 +219,7 @@ export class ClassesService {
   }
 
   private async ensureTeacherCanAccessStudent(
-    user: AuthUser,
+    user: AuthenticatedUser,
     studentId: string,
   ) {
     const enrollment = await this.prisma.studentClassEnrollment.findFirst({
@@ -102,7 +243,25 @@ export class ClassesService {
     }
   }
 
-  create(data: CreateClassDto) {
+  async create(user: AuthenticatedUser, data: CreateClassDto) {
+    ensureUserHasSchoolAccess(user, data.schoolId);
+
+    const schoolYear = await this.prisma.schoolYear.findUnique({
+      where: { id: data.schoolYearId },
+      select: {
+        id: true,
+        schoolId: true,
+      },
+    });
+
+    if (!schoolYear) {
+      throw new NotFoundException('School year not found');
+    }
+
+    if (schoolYear.schoolId !== data.schoolId) {
+      throw new BadRequestException('schoolYearId does not belong to schoolId');
+    }
+
     return this.prisma.class.create({
       data: {
         schoolId: data.schoolId,
@@ -111,57 +270,41 @@ export class ClassesService {
         subject: data.subject,
         isHomeroom: data.isHomeroom ?? false,
       },
-      include: {
-        school: true,
-        schoolYear: true,
-        teachers: {
-          include: {
-            teacher: true,
-          },
-        },
-        students: {
-          include: {
-            student: true,
-          },
-        },
-      },
+      select: this.buildClassSelect(),
     });
   }
 
-  findAll() {
+  findAll(user: AuthenticatedUser) {
+    const accessibleSchoolIds = getAccessibleSchoolIds(user);
+
     return this.prisma.class.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        school: true,
-        schoolYear: true,
-        teachers: {
-          include: {
-            teacher: true,
-          },
-        },
-        students: {
-          include: {
-            student: true,
-          },
-        },
-      },
-    });
-  }
-
-  async findMyClasses(user: AuthUser) {
-    if (this.isAdminLike(user.role)) {
-      return this.prisma.class.findMany({
-        where: { isActive: true },
-        orderBy: { name: 'asc' },
-        include: {
-          school: true,
-          schoolYear: true,
-          teachers: {
-            include: {
-              teacher: true,
+      where: isBypassRole(user.role)
+        ? undefined
+        : {
+            schoolId: {
+              in: accessibleSchoolIds,
             },
           },
+      orderBy: { createdAt: 'desc' },
+      select: this.buildClassSelect(),
+    });
+  }
+
+  async findMyClasses(user: AuthenticatedUser) {
+    if (this.isAdminLike(user.role)) {
+      return this.prisma.class.findMany({
+        where: {
+          isActive: true,
+          ...(isBypassRole(user.role)
+            ? {}
+            : {
+                schoolId: {
+                  in: getAccessibleSchoolIds(user),
+                },
+              }),
         },
+        orderBy: { name: 'asc' },
+        select: this.buildClassSelect(false),
       });
     }
 
@@ -171,17 +314,9 @@ export class ClassesService {
 
     const assignments = await this.prisma.teacherClassAssignment.findMany({
       where: { teacherId: user.id },
-      include: {
+      select: {
         class: {
-          include: {
-            school: true,
-            schoolYear: true,
-            teachers: {
-              include: {
-                teacher: true,
-              },
-            },
-          },
+          select: this.buildClassSelect(false),
         },
       },
       orderBy: {
@@ -194,20 +329,66 @@ export class ClassesService {
     return assignments.map((assignment) => assignment.class);
   }
 
-  assignTeacher(classId: string, data: AssignTeacherDto) {
+  async assignTeacher(
+    user: AuthenticatedUser,
+    classId: string,
+    data: AssignTeacherDto,
+  ) {
+    const existingClass = await this.getClassOrThrow(classId);
+    ensureUserHasSchoolAccess(user, existingClass.schoolId);
+
+    const teacherSchoolIds = await this.getUserSchoolIdsOrThrow(data.teacherId);
+
+    const teacher = await this.prisma.user.findUnique({
+      where: { id: data.teacherId },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
+
+    if (!teacher) {
+      throw new NotFoundException('Teacher not found');
+    }
+
+    if (!this.isTeacherLike(teacher.role)) {
+      throw new BadRequestException('teacherId must belong to a teacher user');
+    }
+
+    if (!teacherSchoolIds.includes(existingClass.schoolId)) {
+      throw new BadRequestException(
+        'Teacher must belong to the same school as the class',
+      );
+    }
+
     return this.prisma.teacherClassAssignment.create({
       data: {
         classId,
         teacherId: data.teacherId,
       },
-      include: {
-        teacher: true,
-        class: true,
+      select: {
+        id: true,
+        classId: true,
+        teacherId: true,
+        createdAt: true,
+        teacher: {
+          select: safeUserSelect,
+        },
+        class: {
+          select: this.buildClassSelect(false),
+        },
       },
     });
   }
 
-  async removeTeacher(classId: string, teacherId: string) {
+  async removeTeacher(
+    user: AuthenticatedUser,
+    classId: string,
+    teacherId: string,
+  ) {
+    const existingClass = await this.getClassOrThrow(classId);
+    ensureUserHasSchoolAccess(user, existingClass.schoolId);
+
     const assignment = await this.prisma.teacherClassAssignment.findFirst({
       where: {
         classId,
@@ -226,27 +407,68 @@ export class ClassesService {
       where: {
         id: assignment.id,
       },
-      include: {
-        teacher: true,
-        class: true,
+      select: {
+        id: true,
+        classId: true,
+        teacherId: true,
+        createdAt: true,
+        teacher: {
+          select: safeUserSelect,
+        },
+        class: {
+          select: this.buildClassSelect(false),
+        },
       },
     });
   }
 
-  enrollStudent(classId: string, data: EnrollStudentDto) {
+  async enrollStudent(
+    user: AuthenticatedUser,
+    classId: string,
+    data: EnrollStudentDto,
+  ) {
+    const existingClass = await this.getClassOrThrow(classId);
+    ensureUserHasSchoolAccess(user, existingClass.schoolId);
+
+    const studentSchoolIds = await this.getUserSchoolIdsOrThrow(
+      data.studentId,
+      UserRole.STUDENT,
+    );
+
+    if (!studentSchoolIds.includes(existingClass.schoolId)) {
+      throw new BadRequestException(
+        'Student must belong to the same school as the class',
+      );
+    }
+
     return this.prisma.studentClassEnrollment.create({
       data: {
         classId,
         studentId: data.studentId,
       },
-      include: {
-        student: true,
-        class: true,
+      select: {
+        id: true,
+        classId: true,
+        studentId: true,
+        createdAt: true,
+        student: {
+          select: safeUserSelect,
+        },
+        class: {
+          select: this.buildClassSelect(false),
+        },
       },
     });
   }
 
-  async unenrollStudent(classId: string, studentId: string) {
+  async unenrollStudent(
+    user: AuthenticatedUser,
+    classId: string,
+    studentId: string,
+  ) {
+    const existingClass = await this.getClassOrThrow(classId);
+    ensureUserHasSchoolAccess(user, existingClass.schoolId);
+
     const enrollment = await this.prisma.studentClassEnrollment.findFirst({
       where: {
         classId,
@@ -265,66 +487,55 @@ export class ClassesService {
       where: {
         id: enrollment.id,
       },
-      include: {
-        student: true,
-        class: true,
+      select: {
+        id: true,
+        classId: true,
+        studentId: true,
+        createdAt: true,
+        student: {
+          select: safeUserSelect,
+        },
+        class: {
+          select: this.buildClassSelect(false),
+        },
       },
     });
   }
 
-  async setClassActiveState(classId: string, isActive: boolean) {
-    const existingClass = await this.prisma.class.findUnique({
-      where: { id: classId },
-      select: { id: true },
-    });
-
-    if (!existingClass) {
-      throw new NotFoundException('Class not found');
-    }
+  async setClassActiveState(
+    user: AuthenticatedUser,
+    classId: string,
+    isActive: boolean,
+  ) {
+    const existingClass = await this.getClassOrThrow(classId);
+    ensureUserHasSchoolAccess(user, existingClass.schoolId);
 
     return this.prisma.class.update({
       where: { id: classId },
       data: { isActive },
-      include: {
-        school: true,
-        schoolYear: true,
-        teachers: {
-          include: {
-            teacher: true,
-          },
-        },
-        students: {
-          include: {
-            student: true,
-          },
-        },
-      },
+      select: this.buildClassSelect(),
     });
   }
 
-  async findTeachers(user: AuthUser, classId: string) {
+  async findTeachers(user: AuthenticatedUser, classId: string) {
     await this.ensureUserCanReadClassRoster(user, classId);
 
     return this.prisma.teacherClassAssignment.findMany({
       where: { classId },
-      include: {
-        teacher: true,
-      },
+      select: this.buildTeacherAssignmentSelect(),
     });
   }
 
-  async findStudents(user: AuthUser, classId: string) {
+  async findStudents(user: AuthenticatedUser, classId: string) {
     await this.ensureUserCanReadClassRoster(user, classId);
 
     return this.prisma.studentClassEnrollment.findMany({
       where: { classId },
-      include: {
-        student: true,
-      },
+      select: this.buildStudentEnrollmentSelect(),
     });
   }
 
-  async findClassesForTeacher(user: AuthUser, teacherId: string) {
+  async findClassesForTeacher(user: AuthenticatedUser, teacherId: string) {
     if (!this.isAdminLike(user.role)) {
       if (!this.isTeacherLike(user.role) || user.id !== teacherId) {
         throw new ForbiddenException('You do not have teacher access');
@@ -332,41 +543,65 @@ export class ClassesService {
     }
 
     return this.prisma.teacherClassAssignment.findMany({
-      where: { teacherId },
-      include: {
+      where: {
+        teacherId,
+        ...(isBypassRole(user.role) || !this.isAdminLike(user.role)
+          ? {}
+          : {
+              class: {
+                schoolId: {
+                  in: getAccessibleSchoolIds(user),
+                },
+              },
+            }),
+      },
+      select: {
+        id: true,
+        classId: true,
+        teacherId: true,
+        createdAt: true,
         class: {
-          include: {
-            school: true,
-            schoolYear: true,
-          },
+          select: this.buildClassSelect(false),
         },
       },
     });
   }
 
-  async findClassesForStudent(user: AuthUser, studentId: string) {
-    if (!this.isAdminLike(user.role)) {
-      if (user.role === 'STUDENT') {
-        if (user.id !== studentId) {
-          throw new ForbiddenException('You do not have student access');
-        }
-      } else if (user.role === 'PARENT') {
-        await this.ensureParentLinkedToStudent(user.id, studentId);
-      } else if (this.isTeacherLike(user.role)) {
-        await this.ensureTeacherCanAccessStudent(user, studentId);
-      } else {
+  async findClassesForStudent(user: AuthenticatedUser, studentId: string) {
+    if (this.isAdminLike(user.role)) {
+      await this.ensureAdminLikeCanAccessStudent(user, studentId);
+    } else if (user.role === 'STUDENT') {
+      if (user.id !== studentId) {
         throw new ForbiddenException('You do not have student access');
       }
+    } else if (user.role === 'PARENT') {
+      await this.ensureParentLinkedToStudent(user.id, studentId);
+    } else if (this.isTeacherLike(user.role)) {
+      await this.ensureTeacherCanAccessStudent(user, studentId);
+    } else {
+      throw new ForbiddenException('You do not have student access');
     }
 
     return this.prisma.studentClassEnrollment.findMany({
-      where: { studentId },
-      include: {
+      where: {
+        studentId,
+        ...(isBypassRole(user.role) || !this.isAdminLike(user.role)
+          ? {}
+          : {
+              class: {
+                schoolId: {
+                  in: getAccessibleSchoolIds(user),
+                },
+              },
+            }),
+      },
+      select: {
+        id: true,
+        classId: true,
+        studentId: true,
+        createdAt: true,
         class: {
-          include: {
-            school: true,
-            schoolYear: true,
-          },
+          select: this.buildClassSelect(false),
         },
       },
     });

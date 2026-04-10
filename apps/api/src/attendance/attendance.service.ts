@@ -8,16 +8,27 @@ import {
 import {
   AttendanceScopeType,
   AttendanceStatus,
+  Prisma,
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { UpdateAttendanceRecordDto } from './dto/update-attendance-record.dto';
+import { AuthenticatedUser } from '../common/auth/auth-user';
+import {
+  ensureUserHasSchoolAccess,
+  getAccessibleSchoolIds,
+  isBypassRole,
+  isSchoolAdminRole,
+  isTeacherRole,
+} from '../common/access/school-access.util';
+import {
+  safeUserSelect,
+  schoolSummarySelect,
+  schoolYearSummarySelect,
+} from '../common/prisma/safe-user-response';
 
-type AuthUser = {
-  id: string;
-  role: UserRole;
-};
+type AuthUser = AuthenticatedUser;
 
 type SessionClassWithClass = {
   classId: string;
@@ -44,6 +55,120 @@ type AttendanceSessionWithClassLinks = {
   classes: { classId: string }[];
 };
 
+const attendanceClassSummarySelect = Prisma.validator<Prisma.ClassSelect>()({
+  id: true,
+  schoolId: true,
+  schoolYearId: true,
+  name: true,
+  subject: true,
+  isHomeroom: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+const attendanceSessionRecordOrderBy: Prisma.AttendanceRecordOrderByWithRelationInput[] =
+  [{ student: { lastName: 'asc' } }, { student: { firstName: 'asc' } }];
+
+const attendanceSessionSelect =
+  Prisma.validator<Prisma.AttendanceSessionSelect>()({
+    id: true,
+    schoolId: true,
+    schoolYearId: true,
+    takenById: true,
+    date: true,
+    scopeType: true,
+    scopeLabel: true,
+    notes: true,
+    createdAt: true,
+    updatedAt: true,
+    school: {
+      select: schoolSummarySelect,
+    },
+    schoolYear: {
+      select: schoolYearSummarySelect,
+    },
+    takenBy: {
+      select: safeUserSelect,
+    },
+    classes: {
+      select: {
+        id: true,
+        attendanceSessionId: true,
+        classId: true,
+        createdAt: true,
+        class: {
+          select: attendanceClassSummarySelect,
+        },
+      },
+    },
+    records: {
+      select: {
+        id: true,
+        attendanceSessionId: true,
+        studentId: true,
+        date: true,
+        status: true,
+        remark: true,
+        createdAt: true,
+        updatedAt: true,
+        student: {
+          select: safeUserSelect,
+        },
+      },
+      orderBy: attendanceSessionRecordOrderBy,
+    },
+  });
+
+const attendanceRecordSelect =
+  Prisma.validator<Prisma.AttendanceRecordSelect>()({
+    id: true,
+    attendanceSessionId: true,
+    studentId: true,
+    date: true,
+    status: true,
+    remark: true,
+    createdAt: true,
+    updatedAt: true,
+    student: {
+      select: safeUserSelect,
+    },
+    attendanceSession: {
+      select: {
+        id: true,
+        schoolId: true,
+        schoolYearId: true,
+        takenById: true,
+        date: true,
+        scopeType: true,
+        scopeLabel: true,
+        notes: true,
+        createdAt: true,
+        updatedAt: true,
+        school: {
+          select: schoolSummarySelect,
+        },
+        schoolYear: {
+          select: schoolYearSummarySelect,
+        },
+        takenBy: {
+          select: safeUserSelect,
+        },
+        classes: {
+          select: {
+            id: true,
+            attendanceSessionId: true,
+            classId: true,
+            createdAt: true,
+            class: {
+              select: attendanceClassSummarySelect,
+            },
+          },
+        },
+      },
+    },
+  });
+
 @Injectable()
 export class AttendanceService {
   constructor(private readonly prisma: PrismaService) {}
@@ -61,15 +186,39 @@ export class AttendanceService {
   }
 
   private isAdminLike(role: UserRole) {
-    return ['OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF'].includes(role);
+    return isBypassRole(role) || isSchoolAdminRole(role);
   }
 
   private isTeacherLike(role: UserRole) {
-    return ['TEACHER', 'SUPPLY_TEACHER'].includes(role);
+    return isTeacherRole(role);
   }
 
   private async ensureUserCanAccessClasses(user: AuthUser, classIds: string[]) {
-    if (this.isAdminLike(user.role)) {
+    if (isBypassRole(user.role)) {
+      return;
+    }
+
+    if (isSchoolAdminRole(user.role)) {
+      const uniqueClassIds = [...new Set(classIds)];
+      const classes = await this.prisma.class.findMany({
+        where: {
+          id: { in: uniqueClassIds },
+        },
+        select: {
+          id: true,
+          schoolId: true,
+        },
+      });
+
+      const accessibleSchoolIds = new Set(getAccessibleSchoolIds(user));
+      const inaccessibleClass = classes.find(
+        (existingClass) => !accessibleSchoolIds.has(existingClass.schoolId),
+      );
+
+      if (inaccessibleClass) {
+        throw new ForbiddenException('You do not have access to these classes');
+      }
+
       return;
     }
 
@@ -148,6 +297,43 @@ export class AttendanceService {
     }
   }
 
+  private async ensureSchoolAdminCanAccessStudent(
+    user: AuthUser,
+    studentId: string,
+  ) {
+    if (isBypassRole(user.role)) {
+      return;
+    }
+
+    const student = await this.prisma.user.findUnique({
+      where: { id: studentId },
+      select: {
+        id: true,
+        memberships: {
+          where: {
+            isActive: true,
+          },
+          select: {
+            schoolId: true,
+          },
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const accessibleSchoolIds = new Set(getAccessibleSchoolIds(user));
+    const hasAccess = student.memberships.some((membership) =>
+      accessibleSchoolIds.has(membership.schoolId),
+    );
+
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have access to this student');
+    }
+  }
+
   private async ensureUserCanAccessStudentAttendance(
     user: AuthUser,
     studentId: string,
@@ -165,7 +351,12 @@ export class AttendanceService {
       return;
     }
 
-    if (!this.isAdminLike(user.role)) {
+    if (isSchoolAdminRole(user.role)) {
+      await this.ensureSchoolAdminCanAccessStudent(user, studentId);
+      return;
+    }
+
+    if (!isBypassRole(user.role)) {
       await this.ensureTeacherCanAccessStudent(user, studentId);
     }
   }
@@ -332,25 +523,7 @@ export class AttendanceService {
   private async getAttendanceSessionOrThrow(sessionId: string) {
     const session = await this.prisma.attendanceSession.findUnique({
       where: { id: sessionId },
-      include: {
-        school: true,
-        schoolYear: true,
-        takenBy: true,
-        classes: {
-          include: {
-            class: true,
-          },
-        },
-        records: {
-          include: {
-            student: true,
-          },
-          orderBy: [
-            { student: { lastName: 'asc' } },
-            { student: { firstName: 'asc' } },
-          ],
-        },
-      },
+      select: attendanceSessionSelect,
     });
 
     if (!session) {
@@ -374,8 +547,10 @@ export class AttendanceService {
       },
       include: {
         students: {
-          include: {
-            student: true,
+          select: {
+            student: {
+              select: safeUserSelect,
+            },
           },
         },
       },
@@ -442,7 +617,30 @@ export class AttendanceService {
     const normalizedDate = this.normalizeDateOnly(dto.date);
     const uniqueClassIds: string[] = [...new Set(dto.classIds)];
 
+    if (this.isAdminLike(user.role)) {
+      ensureUserHasSchoolAccess(user, dto.schoolId);
+    }
     await this.ensureUserCanAccessClasses(user, uniqueClassIds);
+
+    if (dto.schoolYearId) {
+      const schoolYear = await this.prisma.schoolYear.findUnique({
+        where: { id: dto.schoolYearId },
+        select: {
+          id: true,
+          schoolId: true,
+        },
+      });
+
+      if (!schoolYear) {
+        throw new NotFoundException('School year not found');
+      }
+
+      if (schoolYear.schoolId !== dto.schoolId) {
+        throw new BadRequestException(
+          'schoolYearId does not belong to schoolId',
+        );
+      }
+    }
 
     const classes = await this.prisma.class.findMany({
       where: {
@@ -537,25 +735,7 @@ export class AttendanceService {
           })),
         },
       },
-      include: {
-        school: true,
-        schoolYear: true,
-        takenBy: true,
-        classes: {
-          include: {
-            class: true,
-          },
-        },
-        records: {
-          include: {
-            student: true,
-          },
-          orderBy: [
-            { student: { lastName: 'asc' } },
-            { student: { firstName: 'asc' } },
-          ],
-        },
-      },
+      select: attendanceSessionSelect,
     });
   }
 
@@ -571,28 +751,14 @@ export class AttendanceService {
     const normalizedDate = this.normalizeDateOnly(date);
 
     if (this.isAdminLike(user.role)) {
+      ensureUserHasSchoolAccess(user, schoolId);
+
       return this.prisma.attendanceSession.findMany({
         where: {
           schoolId,
           date: normalizedDate,
         },
-        include: {
-          takenBy: true,
-          classes: {
-            include: {
-              class: true,
-            },
-          },
-          records: {
-            include: {
-              student: true,
-            },
-            orderBy: [
-              { student: { lastName: 'asc' } },
-              { student: { firstName: 'asc' } },
-            ],
-          },
-        },
+        select: attendanceSessionSelect,
         orderBy: {
           createdAt: 'desc',
         },
@@ -621,23 +787,7 @@ export class AttendanceService {
           },
         },
       },
-      include: {
-        takenBy: true,
-        classes: {
-          include: {
-            class: true,
-          },
-        },
-        records: {
-          include: {
-            student: true,
-          },
-          orderBy: [
-            { student: { lastName: 'asc' } },
-            { student: { firstName: 'asc' } },
-          ],
-        },
-      },
+      select: attendanceSessionSelect,
       orderBy: {
         createdAt: 'desc',
       },
@@ -650,6 +800,7 @@ export class AttendanceService {
     const session = await this.getAttendanceSessionOrThrow(sessionId);
 
     if (this.isAdminLike(user.role)) {
+      ensureUserHasSchoolAccess(user, session.schoolId);
       return session;
     }
 
@@ -682,21 +833,7 @@ export class AttendanceService {
           date: normalizedDate,
         },
       },
-      include: {
-        student: true,
-        attendanceSession: {
-          include: {
-            school: true,
-            schoolYear: true,
-            takenBy: true,
-            classes: {
-              include: {
-                class: true,
-              },
-            },
-          },
-        },
-      },
+      select: attendanceRecordSelect,
     });
 
     if (!record) {
@@ -717,21 +854,7 @@ export class AttendanceService {
 
     const records = await this.prisma.attendanceRecord.findMany({
       where: { studentId },
-      include: {
-        attendanceSession: {
-          include: {
-            school: true,
-            schoolYear: true,
-            takenBy: true,
-            classes: {
-              include: {
-                class: true,
-              },
-            },
-          },
-        },
-        student: true,
-      },
+      select: attendanceRecordSelect,
       orderBy: {
         date: 'desc',
       },
@@ -842,19 +965,7 @@ export class AttendanceService {
         status: dto.status,
         remark: dto.remark ?? null,
       },
-      include: {
-        student: true,
-        attendanceSession: {
-          include: {
-            classes: {
-              include: {
-                class: true,
-              },
-            },
-            takenBy: true,
-          },
-        },
-      },
+      select: attendanceRecordSelect,
     });
   }
 
@@ -877,25 +988,7 @@ export class AttendanceService {
 
     return this.prisma.attendanceSession.delete({
       where: { id: sessionId },
-      include: {
-        school: true,
-        schoolYear: true,
-        takenBy: true,
-        classes: {
-          include: {
-            class: true,
-          },
-        },
-        records: {
-          include: {
-            student: true,
-          },
-          orderBy: [
-            { student: { lastName: 'asc' } },
-            { student: { firstName: 'asc' } },
-          ],
-        },
-      },
+      select: attendanceSessionSelect,
     });
   }
 }

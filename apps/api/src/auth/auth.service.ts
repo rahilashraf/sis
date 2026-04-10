@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { safeUserSelect } from '../common/prisma/safe-user-response';
 
 @Injectable()
 export class AuthService {
@@ -13,10 +14,9 @@ export class AuthService {
   async login(username: string, password: string) {
     const user = await this.prisma.user.findUnique({
       where: { username },
-      include: {
-        memberships: {
-          include: { school: true },
-        },
+      select: {
+        passwordHash: true,
+        ...safeUserSelect,
       },
     });
 
@@ -47,24 +47,15 @@ export class AuthService {
   }
 
   async validateUser(userId: string) {
-    console.log('validateUser called with:', userId);
-
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        memberships: {
-          include: { school: true },
-        },
-      },
+      select: safeUserSelect,
     });
-
-    console.log('user found:', user);
 
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
 
-    const { passwordHash, ...safeUser } = user;
-    return safeUser;
+    return user;
   }
 }

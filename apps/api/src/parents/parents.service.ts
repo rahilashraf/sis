@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { safeUserSelect } from '../common/prisma/safe-user-response';
 
 @Injectable()
 export class ParentsService {
@@ -8,15 +9,13 @@ export class ParentsService {
   findMyStudents(parentId: string) {
     return this.prisma.studentParentLink.findMany({
       where: { parentId },
-      include: {
+      select: {
+        id: true,
+        parentId: true,
+        studentId: true,
+        createdAt: true,
         student: {
-          include: {
-            memberships: {
-              include: {
-                school: true,
-              },
-            },
-          },
+          select: safeUserSelect,
         },
       },
       orderBy: [

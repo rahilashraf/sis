@@ -1,98 +1,112 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# SIS API Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS backend for the SIS monorepo. This app uses Prisma with PostgreSQL and the root `prisma/` directory for schema, migrations, and seed data.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Scope
 
-## Description
+Implemented backend areas currently covered:
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- auth and role-based access
+- users, parents, students, and school memberships
+- classes, teacher assignment, and student enrollment
+- attendance and attendance summaries
+- school years
+- reporting periods
+- grades, summaries, period-aware summaries, and locking
 
-## Project setup
+## Prerequisites
+
+- Node.js 20+
+- npm
+- PostgreSQL
+
+## Environment
+
+Required for normal startup:
 
 ```bash
-$ npm install
+DATABASE_URL=postgresql://...
+JWT_SECRET=replace-with-a-real-secret
 ```
 
-## Compile and run the project
+Optional but recommended:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+JWT_EXPIRES_IN=1d
+CORS_ORIGIN=http://localhost:3001
+CORS_CREDENTIALS=true
+SHADOW_DATABASE_URL=postgresql://... # only needed for prisma migrate dev
 ```
 
-## Run tests
+Optional seed configuration:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+SEED_SCHOOL_NAME=Demo School
+SEED_SCHOOL_SHORT_NAME=DEMO
+SEED_OWNER_USERNAME=owner
+SEED_OWNER_EMAIL=owner@example.com
+SEED_OWNER_FIRST_NAME=System
+SEED_OWNER_LAST_NAME=Owner
+SEED_OWNER_PASSWORD=ChangeMe123!
+SEED_SCHOOL_YEAR_NAME=2025-2026
+SEED_SCHOOL_YEAR_START_DATE=2025-09-01
+SEED_SCHOOL_YEAR_END_DATE=2026-06-30
 ```
 
-## Deployment
+## Install
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+From the repo root:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm install
+cd apps/api && npm install
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Bootstrap Flow
 
-## Resources
+Fresh database bootstrap:
 
-Check out a few resources that may come in handy when working with NestJS:
+```bash
+npm run prisma:migrate:deploy
+npm --prefix apps/api run prisma:generate
+npm --prefix apps/api run prisma:seed
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Run the API:
 
-## Support
+```bash
+npm --prefix apps/api run start:dev
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+Build:
 
-## Stay in touch
+```bash
+npm --prefix apps/api run build
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## Prisma Commands
 
-## License
+From the repo root:
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```bash
+npm run prisma:migrate:deploy
+npm run prisma:migrate:dev
+npm run prisma:generate
+npm run prisma:seed
+```
+
+From `apps/api`:
+
+```bash
+npm run prisma:migrate:deploy
+npm run prisma:migrate:dev
+npm run prisma:generate
+npm run prisma:seed
+```
+
+## Notes
+
+- `prisma migrate deploy` is the production-safe path and is expected to work from the checked-in migration history alone.
+- The seed is intended for local and demo setup and is idempotent enough to rerun.
+- CORS is disabled unless `CORS_ORIGIN` is set.
+- `JWT_SECRET` is required outside tests.

@@ -145,7 +145,9 @@ export class ReportingPeriodsService {
     });
 
     if (overlappingPeriod) {
-      throw new ConflictException('Reporting period overlaps an existing period');
+      throw new ConflictException(
+        'Reporting period overlaps an existing period',
+      );
     }
   }
 
@@ -174,7 +176,12 @@ export class ReportingPeriodsService {
 
     this.ensureDateRange(startsAt, endsAt);
     this.ensureDatesWithinSchoolYear(startsAt, endsAt, schoolYear);
-    await this.ensureNoOverlap(data.schoolId, data.schoolYearId, startsAt, endsAt);
+    await this.ensureNoOverlap(
+      data.schoolId,
+      data.schoolYearId,
+      startsAt,
+      endsAt,
+    );
 
     try {
       return await this.prisma.reportingPeriod.create({

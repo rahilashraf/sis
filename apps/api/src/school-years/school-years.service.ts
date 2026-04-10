@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSchoolYearDto } from './dto/create-school-year.dto';
+import { AuthenticatedUser } from '../common/auth/auth-user';
+import { ensureUserHasSchoolAccess } from '../common/access/school-access.util';
 
 @Injectable()
 export class SchoolYearsService {
@@ -22,7 +24,9 @@ export class SchoolYearsService {
     }
   }
 
-  async create(data: CreateSchoolYearDto) {
+  async create(user: AuthenticatedUser, data: CreateSchoolYearDto) {
+    ensureUserHasSchoolAccess(user, data.schoolId);
+
     const school = await this.prisma.school.findUnique({
       where: { id: data.schoolId },
       select: { id: true },
@@ -48,10 +52,8 @@ export class SchoolYearsService {
     });
   }
 
-  findAllForSchool(schoolId: string) {
-    if (!schoolId) {
-      throw new BadRequestException('schoolId is required');
-    }
+  findAllForSchool(user: AuthenticatedUser, schoolId: string) {
+    ensureUserHasSchoolAccess(user, schoolId);
 
     return this.prisma.schoolYear.findMany({
       where: {
@@ -62,7 +64,7 @@ export class SchoolYearsService {
     });
   }
 
-  async activate(id: string) {
+  async activate(user: AuthenticatedUser, id: string) {
     return this.prisma.$transaction(async (tx) => {
       const existing = await tx.schoolYear.findUnique({
         where: { id },
@@ -75,6 +77,8 @@ export class SchoolYearsService {
       if (!existing) {
         throw new NotFoundException('School year not found');
       }
+
+      ensureUserHasSchoolAccess(user, existing.schoolId);
 
       await tx.schoolYear.updateMany({
         where: {
@@ -96,15 +100,20 @@ export class SchoolYearsService {
     });
   }
 
-  async archive(id: string) {
+  async archive(user: AuthenticatedUser, id: string) {
     const existing = await this.prisma.schoolYear.findUnique({
       where: { id },
-      select: { id: true },
+      select: {
+        id: true,
+        schoolId: true,
+      },
     });
 
     if (!existing) {
       throw new NotFoundException('School year not found');
     }
+
+    ensureUserHasSchoolAccess(user, existing.schoolId);
 
     return this.prisma.schoolYear.update({
       where: { id },

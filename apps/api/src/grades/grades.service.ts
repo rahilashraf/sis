@@ -8,11 +8,21 @@ import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateGradeRecordDto } from './dto/create-grade-record.dto';
 import { UpdateGradeRecordDto } from './dto/update-grade-record.dto';
+import { AuthenticatedUser } from '../common/auth/auth-user';
+import {
+  ensureUserHasSchoolAccess,
+  getAccessibleSchoolIds,
+  isBypassRole,
+  isSchoolAdminRole,
+  isTeacherRole,
+} from '../common/access/school-access.util';
+import {
+  safeUserSelect,
+  schoolSummarySelect,
+  schoolYearSummarySelect,
+} from '../common/prisma/safe-user-response';
 
-type AuthUser = {
-  id: string;
-  role: UserRole;
-};
+type AuthUser = AuthenticatedUser;
 
 type ReportingPeriodWindow = {
   key: string;
@@ -42,11 +52,11 @@ export class GradesService {
   constructor(private readonly prisma: PrismaService) {}
 
   private isAdminLike(role: UserRole) {
-    return ['OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF'].includes(role);
+    return isBypassRole(role) || isSchoolAdminRole(role);
   }
 
   private isTeacherLike(role: UserRole) {
-    return ['TEACHER', 'SUPPLY_TEACHER'].includes(role);
+    return isTeacherRole(role);
   }
 
   private canOverrideReportingPeriodLock(role: UserRole) {
@@ -56,18 +66,35 @@ export class GradesService {
   private buildInclude() {
     return {
       class: {
-        include: {
-          school: true,
-          schoolYear: true,
+        select: {
+          id: true,
+          schoolId: true,
+          schoolYearId: true,
+          name: true,
+          subject: true,
+          isHomeroom: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          school: {
+            select: schoolSummarySelect,
+          },
+          schoolYear: {
+            select: schoolYearSummarySelect,
+          },
         },
       },
-      student: true,
+      student: {
+        select: safeUserSelect,
+      },
     };
   }
 
   private validateScoreRange(score: number, maxScore: number) {
     if (score > maxScore) {
-      throw new BadRequestException('score must be less than or equal to maxScore');
+      throw new BadRequestException(
+        'score must be less than or equal to maxScore',
+      );
     }
   }
 
@@ -76,37 +103,229 @@ export class GradesService {
   }
 
   private buildStudentGradeWhere(user: AuthUser, studentId: string) {
-    return this.isTeacherLike(user.role) && !this.isAdminLike(user.role)
-      ? {
-          studentId,
-          class: {
-            teachers: {
-              some: {
-                teacherId: user.id,
-              },
+    if (this.isTeacherLike(user.role) && !this.isAdminLike(user.role)) {
+      return {
+        studentId,
+        class: {
+          teachers: {
+            some: {
+              teacherId: user.id,
             },
           },
-        }
-      : {
-          studentId,
-        };
+        },
+      };
+    }
+
+    if (isSchoolAdminRole(user.role)) {
+      return {
+        studentId,
+        class: {
+          schoolId: {
+            in: getAccessibleSchoolIds(user),
+          },
+        },
+      };
+    }
+
+    return {
+      studentId,
+    };
   }
 
   private buildStudentEnrollmentWhere(user: AuthUser, studentId: string) {
-    return this.isTeacherLike(user.role) && !this.isAdminLike(user.role)
-      ? {
-          studentId,
-          class: {
-            teachers: {
-              some: {
-                teacherId: user.id,
-              },
+    if (this.isTeacherLike(user.role) && !this.isAdminLike(user.role)) {
+      return {
+        studentId,
+        class: {
+          teachers: {
+            some: {
+              teacherId: user.id,
             },
           },
-        }
-      : {
+        },
+      };
+    }
+
+    if (isSchoolAdminRole(user.role)) {
+      return {
+        studentId,
+        class: {
+          schoolId: {
+            in: getAccessibleSchoolIds(user),
+          },
+        },
+      };
+    }
+
+    return {
+      studentId,
+    };
+  }
+
+  private async ensureSchoolAdminCanAccessStudent(
+    user: AuthUser,
+    studentId: string,
+  ) {
+    if (isBypassRole(user.role)) {
+      return;
+    }
+
+    const student = await this.prisma.user.findUnique({
+      where: { id: studentId },
+      select: {
+        id: true,
+        memberships: {
+          where: {
+            isActive: true,
+          },
+          select: {
+            schoolId: true,
+          },
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const accessibleSchoolIds = new Set(getAccessibleSchoolIds(user));
+    const hasAccess = student.memberships.some((membership) =>
+      accessibleSchoolIds.has(membership.schoolId),
+    );
+
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have student access');
+    }
+  }
+
+  private async ensureTeacherAssignedToClass(
+    teacherId: string,
+    classId: string,
+  ) {
+    const assignment = await this.prisma.teacherClassAssignment.findFirst({
+      where: {
+        teacherId,
+        classId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!assignment) {
+      throw new ForbiddenException('You do not have class access');
+    }
+  }
+
+  private async ensureStudentEnrolledInClass(
+    studentId: string,
+    classId: string,
+  ) {
+    const enrollment = await this.prisma.studentClassEnrollment.findFirst({
+      where: {
+        studentId,
+        classId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!enrollment) {
+      throw new BadRequestException('Student is not enrolled in this class');
+    }
+  }
+
+  private async ensureParentLinkedToStudent(
+    parentId: string,
+    studentId: string,
+  ) {
+    const link = await this.prisma.studentParentLink.findUnique({
+      where: {
+        parentId_studentId: {
+          parentId,
           studentId,
-        };
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!link) {
+      throw new ForbiddenException('You do not have student access');
+    }
+  }
+
+  private async ensureTeacherCanAccessStudent(
+    user: AuthUser,
+    studentId: string,
+  ) {
+    const enrollment = await this.prisma.studentClassEnrollment.findFirst({
+      where: {
+        studentId,
+        class: {
+          teachers: {
+            some: {
+              teacherId: user.id,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!enrollment) {
+      throw new ForbiddenException('You do not have student access');
+    }
+  }
+
+  private async ensureUserCanManageClass(user: AuthUser, classId: string) {
+    const classContext = await this.getClassContext(classId);
+
+    if (this.isAdminLike(user.role)) {
+      ensureUserHasSchoolAccess(user, classContext.schoolId);
+      return;
+    }
+
+    if (!this.isTeacherLike(user.role)) {
+      throw new ForbiddenException('You do not have class access');
+    }
+
+    await this.ensureTeacherAssignedToClass(user.id, classId);
+  }
+
+  private async ensureUserCanReadStudentGrades(
+    user: AuthUser,
+    studentId: string,
+  ) {
+    if (this.isAdminLike(user.role)) {
+      await this.ensureSchoolAdminCanAccessStudent(user, studentId);
+      return;
+    }
+
+    if (user.role === 'STUDENT') {
+      if (user.id !== studentId) {
+        throw new ForbiddenException('You do not have student access');
+      }
+
+      return;
+    }
+
+    if (user.role === 'PARENT') {
+      await this.ensureParentLinkedToStudent(user.id, studentId);
+      return;
+    }
+
+    if (this.isTeacherLike(user.role)) {
+      await this.ensureTeacherCanAccessStudent(user, studentId);
+      return;
+    }
+
+    throw new ForbiddenException('You do not have student access');
   }
 
   private async ensureClassExists(classId: string) {
@@ -199,13 +418,17 @@ export class GradesService {
     reportingPeriods: ReportingPeriodWindow[],
     periodKey: string,
   ) {
-    const targetPeriod = reportingPeriods.find((period) => period.key === periodKey);
+    const targetPeriod = reportingPeriods.find(
+      (period) => period.key === periodKey,
+    );
 
     if (!targetPeriod) {
       throw new BadRequestException('Invalid reporting period key');
     }
 
-    return reportingPeriods.filter((period) => period.order <= targetPeriod.order);
+    return reportingPeriods.filter(
+      (period) => period.order <= targetPeriod.order,
+    );
   }
 
   private isGradeWithinReportingPeriods(
@@ -221,7 +444,10 @@ export class GradesService {
     contexts: Array<Pick<ClassContext, 'schoolId' | 'schoolYearId'>>,
     periodKey: string,
   ) {
-    const uniqueContexts = new Map<string, Pick<ClassContext, 'schoolId' | 'schoolYearId'>>();
+    const uniqueContexts = new Map<
+      string,
+      Pick<ClassContext, 'schoolId' | 'schoolYearId'>
+    >();
 
     for (const context of contexts) {
       uniqueContexts.set(
@@ -262,7 +488,10 @@ export class GradesService {
         return false;
       }
 
-      return this.isGradeWithinReportingPeriods(grade.gradedAt, reportingPeriods);
+      return this.isGradeWithinReportingPeriods(
+        grade.gradedAt,
+        reportingPeriods,
+      );
     });
   }
 
@@ -272,15 +501,17 @@ export class GradesService {
     grades: Array<Pick<GradeSummaryRecord, 'score' | 'maxScore'>>,
   ) {
     const totalScore = grades.reduce((sum, grade) => sum + grade.score, 0);
-    const totalMaxScore = grades.reduce((sum, grade) => sum + grade.maxScore, 0);
+    const totalMaxScore = grades.reduce(
+      (sum, grade) => sum + grade.maxScore,
+      0,
+    );
 
     return {
       [idField]: id,
       gradeCount: grades.length,
       totalScore,
       totalMaxScore,
-      percentage:
-        totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : null,
+      percentage: totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : null,
     };
   }
 
@@ -307,7 +538,10 @@ export class GradesService {
     studentId: string,
     grades: GradeSummaryRecord[],
   ) {
-    const contexts = new Map<string, Pick<ClassContext, 'schoolId' | 'schoolYearId'>>();
+    const contexts = new Map<
+      string,
+      Pick<ClassContext, 'schoolId' | 'schoolYearId'>
+    >();
 
     for (const grade of grades) {
       contexts.set(
@@ -361,116 +595,6 @@ export class GradesService {
     ) {
       throw new ForbiddenException('Reporting period is locked');
     }
-  }
-
-  private async ensureTeacherAssignedToClass(teacherId: string, classId: string) {
-    const assignment = await this.prisma.teacherClassAssignment.findFirst({
-      where: {
-        teacherId,
-        classId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!assignment) {
-      throw new ForbiddenException('You do not have class access');
-    }
-  }
-
-  private async ensureStudentEnrolledInClass(studentId: string, classId: string) {
-    const enrollment = await this.prisma.studentClassEnrollment.findFirst({
-      where: {
-        studentId,
-        classId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!enrollment) {
-      throw new BadRequestException('Student is not enrolled in this class');
-    }
-  }
-
-  private async ensureParentLinkedToStudent(parentId: string, studentId: string) {
-    const link = await this.prisma.studentParentLink.findUnique({
-      where: {
-        parentId_studentId: {
-          parentId,
-          studentId,
-        },
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!link) {
-      throw new ForbiddenException('You do not have student access');
-    }
-  }
-
-  private async ensureTeacherCanAccessStudent(user: AuthUser, studentId: string) {
-    const enrollment = await this.prisma.studentClassEnrollment.findFirst({
-      where: {
-        studentId,
-        class: {
-          teachers: {
-            some: {
-              teacherId: user.id,
-            },
-          },
-        },
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!enrollment) {
-      throw new ForbiddenException('You do not have student access');
-    }
-  }
-
-  private async ensureUserCanManageClass(user: AuthUser, classId: string) {
-    if (this.isAdminLike(user.role)) {
-      return;
-    }
-
-    if (!this.isTeacherLike(user.role)) {
-      throw new ForbiddenException('You do not have class access');
-    }
-
-    await this.ensureTeacherAssignedToClass(user.id, classId);
-  }
-
-  private async ensureUserCanReadStudentGrades(user: AuthUser, studentId: string) {
-    if (this.isAdminLike(user.role)) {
-      return;
-    }
-
-    if (user.role === 'STUDENT') {
-      if (user.id !== studentId) {
-        throw new ForbiddenException('You do not have student access');
-      }
-
-      return;
-    }
-
-    if (user.role === 'PARENT') {
-      await this.ensureParentLinkedToStudent(user.id, studentId);
-      return;
-    }
-
-    if (this.isTeacherLike(user.role)) {
-      await this.ensureTeacherCanAccessStudent(user, studentId);
-      return;
-    }
-
-    throw new ForbiddenException('You do not have student access');
   }
 
   async create(user: AuthUser, data: CreateGradeRecordDto) {
@@ -530,7 +654,11 @@ export class GradesService {
     const maxScore = data.maxScore ?? existingGrade.maxScore;
 
     this.validateScoreRange(score, maxScore);
-    await this.ensureUserCanWriteGradeForDate(user, existingGrade.classId, gradedAt);
+    await this.ensureUserCanWriteGradeForDate(
+      user,
+      existingGrade.classId,
+      gradedAt,
+    );
 
     return this.prisma.gradeRecord.update({
       where: { id: existingGrade.id },
@@ -568,7 +696,11 @@ export class GradesService {
     });
   }
 
-  async getStudentSummary(user: AuthUser, studentId: string, periodKey?: string) {
+  async getStudentSummary(
+    user: AuthUser,
+    studentId: string,
+    periodKey?: string,
+  ) {
     await this.ensureUserCanReadStudentGrades(user, studentId);
 
     const grades = await this.getStudentSummaryGrades(user, studentId);
@@ -577,7 +709,11 @@ export class GradesService {
       return this.buildSummary('studentId', studentId, grades);
     }
 
-    const contexts = await this.getStudentSummaryContexts(user, studentId, grades);
+    const contexts = await this.getStudentSummaryContexts(
+      user,
+      studentId,
+      grades,
+    );
 
     if (contexts.length === 0) {
       return this.buildSummary('studentId', studentId, []);
@@ -622,7 +758,10 @@ export class GradesService {
 
     const classContext = await this.getClassContext(classId);
     const allowedReportingPeriodsByContext =
-      await this.buildAllowedReportingPeriodsByContext([classContext], periodKey);
+      await this.buildAllowedReportingPeriodsByContext(
+        [classContext],
+        periodKey,
+      );
 
     return this.buildSummary(
       'classId',

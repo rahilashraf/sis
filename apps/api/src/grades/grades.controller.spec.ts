@@ -120,7 +120,9 @@ describe('GradesController (HTTP)', () => {
       schoolId: 'school-1',
       schoolYearId: 'year-1',
     });
-    prisma.studentClassEnrollment.findFirst.mockResolvedValue({ id: 'enrollment-1' });
+    prisma.studentClassEnrollment.findFirst.mockResolvedValue({
+      id: 'enrollment-1',
+    });
     prisma.reportingPeriod.findFirst.mockResolvedValue({
       id: 'period-1',
       isLocked: false,
@@ -176,8 +178,12 @@ describe('GradesController (HTTP)', () => {
       schoolId: 'school-1',
       schoolYearId: 'year-1',
     });
-    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
-    prisma.studentClassEnrollment.findFirst.mockResolvedValue({ id: 'enrollment-1' });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-1',
+    });
+    prisma.studentClassEnrollment.findFirst.mockResolvedValue({
+      id: 'enrollment-1',
+    });
     prisma.reportingPeriod.findFirst.mockResolvedValue({
       id: 'period-1',
       isLocked: false,
@@ -267,8 +273,12 @@ describe('GradesController (HTTP)', () => {
       schoolId: 'school-1',
       schoolYearId: 'year-1',
     });
-    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
-    prisma.studentClassEnrollment.findFirst.mockResolvedValue({ id: 'enrollment-1' });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-1',
+    });
+    prisma.studentClassEnrollment.findFirst.mockResolvedValue({
+      id: 'enrollment-1',
+    });
     prisma.reportingPeriod.findFirst.mockResolvedValue({
       id: 'period-1',
       isLocked: true,
@@ -297,7 +307,9 @@ describe('GradesController (HTTP)', () => {
       schoolId: 'school-1',
       schoolYearId: 'year-1',
     });
-    prisma.studentClassEnrollment.findFirst.mockResolvedValue({ id: 'enrollment-1' });
+    prisma.studentClassEnrollment.findFirst.mockResolvedValue({
+      id: 'enrollment-1',
+    });
     prisma.reportingPeriod.findFirst.mockResolvedValue(null);
 
     await request(app.getHttpServer())
@@ -408,7 +420,9 @@ describe('GradesController (HTTP)', () => {
       maxScore: 10,
       gradedAt: new Date('2026-04-10T00:00:00.000Z'),
     });
-    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-1',
+    });
     prisma.class.findUnique.mockResolvedValue({
       id: 'class-1',
       schoolId: 'school-1',
@@ -441,7 +455,9 @@ describe('GradesController (HTTP)', () => {
       maxScore: 10,
       gradedAt: new Date('2026-02-10T00:00:00.000Z'),
     });
-    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-1',
+    });
     prisma.class.findUnique.mockResolvedValue({
       id: 'class-1',
       schoolId: 'school-1',
@@ -555,7 +571,9 @@ describe('GradesController (HTTP)', () => {
 
   it('returns all-time class summary for an assigned teacher', async () => {
     prisma.class.findUnique.mockResolvedValue({ id: 'class-1' });
-    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-1',
+    });
     prisma.gradeRecord.findMany.mockResolvedValue([
       {
         score: 8,
@@ -588,12 +606,16 @@ describe('GradesController (HTTP)', () => {
   });
 
   it('returns period-filtered class summary for an assigned teacher', async () => {
-    prisma.class.findUnique.mockResolvedValueOnce({ id: 'class-1' }).mockResolvedValueOnce({
-      id: 'class-1',
-      schoolId: 'school-1',
-      schoolYearId: 'year-1',
+    prisma.class.findUnique
+      .mockResolvedValueOnce({ id: 'class-1' })
+      .mockResolvedValueOnce({
+        id: 'class-1',
+        schoolId: 'school-1',
+        schoolYearId: 'year-1',
+      });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-1',
     });
-    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
     prisma.gradeRecord.findMany.mockResolvedValue([
       {
         score: 8,
@@ -645,12 +667,16 @@ describe('GradesController (HTTP)', () => {
   });
 
   it('returns cumulative class summary when periodKey targets a later reporting period', async () => {
-    prisma.class.findUnique.mockResolvedValueOnce({ id: 'class-1' }).mockResolvedValueOnce({
-      id: 'class-1',
-      schoolId: 'school-1',
-      schoolYearId: 'year-1',
+    prisma.class.findUnique
+      .mockResolvedValueOnce({ id: 'class-1' })
+      .mockResolvedValueOnce({
+        id: 'class-1',
+        schoolId: 'school-1',
+        schoolYearId: 'year-1',
+      });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-1',
     });
-    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
     prisma.gradeRecord.findMany.mockResolvedValue([
       {
         score: 8,
@@ -702,12 +728,16 @@ describe('GradesController (HTTP)', () => {
   });
 
   it('returns 400 when periodKey is invalid for class summary', async () => {
-    prisma.class.findUnique.mockResolvedValueOnce({ id: 'class-1' }).mockResolvedValueOnce({
-      id: 'class-1',
-      schoolId: 'school-1',
-      schoolYearId: 'year-1',
+    prisma.class.findUnique
+      .mockResolvedValueOnce({ id: 'class-1' })
+      .mockResolvedValueOnce({
+        id: 'class-1',
+        schoolId: 'school-1',
+        schoolYearId: 'year-1',
+      });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-1',
     });
-    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
     prisma.gradeRecord.findMany.mockResolvedValue([]);
     prisma.reportingPeriod.findMany.mockResolvedValue([
       {
@@ -751,7 +781,9 @@ describe('GradesController (HTTP)', () => {
 
   it('returns class grades for an assigned teacher', async () => {
     prisma.class.findUnique.mockResolvedValue({ id: 'class-1' });
-    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-1',
+    });
     prisma.gradeRecord.findMany.mockResolvedValue([
       {
         id: 'grade-1',
@@ -842,7 +874,9 @@ describe('GradesController (HTTP)', () => {
   });
 
   it('returns teacher-filtered student grades for an assigned teacher', async () => {
-    prisma.studentClassEnrollment.findFirst.mockResolvedValue({ id: 'enrollment-1' });
+    prisma.studentClassEnrollment.findFirst.mockResolvedValue({
+      id: 'enrollment-1',
+    });
     prisma.gradeRecord.findMany.mockResolvedValue([
       {
         id: 'grade-1',

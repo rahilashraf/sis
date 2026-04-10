@@ -6,6 +6,7 @@ import {
   Post,
   Query,
   Param,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -13,6 +14,9 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CreateSchoolYearDto } from './dto/create-school-year.dto';
 import { SchoolYearsService } from './school-years.service';
+import type { AuthenticatedRequest } from '../common/auth/auth-user';
+import { SchoolIdQueryDto } from '../common/dto/school-id-query.dto';
+import { NonEmptyStringPipe } from '../common/pipes/non-empty-string.pipe';
 
 @Controller('school-years')
 export class SchoolYearsController {
@@ -21,34 +25,46 @@ export class SchoolYearsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
   @Post()
-  create(@Body() body: CreateSchoolYearDto) {
-    return this.schoolYearsService.create(body);
+  create(@Req() req: AuthenticatedRequest, @Body() body: CreateSchoolYearDto) {
+    return this.schoolYearsService.create(req.user, body);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  findAllForSchool(@Query('schoolId') schoolId: string) {
-    return this.schoolYearsService.findAllForSchool(schoolId);
+  findAllForSchool(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: SchoolIdQueryDto,
+  ) {
+    return this.schoolYearsService.findAllForSchool(req.user, query.schoolId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
   @Patch(':id/activate')
-  activate(@Param('id') id: string) {
-    return this.schoolYearsService.activate(id);
+  activate(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
+    return this.schoolYearsService.activate(req.user, id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
   @Patch(':id/archive')
-  archive(@Param('id') id: string) {
-    return this.schoolYearsService.archive(id);
+  archive(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
+    return this.schoolYearsService.archive(req.user, id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
   @Patch(':id/deactivate')
-  deactivate(@Param('id') id: string) {
-    return this.schoolYearsService.archive(id);
+  deactivate(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
+    return this.schoolYearsService.archive(req.user, id);
   }
 }
