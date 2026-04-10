@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  OWNER
+  SUPER_ADMIN
+  ADMIN
+  TEACHER
+  STAFF
+  SUPPLY_TEACHER
+  PARENT
+  STUDENT
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum AttendanceScopeType {
+  CLASS
+  MULTI_CLASS
+  GRADE
+  HOMEROOM
+  CUSTOM
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  email        String?  @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         UserRole
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships UserSchoolMembership[]
+
+  parentLinks  StudentParentLink[] @relation("ParentLinks")
+  studentLinks StudentParentLink[] @relation("StudentLinks")
+
+  teacherClasses TeacherClassAssignment[] @relation("TeacherClasses")
+  studentClasses StudentClassEnrollment[] @relation("StudentClasses")
+
+  takenAttendanceSessions AttendanceSession[] @relation("AttendanceTakenBy")
+  attendanceRecords       AttendanceRecord[]  @relation("AttendanceStudent")
+}
+
+model School {
+  id        String   @id @default(cuid())
+  name      String
+  shortName String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships       UserSchoolMembership[]
+  schoolYears       SchoolYear[]
+  classes           Class[]
+  attendanceSessions AttendanceSession[]
+}
+
+model UserSchoolMembership {
+  id        String   @id @default(cuid())
+  userId    String
+  schoolId  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, schoolId])
+}
+
+model SchoolYear {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school             School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classes            Class[]
+  attendanceSessions AttendanceSession[]
+
+  @@unique([schoolId, name])
+}
+
+model StudentParentLink {
+  id        String   @id @default(cuid())
+  parentId  String
+  studentId String
+  createdAt DateTime @default(now())
+
+  parent  User @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
+  student User @relation("StudentLinks", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, studentId])
+}
+
+model Class {
+  id           String @id @default(cuid())
+  schoolId     String
+  schoolYearId String
+
+  name       String
+  subject    String?
+  isHomeroom Boolean @default(false)
+  isActive   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school     School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolYear SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+
+  teachers TeacherClassAssignment[]
+  students StudentClassEnrollment[]
+
+  attendanceSessionClasses AttendanceSessionClass[]
+
+  @@unique([schoolId, schoolYearId, name])
+}
+
+model TeacherClassAssignment {
+  id        String   @id @default(cuid())
+  teacherId String
+  classId   String
+  createdAt DateTime @default(now())
+
+  teacher User  @relation("TeacherClasses", fields: [teacherId], references: [id], onDelete: Cascade)
+  class   Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, classId])
+}
+
+model StudentClassEnrollment {
+  id        String   @id @default(cuid())
+  studentId String
+  classId   String
+  createdAt DateTime @default(now())
+
+  student User  @relation("StudentClasses", fields: [studentId], references: [id], onDelete: Cascade)
+  class   Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, classId])
+}
+
+model AttendanceSession {
+  id           String              @id @default(cuid())
+  schoolId     String
+  schoolYearId String?
+  takenById    String?
+  date         DateTime
+  scopeType    AttendanceScopeType @default(CLASS)
+  scopeLabel   String?
+  notes        String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  school     School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolYear SchoolYear? @relation(fields: [schoolYearId], references: [id], onDelete: SetNull)
+  takenBy    User?       @relation("AttendanceTakenBy", fields: [takenById], references: [id], onDelete: SetNull)
+
+  classes AttendanceSessionClass[]
+  records AttendanceRecord[]
+
+  @@index([schoolId, date])
+  @@index([takenById, date])
+}
+
+model AttendanceSessionClass {
+  id                  String   @id @default(cuid())
+  attendanceSessionId String
+  classId             String
+  createdAt           DateTime @default(now())
+
+  attendanceSession AttendanceSession @relation(fields: [attendanceSessionId], references: [id], onDelete: Cascade)
+  class             Class             @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([attendanceSessionId, classId])
+}
+
+model AttendanceRecord {
+  id                  String           @id @default(cuid())
+  attendanceSessionId String
+  studentId           String
+  date                DateTime
+  status              AttendanceStatus
+  remark              String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  attendanceSession AttendanceSession @relation(fields: [attendanceSessionId], references: [id], onDelete: Cascade)
+  student           User              @relation("AttendanceStudent", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, date])
+  @@unique([attendanceSessionId, studentId])
+  @@index([date])
+  @@index([studentId, date])
+}
