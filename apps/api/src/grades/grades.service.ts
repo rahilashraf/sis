@@ -14,6 +14,29 @@ type AuthUser = {
   role: UserRole;
 };
 
+type ReportingPeriodWindow = {
+  key: string;
+  order: number;
+  startsAt: Date;
+  endsAt: Date;
+};
+
+type ClassContext = {
+  id: string;
+  schoolId: string;
+  schoolYearId: string;
+};
+
+type GradeSummaryRecord = {
+  score: number;
+  maxScore: number;
+  gradedAt: Date;
+  class: {
+    schoolId: string;
+    schoolYearId: string;
+  };
+};
+
 @Injectable()
 export class GradesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -48,6 +71,44 @@ export class GradesService {
     }
   }
 
+  private getContextKey(schoolId: string, schoolYearId: string) {
+    return `${schoolId}:${schoolYearId}`;
+  }
+
+  private buildStudentGradeWhere(user: AuthUser, studentId: string) {
+    return this.isTeacherLike(user.role) && !this.isAdminLike(user.role)
+      ? {
+          studentId,
+          class: {
+            teachers: {
+              some: {
+                teacherId: user.id,
+              },
+            },
+          },
+        }
+      : {
+          studentId,
+        };
+  }
+
+  private buildStudentEnrollmentWhere(user: AuthUser, studentId: string) {
+    return this.isTeacherLike(user.role) && !this.isAdminLike(user.role)
+      ? {
+          studentId,
+          class: {
+            teachers: {
+              some: {
+                teacherId: user.id,
+              },
+            },
+          },
+        }
+      : {
+          studentId,
+        };
+  }
+
   private async ensureClassExists(classId: string) {
     const existingClass = await this.prisma.class.findUnique({
       where: { id: classId },
@@ -57,6 +118,23 @@ export class GradesService {
     if (!existingClass) {
       throw new NotFoundException('Class not found');
     }
+  }
+
+  private async getClassContext(classId: string): Promise<ClassContext> {
+    const existingClass = await this.prisma.class.findUnique({
+      where: { id: classId },
+      select: {
+        id: true,
+        schoolId: true,
+        schoolYearId: true,
+      },
+    });
+
+    if (!existingClass) {
+      throw new NotFoundException('Class not found');
+    }
+
+    return existingClass;
   }
 
   private parseGradedAt(gradedAt: string) {
@@ -70,18 +148,7 @@ export class GradesService {
   }
 
   private async findReportingPeriodForDate(classId: string, gradedAt: Date) {
-    const existingClass = await this.prisma.class.findUnique({
-      where: { id: classId },
-      select: {
-        id: true,
-        schoolId: true,
-        schoolYearId: true,
-      },
-    });
-
-    if (!existingClass) {
-      throw new NotFoundException('Class not found');
-    }
+    const existingClass = await this.getClassContext(classId);
 
     const reportingPeriod = await this.prisma.reportingPeriod.findFirst({
       where: {
@@ -107,6 +174,175 @@ export class GradesService {
     }
 
     return reportingPeriod;
+  }
+
+  private async loadReportingPeriodsForContext(
+    schoolId: string,
+    schoolYearId: string,
+  ): Promise<ReportingPeriodWindow[]> {
+    return this.prisma.reportingPeriod.findMany({
+      where: {
+        schoolId,
+        schoolYearId,
+      },
+      orderBy: [{ order: 'asc' }, { startsAt: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        key: true,
+        order: true,
+        startsAt: true,
+        endsAt: true,
+      },
+    });
+  }
+
+  private selectCumulativeReportingPeriods(
+    reportingPeriods: ReportingPeriodWindow[],
+    periodKey: string,
+  ) {
+    const targetPeriod = reportingPeriods.find((period) => period.key === periodKey);
+
+    if (!targetPeriod) {
+      throw new BadRequestException('Invalid reporting period key');
+    }
+
+    return reportingPeriods.filter((period) => period.order <= targetPeriod.order);
+  }
+
+  private isGradeWithinReportingPeriods(
+    gradedAt: Date,
+    reportingPeriods: ReportingPeriodWindow[],
+  ) {
+    return reportingPeriods.some(
+      (period) => period.startsAt <= gradedAt && gradedAt <= period.endsAt,
+    );
+  }
+
+  private async buildAllowedReportingPeriodsByContext(
+    contexts: Array<Pick<ClassContext, 'schoolId' | 'schoolYearId'>>,
+    periodKey: string,
+  ) {
+    const uniqueContexts = new Map<string, Pick<ClassContext, 'schoolId' | 'schoolYearId'>>();
+
+    for (const context of contexts) {
+      uniqueContexts.set(
+        this.getContextKey(context.schoolId, context.schoolYearId),
+        context,
+      );
+    }
+
+    const entries = await Promise.all(
+      [...uniqueContexts.values()].map(async (context) => {
+        const reportingPeriods = await this.loadReportingPeriodsForContext(
+          context.schoolId,
+          context.schoolYearId,
+        );
+
+        return [
+          this.getContextKey(context.schoolId, context.schoolYearId),
+          this.selectCumulativeReportingPeriods(reportingPeriods, periodKey),
+        ] as const;
+      }),
+    );
+
+    return new Map(entries);
+  }
+
+  private filterGradesByReportingPeriodWindows(
+    grades: GradeSummaryRecord[],
+    allowedReportingPeriodsByContext: Map<string, ReportingPeriodWindow[]>,
+  ) {
+    return grades.filter((grade) => {
+      const contextKey = this.getContextKey(
+        grade.class.schoolId,
+        grade.class.schoolYearId,
+      );
+      const reportingPeriods = allowedReportingPeriodsByContext.get(contextKey);
+
+      if (!reportingPeriods) {
+        return false;
+      }
+
+      return this.isGradeWithinReportingPeriods(grade.gradedAt, reportingPeriods);
+    });
+  }
+
+  private buildSummary(
+    idField: 'studentId' | 'classId',
+    id: string,
+    grades: Array<Pick<GradeSummaryRecord, 'score' | 'maxScore'>>,
+  ) {
+    const totalScore = grades.reduce((sum, grade) => sum + grade.score, 0);
+    const totalMaxScore = grades.reduce((sum, grade) => sum + grade.maxScore, 0);
+
+    return {
+      [idField]: id,
+      gradeCount: grades.length,
+      totalScore,
+      totalMaxScore,
+      percentage:
+        totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : null,
+    };
+  }
+
+  private async getStudentSummaryGrades(user: AuthUser, studentId: string) {
+    return this.prisma.gradeRecord.findMany({
+      where: this.buildStudentGradeWhere(user, studentId),
+      select: {
+        score: true,
+        maxScore: true,
+        gradedAt: true,
+        class: {
+          select: {
+            schoolId: true,
+            schoolYearId: true,
+          },
+        },
+      },
+      orderBy: [{ gradedAt: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  private async getStudentSummaryContexts(
+    user: AuthUser,
+    studentId: string,
+    grades: GradeSummaryRecord[],
+  ) {
+    const contexts = new Map<string, Pick<ClassContext, 'schoolId' | 'schoolYearId'>>();
+
+    for (const grade of grades) {
+      contexts.set(
+        this.getContextKey(grade.class.schoolId, grade.class.schoolYearId),
+        grade.class,
+      );
+    }
+
+    if (contexts.size > 0) {
+      return [...contexts.values()];
+    }
+
+    const enrollments = await this.prisma.studentClassEnrollment.findMany({
+      where: this.buildStudentEnrollmentWhere(user, studentId),
+      select: {
+        class: {
+          select: {
+            schoolId: true,
+            schoolYearId: true,
+          },
+        },
+      },
+    });
+
+    for (const enrollment of enrollments) {
+      contexts.set(
+        this.getContextKey(
+          enrollment.class.schoolId,
+          enrollment.class.schoolYearId,
+        ),
+        enrollment.class,
+      );
+    }
+
+    return [...contexts.values()];
   }
 
   private async ensureUserCanWriteGradeForDate(
@@ -325,25 +561,76 @@ export class GradesService {
   async findByStudent(user: AuthUser, studentId: string) {
     await this.ensureUserCanReadStudentGrades(user, studentId);
 
-    const where = this.isTeacherLike(user.role) && !this.isAdminLike(user.role)
-      ? {
-          studentId,
-          class: {
-            teachers: {
-              some: {
-                teacherId: user.id,
-              },
-            },
-          },
-        }
-      : {
-          studentId,
-        };
-
     return this.prisma.gradeRecord.findMany({
-      where,
+      where: this.buildStudentGradeWhere(user, studentId),
       orderBy: [{ gradedAt: 'desc' }, { createdAt: 'desc' }],
       include: this.buildInclude(),
     });
+  }
+
+  async getStudentSummary(user: AuthUser, studentId: string, periodKey?: string) {
+    await this.ensureUserCanReadStudentGrades(user, studentId);
+
+    const grades = await this.getStudentSummaryGrades(user, studentId);
+
+    if (!periodKey) {
+      return this.buildSummary('studentId', studentId, grades);
+    }
+
+    const contexts = await this.getStudentSummaryContexts(user, studentId, grades);
+
+    if (contexts.length === 0) {
+      return this.buildSummary('studentId', studentId, []);
+    }
+
+    const allowedReportingPeriodsByContext =
+      await this.buildAllowedReportingPeriodsByContext(contexts, periodKey);
+
+    return this.buildSummary(
+      'studentId',
+      studentId,
+      this.filterGradesByReportingPeriodWindows(
+        grades,
+        allowedReportingPeriodsByContext,
+      ),
+    );
+  }
+
+  async getClassSummary(user: AuthUser, classId: string, periodKey?: string) {
+    await this.ensureClassExists(classId);
+    await this.ensureUserCanManageClass(user, classId);
+
+    const grades = await this.prisma.gradeRecord.findMany({
+      where: { classId },
+      select: {
+        score: true,
+        maxScore: true,
+        gradedAt: true,
+        class: {
+          select: {
+            schoolId: true,
+            schoolYearId: true,
+          },
+        },
+      },
+      orderBy: [{ gradedAt: 'desc' }, { createdAt: 'desc' }],
+    });
+
+    if (!periodKey) {
+      return this.buildSummary('classId', classId, grades);
+    }
+
+    const classContext = await this.getClassContext(classId);
+    const allowedReportingPeriodsByContext =
+      await this.buildAllowedReportingPeriodsByContext([classContext], periodKey);
+
+    return this.buildSummary(
+      'classId',
+      classId,
+      this.filterGradesByReportingPeriodWindows(
+        grades,
+        allowedReportingPeriodsByContext,
+      ),
+    );
   }
 }

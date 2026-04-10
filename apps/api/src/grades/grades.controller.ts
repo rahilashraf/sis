@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -42,6 +43,16 @@ export class GradesController {
     return this.gradesService.findByClass(req.user, classId);
   }
 
+  @Get('classes/:classId/summary')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  getClassSummary(
+    @Req() req: any,
+    @Param('classId') classId: string,
+    @Query('periodKey') periodKey?: string,
+  ) {
+    return this.gradesService.getClassSummary(req.user, classId, periodKey);
+  }
+
   @Get('students/:studentId')
   @Roles(
     'OWNER',
@@ -55,5 +66,24 @@ export class GradesController {
   )
   findByStudent(@Req() req: any, @Param('studentId') studentId: string) {
     return this.gradesService.findByStudent(req.user, studentId);
+  }
+
+  @Get('students/:studentId/summary')
+  @Roles(
+    'OWNER',
+    'SUPER_ADMIN',
+    'ADMIN',
+    'STAFF',
+    'TEACHER',
+    'SUPPLY_TEACHER',
+    'PARENT',
+    'STUDENT',
+  )
+  getStudentSummary(
+    @Req() req: any,
+    @Param('studentId') studentId: string,
+    @Query('periodKey') periodKey?: string,
+  ) {
+    return this.gradesService.getStudentSummary(req.user, studentId, periodKey);
   }
 }

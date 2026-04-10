@@ -55,9 +55,9 @@ describe('GradesController (HTTP)', () => {
   let app: INestApplication;
   let prisma: {
     class: { findUnique: jest.Mock };
-    reportingPeriod: { findFirst: jest.Mock };
+    reportingPeriod: { findFirst: jest.Mock; findMany: jest.Mock };
     teacherClassAssignment: { findFirst: jest.Mock };
-    studentClassEnrollment: { findFirst: jest.Mock };
+    studentClassEnrollment: { findFirst: jest.Mock; findMany: jest.Mock };
     studentParentLink: { findUnique: jest.Mock };
     gradeRecord: {
       create: jest.Mock;
@@ -70,9 +70,9 @@ describe('GradesController (HTTP)', () => {
   beforeEach(async () => {
     prisma = {
       class: { findUnique: jest.fn() },
-      reportingPeriod: { findFirst: jest.fn() },
+      reportingPeriod: { findFirst: jest.fn(), findMany: jest.fn() },
       teacherClassAssignment: { findFirst: jest.fn() },
-      studentClassEnrollment: { findFirst: jest.fn() },
+      studentClassEnrollment: { findFirst: jest.fn(), findMany: jest.fn() },
       studentParentLink: { findUnique: jest.fn() },
       gradeRecord: {
         create: jest.fn(),
@@ -468,6 +468,285 @@ describe('GradesController (HTTP)', () => {
 
     expect(prisma.gradeRecord.update).not.toHaveBeenCalled();
     expect(prisma.reportingPeriod.findFirst).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns all-time student summary for self access', async () => {
+    prisma.gradeRecord.findMany.mockResolvedValue([
+      {
+        score: 8,
+        maxScore: 10,
+        gradedAt: new Date('2026-02-10T00:00:00.000Z'),
+        class: { schoolId: 'school-1', schoolYearId: 'year-1' },
+      },
+      {
+        score: 7,
+        maxScore: 10,
+        gradedAt: new Date('2026-04-10T00:00:00.000Z'),
+        class: { schoolId: 'school-1', schoolYearId: 'year-1' },
+      },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/grades/students/student-1/summary')
+      .set('x-test-user-id', 'student-1')
+      .set('x-test-role', UserRole.STUDENT)
+      .expect(200)
+      .expect({
+        studentId: 'student-1',
+        gradeCount: 2,
+        totalScore: 15,
+        totalMaxScore: 20,
+        percentage: 75,
+      });
+
+    expect(prisma.reportingPeriod.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns period-filtered student summary for self access', async () => {
+    prisma.gradeRecord.findMany.mockResolvedValue([
+      {
+        score: 8,
+        maxScore: 10,
+        gradedAt: new Date('2026-02-10T00:00:00.000Z'),
+        class: { schoolId: 'school-1', schoolYearId: 'year-1' },
+      },
+      {
+        score: 7,
+        maxScore: 10,
+        gradedAt: new Date('2026-04-10T00:00:00.000Z'),
+        class: { schoolId: 'school-1', schoolYearId: 'year-1' },
+      },
+      {
+        score: 9,
+        maxScore: 10,
+        gradedAt: new Date('2026-08-10T00:00:00.000Z'),
+        class: { schoolId: 'school-1', schoolYearId: 'year-1' },
+      },
+    ]);
+    prisma.reportingPeriod.findMany.mockResolvedValue([
+      {
+        key: 'TERM_1',
+        order: 1,
+        startsAt: new Date('2026-01-01T00:00:00.000Z'),
+        endsAt: new Date('2026-03-31T23:59:59.999Z'),
+      },
+      {
+        key: 'TERM_2',
+        order: 2,
+        startsAt: new Date('2026-04-01T00:00:00.000Z'),
+        endsAt: new Date('2026-06-30T23:59:59.999Z'),
+      },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/grades/students/student-1/summary')
+      .query({ periodKey: 'TERM_1' })
+      .set('x-test-user-id', 'student-1')
+      .set('x-test-role', UserRole.STUDENT)
+      .expect(200)
+      .expect({
+        studentId: 'student-1',
+        gradeCount: 1,
+        totalScore: 8,
+        totalMaxScore: 10,
+        percentage: 80,
+      });
+  });
+
+  it('returns all-time class summary for an assigned teacher', async () => {
+    prisma.class.findUnique.mockResolvedValue({ id: 'class-1' });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.gradeRecord.findMany.mockResolvedValue([
+      {
+        score: 8,
+        maxScore: 10,
+        gradedAt: new Date('2026-02-10T00:00:00.000Z'),
+        class: { schoolId: 'school-1', schoolYearId: 'year-1' },
+      },
+      {
+        score: 7,
+        maxScore: 10,
+        gradedAt: new Date('2026-04-10T00:00:00.000Z'),
+        class: { schoolId: 'school-1', schoolYearId: 'year-1' },
+      },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/grades/classes/class-1/summary')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(200)
+      .expect({
+        classId: 'class-1',
+        gradeCount: 2,
+        totalScore: 15,
+        totalMaxScore: 20,
+        percentage: 75,
+      });
+
+    expect(prisma.reportingPeriod.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns period-filtered class summary for an assigned teacher', async () => {
+    prisma.class.findUnique.mockResolvedValueOnce({ id: 'class-1' }).mockResolvedValueOnce({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.gradeRecord.findMany.mockResolvedValue([
+      {
+        score: 8,
+        maxScore: 10,
+        gradedAt: new Date('2026-02-10T00:00:00.000Z'),
+        class: { schoolId: 'school-1', schoolYearId: 'year-1' },
+      },
+      {
+        score: 7,
+        maxScore: 10,
+        gradedAt: new Date('2026-04-10T00:00:00.000Z'),
+        class: { schoolId: 'school-1', schoolYearId: 'year-1' },
+      },
+      {
+        score: 9,
+        maxScore: 10,
+        gradedAt: new Date('2026-08-10T00:00:00.000Z'),
+        class: { schoolId: 'school-1', schoolYearId: 'year-1' },
+      },
+    ]);
+    prisma.reportingPeriod.findMany.mockResolvedValue([
+      {
+        key: 'TERM_1',
+        order: 1,
+        startsAt: new Date('2026-01-01T00:00:00.000Z'),
+        endsAt: new Date('2026-03-31T23:59:59.999Z'),
+      },
+      {
+        key: 'TERM_2',
+        order: 2,
+        startsAt: new Date('2026-04-01T00:00:00.000Z'),
+        endsAt: new Date('2026-06-30T23:59:59.999Z'),
+      },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/grades/classes/class-1/summary')
+      .query({ periodKey: 'TERM_1' })
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(200)
+      .expect({
+        classId: 'class-1',
+        gradeCount: 1,
+        totalScore: 8,
+        totalMaxScore: 10,
+        percentage: 80,
+      });
+  });
+
+  it('returns cumulative class summary when periodKey targets a later reporting period', async () => {
+    prisma.class.findUnique.mockResolvedValueOnce({ id: 'class-1' }).mockResolvedValueOnce({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.gradeRecord.findMany.mockResolvedValue([
+      {
+        score: 8,
+        maxScore: 10,
+        gradedAt: new Date('2026-02-10T00:00:00.000Z'),
+        class: { schoolId: 'school-1', schoolYearId: 'year-1' },
+      },
+      {
+        score: 7,
+        maxScore: 10,
+        gradedAt: new Date('2026-04-10T00:00:00.000Z'),
+        class: { schoolId: 'school-1', schoolYearId: 'year-1' },
+      },
+      {
+        score: 9,
+        maxScore: 10,
+        gradedAt: new Date('2026-08-10T00:00:00.000Z'),
+        class: { schoolId: 'school-1', schoolYearId: 'year-1' },
+      },
+    ]);
+    prisma.reportingPeriod.findMany.mockResolvedValue([
+      {
+        key: 'TERM_1',
+        order: 1,
+        startsAt: new Date('2026-01-01T00:00:00.000Z'),
+        endsAt: new Date('2026-03-31T23:59:59.999Z'),
+      },
+      {
+        key: 'TERM_2',
+        order: 2,
+        startsAt: new Date('2026-04-01T00:00:00.000Z'),
+        endsAt: new Date('2026-06-30T23:59:59.999Z'),
+      },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/grades/classes/class-1/summary')
+      .query({ periodKey: 'TERM_2' })
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(200)
+      .expect({
+        classId: 'class-1',
+        gradeCount: 2,
+        totalScore: 15,
+        totalMaxScore: 20,
+        percentage: 75,
+      });
+  });
+
+  it('returns 400 when periodKey is invalid for class summary', async () => {
+    prisma.class.findUnique.mockResolvedValueOnce({ id: 'class-1' }).mockResolvedValueOnce({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.gradeRecord.findMany.mockResolvedValue([]);
+    prisma.reportingPeriod.findMany.mockResolvedValue([
+      {
+        key: 'TERM_1',
+        order: 1,
+        startsAt: new Date('2026-01-01T00:00:00.000Z'),
+        endsAt: new Date('2026-03-31T23:59:59.999Z'),
+      },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/grades/classes/class-1/summary')
+      .query({ periodKey: 'TERM_X' })
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(400);
+  });
+
+  it('returns 403 when a student requests another student summary', async () => {
+    await request(app.getHttpServer())
+      .get('/grades/students/student-2/summary')
+      .set('x-test-user-id', 'student-1')
+      .set('x-test-role', UserRole.STUDENT)
+      .expect(403);
+
+    expect(prisma.gradeRecord.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when a teacher requests class summary for an unassigned class', async () => {
+    prisma.class.findUnique.mockResolvedValue({ id: 'class-1' });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .get('/grades/classes/class-1/summary')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(403);
+
+    expect(prisma.gradeRecord.findMany).not.toHaveBeenCalled();
   });
 
   it('returns class grades for an assigned teacher', async () => {
