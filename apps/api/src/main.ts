@@ -8,21 +8,20 @@ import { StripSensitiveFieldsInterceptor } from './common/interceptors/strip-sen
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
-  const corsOrigin = configService.get<string>('CORS_ORIGIN');
+  const corsOrigin =
+    configService.get<string>('CORS_ORIGIN') ?? 'http://localhost:3001';
   const corsCredentials =
     configService.get<string>('CORS_CREDENTIALS') === 'true';
 
-  if (corsOrigin) {
-    const origins = corsOrigin
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean);
+  const origins = corsOrigin
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
-    app.enableCors({
-      origin: origins.length === 1 ? origins[0] : origins,
-      credentials: corsCredentials,
-    });
-  }
+  app.enableCors({
+    origin: origins.length === 1 ? origins[0] : origins,
+    credentials: corsCredentials,
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -37,6 +36,8 @@ async function bootstrap() {
   app.useGlobalFilters(new PrismaClientExceptionFilter());
   app.useGlobalInterceptors(new StripSensitiveFieldsInterceptor());
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+  console.log(`API running on http://localhost:${port}`);
 }
 bootstrap();

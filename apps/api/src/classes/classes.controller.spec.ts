@@ -143,6 +143,21 @@ describe('ClassesController (HTTP)', () => {
     expect(prisma.class.findMany).not.toHaveBeenCalled();
   });
 
+  it('routes /classes/my to the teacher assigned-classes handler instead of the :id route', async () => {
+    prisma.teacherClassAssignment.findMany.mockResolvedValue([
+      { class: { id: 'class-1', name: 'Math' } },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/classes/my')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(200)
+      .expect([{ id: 'class-1', name: 'Math' }]);
+
+    expect(prisma.class.findUnique).not.toHaveBeenCalled();
+  });
+
   it('returns class students for an assigned teacher', async () => {
     prisma.teacherClassAssignment.findFirst.mockResolvedValue({
       id: 'assignment-1',

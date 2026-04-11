@@ -1,14 +1,42 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../common/auth/auth-user';
 import {
+  ensureUserHasSchoolAccess,
   getAccessibleSchoolIds,
   isBypassRole,
 } from '../common/access/school-access.util';
+import { UpdateSchoolDto } from './dto/update-school.dto';
+import { CreateSchoolDto } from './dto/create-school.dto';
 
 @Injectable()
 export class SchoolsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private async getSchoolOrThrow(user: AuthenticatedUser, schoolId: string) {
+    const existingSchool = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: {
+        id: true,
+        isActive: true,
+      },
+    });
+
+    if (!existingSchool) {
+      throw new NotFoundException('School not found');
+    }
+
+    ensureUserHasSchoolAccess(user, existingSchool.id);
+
+    return existingSchool;
+  }
 
   findAll(user: AuthenticatedUser) {
     const accessibleSchoolIds = getAccessibleSchoolIds(user);
@@ -23,5 +51,111 @@ export class SchoolsService {
           },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async create(user: AuthenticatedUser, data: CreateSchoolDto) {
+    if (!isBypassRole(user.role) && user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'Only owner, super admin, and admin roles can create schools',
+      );
+    }
+
+    return this.prisma.school.create({
+      data: {
+        name: data.name,
+        shortName: data.shortName,
+      },
+    });
+  }
+
+  async update(user: AuthenticatedUser, schoolId: string, data: UpdateSchoolDto) {
+    await this.getSchoolOrThrow(user, schoolId);
+
+    const updateData: {
+      name?: string;
+      shortName?: string | null;
+    } = {};
+
+    if (data.name !== undefined) {
+      updateData.name = data.name;
+    }
+
+    if (data.shortName !== undefined) {
+      updateData.shortName = data.shortName;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      throw new BadRequestException('No valid fields provided for update');
+    }
+
+    return this.prisma.school.update({
+      where: { id: schoolId },
+      data: updateData,
+    });
+  }
+
+  async setActiveState(
+    user: AuthenticatedUser,
+    schoolId: string,
+    isActive: boolean,
+  ) {
+    const existingSchool = await this.getSchoolOrThrow(user, schoolId);
+
+    if (existingSchool.isActive === isActive) {
+      return this.prisma.school.findUniqueOrThrow({
+        where: { id: schoolId },
+      });
+    }
+
+    return this.prisma.school.update({
+      where: { id: schoolId },
+      data: { isActive },
+    });
+  }
+
+  async remove(user: AuthenticatedUser, schoolId: string) {
+    const existingSchool = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: {
+        id: true,
+        _count: {
+          select: {
+            memberships: true,
+            schoolYears: true,
+            classes: true,
+            attendanceSessions: true,
+            reportingPeriods: true,
+          },
+        },
+      },
+    });
+
+    if (!existingSchool) {
+      throw new NotFoundException('School not found');
+    }
+
+    ensureUserHasSchoolAccess(user, existingSchool.id);
+
+    const dependencyLabels: string[] = [
+      ['memberships', existingSchool._count.memberships],
+      ['school years', existingSchool._count.schoolYears],
+      ['classes', existingSchool._count.classes],
+      ['attendance sessions', existingSchool._count.attendanceSessions],
+      ['reporting periods', existingSchool._count.reportingPeriods],
+    ].flatMap(([label, count]: [string, number]) => (count > 0 ? [label] : []));
+
+    if (dependencyLabels.length > 0) {
+      throw new ConflictException(
+        `School cannot be deleted because related ${dependencyLabels.join(', ')} still exist`,
+      );
+    }
+
+    await this.prisma.school.delete({
+      where: { id: existingSchool.id },
+    });
+
+    return {
+      success: true,
+    };
   }
 }

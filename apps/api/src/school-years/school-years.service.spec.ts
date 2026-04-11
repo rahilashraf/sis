@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { SchoolYearsService } from './school-years.service';
 
@@ -7,6 +7,8 @@ describe('SchoolYearsService', () => {
   let prisma: {
     schoolYear: {
       findMany: jest.Mock;
+      findUnique: jest.Mock;
+      delete: jest.Mock;
     };
   };
 
@@ -14,6 +16,8 @@ describe('SchoolYearsService', () => {
     prisma = {
       schoolYear: {
         findMany: jest.fn(),
+        findUnique: jest.fn(),
+        delete: jest.fn(),
       },
     };
 
@@ -31,5 +35,58 @@ describe('SchoolYearsService', () => {
         'school-2',
       ),
     ).toThrow(ForbiddenException);
+  });
+
+  it('blocks deleting school years with dependent records', async () => {
+    prisma.schoolYear.findUnique.mockResolvedValue({
+      id: 'year-1',
+      schoolId: 'school-1',
+      _count: {
+        classes: 1,
+        attendanceSessions: 0,
+        reportingPeriods: 0,
+      },
+    });
+
+    await expect(
+      service.remove(
+        {
+          id: 'owner-1',
+          role: UserRole.OWNER,
+          memberships: [],
+        } as never,
+        'year-1',
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.schoolYear.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes an empty school year', async () => {
+    prisma.schoolYear.findUnique.mockResolvedValue({
+      id: 'year-1',
+      schoolId: 'school-1',
+      _count: {
+        classes: 0,
+        attendanceSessions: 0,
+        reportingPeriods: 0,
+      },
+    });
+    prisma.schoolYear.delete.mockResolvedValue({ id: 'year-1' });
+
+    await expect(
+      service.remove(
+        {
+          id: 'owner-1',
+          role: UserRole.OWNER,
+          memberships: [],
+        } as never,
+        'year-1',
+      ),
+    ).resolves.toEqual({ success: true });
+
+    expect(prisma.schoolYear.delete).toHaveBeenCalledWith({
+      where: { id: 'year-1' },
+    });
   });
 });

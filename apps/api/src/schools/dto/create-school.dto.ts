@@ -1,18 +1,7 @@
 import { Transform } from 'class-transformer';
-import { IsDateString, IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
-export class CreateSchoolYearDto {
-  @Transform(({ value }) => {
-    if (typeof value !== 'string') {
-      return value;
-    }
-
-    return value.trim();
-  })
-  @IsString()
-  @IsNotEmpty()
-  schoolId: string;
-
+export class CreateSchoolDto {
   @Transform(({ value }) => {
     if (typeof value !== 'string') {
       return value;
@@ -24,9 +13,15 @@ export class CreateSchoolYearDto {
   @IsNotEmpty()
   name: string;
 
-  @IsDateString()
-  startDate: string;
+  @Transform(({ value }) => {
+    if (typeof value !== 'string') {
+      return value;
+    }
 
-  @IsDateString()
-  endDate: string;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  })
+  @IsOptional()
+  @IsString()
+  shortName?: string;
 }

@@ -1,12 +1,17 @@
 import {
   BadRequestException,
+  ConflictException,
+  HttpException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSchoolYearDto } from './dto/create-school-year.dto';
 import { AuthenticatedUser } from '../common/auth/auth-user';
 import { ensureUserHasSchoolAccess } from '../common/access/school-access.util';
+import { UpdateSchoolYearDto } from './dto/update-school-year.dto';
 
 @Injectable()
 export class SchoolYearsService {
@@ -22,6 +27,28 @@ export class SchoolYearsService {
     if (startDate >= endDate) {
       throw new BadRequestException('startDate must be before endDate');
     }
+  }
+
+  private handleRemoveError(error: unknown): never {
+    if (error instanceof HttpException) {
+      throw error;
+    }
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') {
+        throw new NotFoundException('School year not found');
+      }
+
+      if (error.code === 'P2003') {
+        throw new ConflictException(
+          'School year cannot be deleted because related records still exist',
+        );
+      }
+    }
+
+    throw new InternalServerErrorException(
+      'Unable to delete school year right now',
+    );
   }
 
   async create(user: AuthenticatedUser, data: CreateSchoolYearDto) {
@@ -60,6 +87,59 @@ export class SchoolYearsService {
         schoolId,
       },
       orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
+      include: this.buildInclude(),
+    });
+  }
+
+  async update(user: AuthenticatedUser, id: string, data: UpdateSchoolYearDto) {
+    const existing = await this.prisma.schoolYear.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        schoolId: true,
+        startDate: true,
+        endDate: true,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('School year not found');
+    }
+
+    ensureUserHasSchoolAccess(user, existing.schoolId);
+
+    const nextStartDate = data.startDate
+      ? new Date(data.startDate)
+      : existing.startDate;
+    const nextEndDate = data.endDate ? new Date(data.endDate) : existing.endDate;
+
+    this.ensureValidDateRange(nextStartDate, nextEndDate);
+
+    const updateData: {
+      name?: string;
+      startDate?: Date;
+      endDate?: Date;
+    } = {};
+
+    if (data.name !== undefined) {
+      updateData.name = data.name;
+    }
+
+    if (data.startDate !== undefined) {
+      updateData.startDate = nextStartDate;
+    }
+
+    if (data.endDate !== undefined) {
+      updateData.endDate = nextEndDate;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      throw new BadRequestException('No valid fields provided for update');
+    }
+
+    return this.prisma.schoolYear.update({
+      where: { id },
+      data: updateData,
       include: this.buildInclude(),
     });
   }
@@ -122,5 +202,52 @@ export class SchoolYearsService {
       },
       include: this.buildInclude(),
     });
+  }
+
+  async remove(user: AuthenticatedUser, id: string) {
+    try {
+      const existing = await this.prisma.schoolYear.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          schoolId: true,
+          _count: {
+            select: {
+              classes: true,
+              attendanceSessions: true,
+              reportingPeriods: true,
+            },
+          },
+        },
+      });
+
+      if (!existing) {
+        throw new NotFoundException('School year not found');
+      }
+
+      ensureUserHasSchoolAccess(user, existing.schoolId);
+
+      const dependencyLabels: string[] = [
+        ['classes', existing._count.classes],
+        ['attendance sessions', existing._count.attendanceSessions],
+        ['reporting periods', existing._count.reportingPeriods],
+      ].flatMap(([label, count]: [string, number]) => (count > 0 ? [label] : []));
+
+      if (dependencyLabels.length > 0) {
+        throw new ConflictException(
+          `School year cannot be deleted because related ${dependencyLabels.join(', ')} still exist`,
+        );
+      }
+
+      await this.prisma.schoolYear.delete({
+        where: { id: existing.id },
+      });
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      this.handleRemoveError(error);
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { UsersService } from './users.service';
 
@@ -8,6 +8,8 @@ describe('UsersService', () => {
     user: {
       findMany: jest.Mock;
       create: jest.Mock;
+      findUnique: jest.Mock;
+      delete: jest.Mock;
     };
     school: {
       findUnique: jest.Mock;
@@ -19,6 +21,8 @@ describe('UsersService', () => {
       user: {
         findMany: jest.fn(),
         create: jest.fn(),
+        findUnique: jest.fn(),
+        delete: jest.fn(),
       },
       school: {
         findUnique: jest.fn(),
@@ -70,5 +74,111 @@ describe('UsersService', () => {
         } as never,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('blocks deleting the current user account', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'admin-1',
+      role: UserRole.ADMIN,
+      memberships: [],
+      _count: {
+        parentLinks: 0,
+        studentLinks: 0,
+        teacherClasses: 0,
+        studentClasses: 0,
+        takenAttendanceSessions: 0,
+        attendanceRecords: 0,
+        studentGradeRecords: 0,
+      },
+    });
+
+    await expect(
+      service.remove(
+        {
+          id: 'admin-1',
+          role: UserRole.OWNER,
+          memberships: [],
+        } as never,
+        'admin-1',
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.user.delete).not.toHaveBeenCalled();
+  });
+
+  it('blocks deleting users with related records', async () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce({
+        id: 'teacher-1',
+        role: UserRole.TEACHER,
+        memberships: [],
+        _count: {
+          parentLinks: 0,
+          studentLinks: 0,
+          teacherClasses: 1,
+          studentClasses: 0,
+          takenAttendanceSessions: 0,
+          attendanceRecords: 0,
+          studentGradeRecords: 0,
+        },
+      })
+      .mockResolvedValueOnce({
+        id: 'teacher-1',
+        role: UserRole.TEACHER,
+        memberships: [],
+      });
+
+    await expect(
+      service.remove(
+        {
+          id: 'owner-1',
+          role: UserRole.OWNER,
+          memberships: [],
+        } as never,
+        'teacher-1',
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.user.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes a manageable user with no dependent records', async () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce({
+        id: 'teacher-1',
+        role: UserRole.TEACHER,
+        memberships: [],
+        _count: {
+          parentLinks: 0,
+          studentLinks: 0,
+          teacherClasses: 0,
+          studentClasses: 0,
+          takenAttendanceSessions: 0,
+          attendanceRecords: 0,
+          studentGradeRecords: 0,
+        },
+      })
+      .mockResolvedValueOnce({
+        id: 'teacher-1',
+        role: UserRole.TEACHER,
+        memberships: [],
+      });
+
+    prisma.user.delete.mockResolvedValue({ id: 'teacher-1' });
+
+    await expect(
+      service.remove(
+        {
+          id: 'owner-1',
+          role: UserRole.OWNER,
+          memberships: [],
+        } as never,
+        'teacher-1',
+      ),
+    ).resolves.toEqual({ success: true });
+
+    expect(prisma.user.delete).toHaveBeenCalledWith({
+      where: { id: 'teacher-1' },
+    });
   });
 });

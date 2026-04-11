@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -13,6 +14,7 @@ import {
 import { AttendanceService } from './attendance.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { UpdateAttendanceRecordDto } from './dto/update-attendance-record.dto';
+import { UpdateAttendanceSessionDto } from './dto/update-attendance-session.dto';
 import { GetAttendanceSessionsQueryDto } from './dto/get-attendance-sessions-query.dto';
 import { GetStudentAttendanceByDateQueryDto } from './dto/get-student-attendance-by-date-query.dto';
 import { GetStudentSummaryQueryDto } from './dto/get-student-summary-query.dto';
@@ -66,6 +68,16 @@ export class AttendanceController {
     @Param('sessionId', NonEmptyStringPipe) sessionId: string,
   ) {
     return this.attendanceService.getSessionById(req.user, sessionId);
+  }
+
+  @Patch('sessions/:sessionId')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  updateSession(
+    @Req() req: AuthenticatedRequest,
+    @Param('sessionId', NonEmptyStringPipe) sessionId: string,
+    @Body() body: UpdateAttendanceSessionDto,
+  ) {
+    return this.attendanceService.updateSession(req.user, sessionId, body);
   }
 
   @Get('students/:studentId/by-date')
@@ -125,18 +137,16 @@ export class AttendanceController {
     @Param('studentId', NonEmptyStringPipe) studentId: string,
     @Query() query: GetStudentSummaryQueryDto,
   ) {
+    if (!query.startDate || !query.endDate) {
+      throw new BadRequestException('startDate and endDate are required');
+    }
+
     return this.attendanceService.getStudentSummary(
       req.user,
       studentId,
       query.startDate,
       query.endDate,
     );
-  }
-
-  @Get('classes/:classId/summary')
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
-  getClassSummary(@Req() req: any, @Param('classId') classId: string) {
-    return this.attendanceService.getClassSummary(req.user, classId);
   }
 
   @Patch('records/:recordId')

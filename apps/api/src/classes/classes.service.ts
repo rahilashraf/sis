@@ -7,6 +7,7 @@ import {
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClassDto } from './dto/create-class.dto';
+import { UpdateClassDto } from './dto/update-class.dto';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
 import { EnrollStudentDto } from './dto/enroll-student.dto';
 import { AuthenticatedUser } from '../common/auth/auth-user';
@@ -290,6 +291,23 @@ export class ClassesService {
     });
   }
 
+  async findOne(user: AuthenticatedUser, classId: string) {
+    const existingClass = await this.getClassOrThrow(classId);
+
+    if (this.isAdminLike(user.role)) {
+      ensureUserHasSchoolAccess(user, existingClass.schoolId);
+    } else if (this.isTeacherLike(user.role)) {
+      await this.ensureTeacherAssignedToClass(user.id, classId);
+    } else {
+      throw new ForbiddenException('You do not have class access');
+    }
+
+    return this.prisma.class.findUniqueOrThrow({
+      where: { id: classId },
+      select: this.buildClassSelect(),
+    });
+  }
+
   async findMyClasses(user: AuthenticatedUser) {
     if (this.isAdminLike(user.role)) {
       return this.prisma.class.findMany({
@@ -513,6 +531,26 @@ export class ClassesService {
     return this.prisma.class.update({
       where: { id: classId },
       data: { isActive },
+      select: this.buildClassSelect(),
+    });
+  }
+
+  async update(user: AuthenticatedUser, classId: string, data: UpdateClassDto) {
+    const existingClass = await this.getClassOrThrow(classId);
+    ensureUserHasSchoolAccess(user, existingClass.schoolId);
+
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException('No valid fields provided for update');
+    }
+
+    return this.prisma.class.update({
+      where: { id: classId },
+      data: {
+        name: data.name,
+        subject: data.subject,
+        isHomeroom: data.isHomeroom,
+        isActive: data.isActive,
+      },
       select: this.buildClassSelect(),
     });
   }

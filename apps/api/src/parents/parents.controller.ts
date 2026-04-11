@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Param,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -28,6 +36,10 @@ export class ParentsController {
     @Param('studentId', NonEmptyStringPipe) studentId: string,
     @Query() query: GetStudentSummaryQueryDto,
   ) {
+    if (!query.startDate || !query.endDate) {
+      throw new BadRequestException('startDate and endDate are required');
+    }
+
     return this.attendanceService.getStudentSummary(
       req.user,
       studentId,

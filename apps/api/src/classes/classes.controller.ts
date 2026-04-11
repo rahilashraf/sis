@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ClassesService } from './classes.service';
 import { CreateClassDto } from './dto/create-class.dto';
+import { UpdateClassDto } from './dto/update-class.dto';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
 import { EnrollStudentDto } from './dto/enroll-student.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -42,6 +43,16 @@ export class ClassesController {
   @Get('my')
   findMyClasses(@Req() req: AuthenticatedRequest) {
     return this.classesService.findMyClasses(req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  @Get(':id')
+  findOne(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
+    return this.classesService.findOne(req.user, id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -106,6 +117,17 @@ export class ClassesController {
     @Param('id', NonEmptyStringPipe) id: string,
   ) {
     return this.classesService.setClassActiveState(req.user, id, true);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Patch(':id')
+  update(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+    @Body() body: UpdateClassDto,
+  ) {
+    return this.classesService.update(req.user, id, body);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import request from 'supertest';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ROLES_KEY } from '../auth/roles.decorator';
@@ -23,6 +23,7 @@ class TestJwtAuthGuard implements CanActivate {
     request.user = {
       id: request.headers['x-test-user-id'],
       role: request.headers['x-test-role'],
+      memberships: [{ schoolId: 'school-1', isActive: true }],
     };
     return true;
   }
@@ -55,6 +56,7 @@ describe('SchoolYearsController (HTTP)', () => {
       create: jest.Mock;
       findMany: jest.Mock;
       findUnique: jest.Mock;
+      delete: jest.Mock;
       updateMany: jest.Mock;
       update: jest.Mock;
     };
@@ -70,6 +72,7 @@ describe('SchoolYearsController (HTTP)', () => {
         create: jest.fn(),
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        delete: jest.fn(),
         updateMany: jest.fn(),
         update: jest.fn(),
       },
@@ -263,7 +266,10 @@ describe('SchoolYearsController (HTTP)', () => {
   });
 
   it('archives a school year for admin-like roles', async () => {
-    prisma.schoolYear.findUnique.mockResolvedValue({ id: 'year-1' });
+    prisma.schoolYear.findUnique.mockResolvedValue({
+      id: 'year-1',
+      schoolId: 'school-1',
+    });
     prisma.schoolYear.update.mockResolvedValue({
       id: 'year-1',
       schoolId: 'school-1',
@@ -287,7 +293,10 @@ describe('SchoolYearsController (HTTP)', () => {
   });
 
   it('deactivates a school year through the alias endpoint', async () => {
-    prisma.schoolYear.findUnique.mockResolvedValue({ id: 'year-1' });
+    prisma.schoolYear.findUnique.mockResolvedValue({
+      id: 'year-1',
+      schoolId: 'school-1',
+    });
     prisma.schoolYear.update.mockResolvedValue({
       id: 'year-1',
       schoolId: 'school-1',
@@ -326,5 +335,65 @@ describe('SchoolYearsController (HTTP)', () => {
       .expect(400);
 
     expect(prisma.schoolYear.create).not.toHaveBeenCalled();
+  });
+
+  it('deletes an empty school year for admin-level access', async () => {
+    prisma.schoolYear.findUnique.mockResolvedValue({
+      id: 'year-1',
+      schoolId: 'school-1',
+      _count: {
+        classes: 0,
+        attendanceSessions: 0,
+        reportingPeriods: 0,
+      },
+    });
+    prisma.schoolYear.delete.mockResolvedValue({ id: 'year-1' });
+
+    await request(app.getHttpServer())
+      .delete('/school-years/year-1')
+      .set('x-test-user-id', 'owner-1')
+      .set('x-test-role', UserRole.OWNER)
+      .expect(200)
+      .expect({ success: true });
+  });
+
+  it('returns 409 when delete reaches a relational conflict', async () => {
+    prisma.schoolYear.findUnique.mockResolvedValue({
+      id: 'year-1',
+      schoolId: 'school-1',
+      _count: {
+        classes: 0,
+        attendanceSessions: 0,
+        reportingPeriods: 0,
+      },
+    });
+    prisma.schoolYear.delete.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('constraint failed', {
+        code: 'P2003',
+        clientVersion: 'test',
+      }),
+    );
+
+    await request(app.getHttpServer())
+      .delete('/school-years/year-1')
+      .set('x-test-user-id', 'owner-1')
+      .set('x-test-role', UserRole.OWNER)
+      .expect(409)
+      .expect({
+        statusCode: 409,
+        message: 'School year cannot be deleted because related records still exist',
+        error: 'Conflict',
+      });
+  });
+
+  it('returns 403 when a staff role deletes a school year', async () => {
+    await request(app.getHttpServer())
+      .delete('/school-years/year-1')
+      .set('x-test-user-id', 'staff-1')
+      .set('x-test-role', UserRole.STAFF)
+      .expect(403);
+
+    expect(prisma.schoolYear.findUnique).not.toHaveBeenCalled();
+    expect(prisma.schoolYear.delete).not.toHaveBeenCalled();
   });
 });

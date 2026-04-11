@@ -14,6 +14,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { UpdateAttendanceRecordDto } from './dto/update-attendance-record.dto';
+import { UpdateAttendanceSessionDto } from './dto/update-attendance-session.dto';
 import { AuthenticatedUser } from '../common/auth/auth-user';
 import {
   ensureUserHasSchoolAccess,
@@ -533,6 +534,35 @@ export class AttendanceService {
     return session;
   }
 
+  private validateAttendanceRecords(
+    records: { studentId: string; status: AttendanceStatus; remark?: string | null }[],
+    allowedStudentIds: Set<string>,
+  ) {
+    const seenStudentIds = new Set<string>();
+
+    for (const record of records) {
+      if (seenStudentIds.has(record.studentId)) {
+        throw new BadRequestException(
+          `Duplicate studentId in request: ${record.studentId}`,
+        );
+      }
+
+      seenStudentIds.add(record.studentId);
+
+      if (!allowedStudentIds.has(record.studentId)) {
+        throw new BadRequestException(
+          `Student ${record.studentId} is not enrolled in the selected class set`,
+        );
+      }
+
+      if (!Object.values(AttendanceStatus).includes(record.status)) {
+        throw new BadRequestException(
+          `Invalid attendance status for student ${record.studentId}`,
+        );
+      }
+    }
+  }
+
   async getStudentsForClasses(user: AuthUser, classIds: string[]) {
     if (!classIds.length) {
       throw new BadRequestException('classIds is required');
@@ -666,29 +696,7 @@ export class AttendanceService {
       }
     }
 
-    const seenStudentIds = new Set<string>();
-
-    for (const record of dto.records) {
-      if (seenStudentIds.has(record.studentId)) {
-        throw new BadRequestException(
-          `Duplicate studentId in request: ${record.studentId}`,
-        );
-      }
-
-      seenStudentIds.add(record.studentId);
-
-      if (!allowedStudentIds.has(record.studentId)) {
-        throw new BadRequestException(
-          `Student ${record.studentId} is not enrolled in the selected class set`,
-        );
-      }
-
-      if (!Object.values(AttendanceStatus).includes(record.status)) {
-        throw new BadRequestException(
-          `Invalid attendance status for student ${record.studentId}`,
-        );
-      }
-    }
+    this.validateAttendanceRecords(dto.records, allowedStudentIds);
 
     const existingRecords = await this.prisma.attendanceRecord.findMany({
       where: {
@@ -737,6 +745,48 @@ export class AttendanceService {
       },
       select: attendanceSessionSelect,
     });
+  }
+
+  async updateSession(
+    user: AuthUser,
+    sessionId: string,
+    dto: UpdateAttendanceSessionDto,
+  ) {
+    const existingSession = await this.getAttendanceSessionOrThrow(sessionId);
+    const classIds = existingSession.classes.map(
+      (sessionClass) => sessionClass.classId,
+    );
+
+    await this.ensureUserCanAccessClasses(user, classIds);
+
+    const allowedStudentIds = await this.getStudentIdsForClasses(classIds);
+    this.validateAttendanceRecords(dto.records, allowedStudentIds);
+
+    await this.prisma.$transaction(
+      dto.records.map((record) =>
+        this.prisma.attendanceRecord.upsert({
+          where: {
+            attendanceSessionId_studentId: {
+              attendanceSessionId: sessionId,
+              studentId: record.studentId,
+            },
+          },
+          update: {
+            status: record.status,
+            remark: record.remark ?? null,
+          },
+          create: {
+            attendanceSessionId: sessionId,
+            studentId: record.studentId,
+            date: existingSession.date,
+            status: record.status,
+            remark: record.remark ?? null,
+          },
+        }),
+      ),
+    );
+
+    return this.getSessionById(user, sessionId);
   }
 
   async getSessionsByDate(user: AuthUser, schoolId: string, date: string) {

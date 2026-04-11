@@ -50,12 +50,20 @@ class TestRolesGuard implements CanActivate {
 describe('UsersController (HTTP)', () => {
   let app: INestApplication;
   let prisma: {
-    user: { findMany: jest.Mock };
+    user: {
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+      delete: jest.Mock;
+    };
   };
 
   beforeEach(async () => {
     prisma = {
-      user: { findMany: jest.fn() },
+      user: {
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        delete: jest.fn(),
+      },
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -121,5 +129,47 @@ describe('UsersController (HTTP)', () => {
       .expect(403);
 
     expect(prisma.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it('deletes a user for admin-level access', async () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce({
+        id: 'user-2',
+        role: UserRole.TEACHER,
+        memberships: [],
+        _count: {
+          parentLinks: 0,
+          studentLinks: 0,
+          teacherClasses: 0,
+          studentClasses: 0,
+          takenAttendanceSessions: 0,
+          attendanceRecords: 0,
+          studentGradeRecords: 0,
+        },
+      })
+      .mockResolvedValueOnce({
+        id: 'user-2',
+        role: UserRole.TEACHER,
+        memberships: [],
+      });
+    prisma.user.delete.mockResolvedValue({ id: 'user-2' });
+
+    await request(app.getHttpServer())
+      .delete('/users/user-2')
+      .set('x-test-user-id', 'owner-1')
+      .set('x-test-role', UserRole.OWNER)
+      .expect(200)
+      .expect({ success: true });
+  });
+
+  it('returns 403 for non-admin user deletion access', async () => {
+    await request(app.getHttpServer())
+      .delete('/users/user-2')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(403);
+
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.user.delete).not.toHaveBeenCalled();
   });
 });
