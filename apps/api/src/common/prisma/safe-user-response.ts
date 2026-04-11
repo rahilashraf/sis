@@ -57,6 +57,10 @@ function stripPasswordHash(value: unknown): unknown {
     return value.map((entry) => stripPasswordHash(entry));
   }
 
+  if (value instanceof Date) {
+    return value;
+  }
+
   if (!value || typeof value !== 'object') {
     return value;
   }

@@ -60,10 +60,23 @@ export class SchoolsService {
       );
     }
 
+    const membershipData =
+      user.role === UserRole.ADMIN
+        ? {
+            memberships: {
+              create: {
+                userId: user.id,
+                isActive: true,
+              },
+            },
+          }
+        : {};
+
     return this.prisma.school.create({
       data: {
         name: data.name,
         shortName: data.shortName,
+        ...membershipData,
       },
     });
   }

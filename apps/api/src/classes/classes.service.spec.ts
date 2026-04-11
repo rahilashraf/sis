@@ -1,12 +1,17 @@
-import { BadRequestException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { BadRequestException, ConflictException } from '@nestjs/common';
+import { Prisma, UserRole } from '@prisma/client';
 import { ClassesService } from './classes.service';
 
 describe('ClassesService', () => {
   let service: ClassesService;
   let prisma: {
     class: {
+      create: jest.Mock;
       findMany: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+    };
+    schoolYear: {
       findUnique: jest.Mock;
     };
     user: {
@@ -20,7 +25,12 @@ describe('ClassesService', () => {
   beforeEach(() => {
     prisma = {
       class: {
+        create: jest.fn(),
         findMany: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      schoolYear: {
         findUnique: jest.fn(),
       },
       user: {
@@ -82,5 +92,75 @@ describe('ClassesService', () => {
         { teacherId: 'teacher-1' },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('returns a class-specific duplicate message during create', async () => {
+    prisma.schoolYear.findUnique.mockResolvedValue({
+      id: 'year-1',
+      schoolId: 'school-1',
+    });
+    prisma.class.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('duplicate', {
+        code: 'P2002',
+        clientVersion: 'test',
+        meta: {
+          target: ['schoolId', 'schoolYearId', 'name'],
+        },
+      }),
+    );
+
+    await expect(
+      service.create(
+        {
+          id: 'admin-1',
+          role: UserRole.ADMIN,
+          memberships: [{ schoolId: 'school-1', isActive: true }],
+        } as never,
+        {
+          schoolId: 'school-1',
+          schoolYearId: 'year-1',
+          name: 'Math 101',
+        },
+      ),
+    ).rejects.toEqual(
+      new ConflictException(
+        'A class with this name already exists for this school year',
+      ),
+    );
+  });
+
+  it('returns a class-specific duplicate message during update', async () => {
+    prisma.class.findUnique.mockResolvedValue({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
+    prisma.class.update.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('duplicate', {
+        code: 'P2002',
+        clientVersion: 'test',
+        meta: {
+          target: ['schoolId', 'schoolYearId', 'name'],
+        },
+      }),
+    );
+
+    await expect(
+      service.update(
+        {
+          id: 'admin-1',
+          role: UserRole.ADMIN,
+          memberships: [{ schoolId: 'school-1', isActive: true }],
+        } as never,
+        'class-1',
+        {
+          name: 'Math 101',
+        },
+      ),
+    ).rejects.toEqual(
+      new ConflictException(
+        'A class with this name already exists for this school year',
+      ),
+    );
   });
 });

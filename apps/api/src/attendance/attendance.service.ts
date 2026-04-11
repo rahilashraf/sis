@@ -404,6 +404,76 @@ export class AttendanceService {
     return new Set(assignments.map((assignment) => assignment.classId));
   }
 
+  private async getWritableClassIdsForSession(
+    user: AuthUser,
+    classIds: string[],
+  ): Promise<string[]> {
+    if (this.isAdminLike(user.role) || isBypassRole(user.role)) {
+      await this.ensureUserCanAccessClasses(user, classIds);
+      return classIds;
+    }
+
+    if (!this.isTeacherLike(user.role)) {
+      throw new ForbiddenException(
+        'You do not have access to these classes',
+      );
+    }
+
+    const assignedClassIds = await this.getTeacherAssignedClassIds(
+      user.id,
+      classIds,
+    );
+    const writableClassIds = classIds.filter((classId) =>
+      assignedClassIds.has(classId),
+    );
+
+    if (writableClassIds.length === 0) {
+      throw new ForbiddenException(
+        'You are not assigned to one or more selected classes',
+      );
+    }
+
+    return writableClassIds;
+  }
+
+  private async getWritableClassIdsForRequestedScope(
+    user: AuthUser,
+    classIds: string[],
+  ): Promise<string[]> {
+    const uniqueClassIds = [...new Set(classIds)];
+    await this.ensureUserCanAccessClasses(user, uniqueClassIds);
+    return uniqueClassIds;
+  }
+
+  private buildAttachSessionClassesOperation(
+    sessionId: string,
+    existingClassIds: string[],
+    writableClassIds: string[],
+  ) {
+    const existingClassIdSet = new Set(existingClassIds);
+    const missingClassIds = writableClassIds.filter(
+      (classId) => !existingClassIdSet.has(classId),
+    );
+
+    if (missingClassIds.length === 0) {
+      return null;
+    }
+
+    return this.prisma.attendanceSession.update({
+      where: { id: sessionId },
+      data: {
+        classes: {
+          create: missingClassIds.map((classId) => ({
+            classId,
+          })),
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
+
   private async getStudentIdsForClasses(
     classIds: string[],
   ): Promise<Set<string>> {
@@ -563,6 +633,58 @@ export class AttendanceService {
     }
   }
 
+  private async findExistingSessionForClassDate(
+    schoolId: string,
+    classId: string,
+    date: Date,
+  ) {
+    return this.prisma.attendanceSession.findFirst({
+      where: {
+        schoolId,
+        date,
+        classes: {
+          some: {
+            classId,
+          },
+        },
+      },
+      select: {
+        id: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  private async findExistingSessionForStudentDate(
+    schoolId: string,
+    date: Date,
+    attendanceSessionIds: string[],
+  ) {
+    const uniqueSessionIds = [...new Set(attendanceSessionIds)];
+
+    if (uniqueSessionIds.length === 0) {
+      return null;
+    }
+
+    return this.prisma.attendanceSession.findFirst({
+      where: {
+        id: {
+          in: uniqueSessionIds,
+        },
+        schoolId,
+        date,
+      },
+      select: {
+        id: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
   async getStudentsForClasses(user: AuthUser, classIds: string[]) {
     if (!classIds.length) {
       throw new BadRequestException('classIds is required');
@@ -698,6 +820,20 @@ export class AttendanceService {
 
     this.validateAttendanceRecords(dto.records, allowedStudentIds);
 
+    if (uniqueClassIds.length === 1) {
+      const existingSession = await this.findExistingSessionForClassDate(
+        dto.schoolId,
+        uniqueClassIds[0],
+        normalizedDate,
+      );
+
+      if (existingSession) {
+        return this.updateSessionWithScope(user, existingSession.id, {
+          records: dto.records,
+        }, uniqueClassIds);
+      }
+    }
+
     const existingRecords = await this.prisma.attendanceRecord.findMany({
       where: {
         studentId: { in: dto.records.map((r) => r.studentId) },
@@ -705,11 +841,26 @@ export class AttendanceService {
       },
       select: {
         id: true,
+        attendanceSessionId: true,
         studentId: true,
       },
     });
 
     if (existingRecords.length > 0) {
+      if (uniqueClassIds.length === 1) {
+        const existingSession = await this.findExistingSessionForStudentDate(
+          dto.schoolId,
+          normalizedDate,
+          existingRecords.map((record) => record.attendanceSessionId),
+        );
+
+        if (existingSession) {
+          return this.updateSessionWithScope(user, existingSession.id, {
+            records: dto.records,
+          }, uniqueClassIds);
+        }
+      }
+
       throw new ConflictException({
         message: 'One or more students already have attendance for this date',
         conflicts: existingRecords,
@@ -747,46 +898,67 @@ export class AttendanceService {
     });
   }
 
+  private async updateSessionWithScope(
+    user: AuthUser,
+    sessionId: string,
+    dto: UpdateAttendanceSessionDto,
+    scopeClassIds?: string[],
+  ) {
+    const existingSession = await this.getAttendanceSessionOrThrow(sessionId);
+    const existingClassIds = existingSession.classes.map(
+      (sessionClass) => sessionClass.classId,
+    );
+    const writableClassIds =
+      scopeClassIds && scopeClassIds.length > 0
+        ? await this.getWritableClassIdsForRequestedScope(user, scopeClassIds)
+        : await this.getWritableClassIdsForSession(user, existingClassIds);
+    const allowedStudentIds = await this.getStudentIdsForClasses(
+      writableClassIds,
+    );
+    this.validateAttendanceRecords(dto.records, allowedStudentIds);
+
+    const attachSessionClassesOperation = this.buildAttachSessionClassesOperation(
+      sessionId,
+      existingClassIds,
+      writableClassIds,
+    );
+
+    await this.prisma.$transaction(
+      [
+        ...(attachSessionClassesOperation ? [attachSessionClassesOperation] : []),
+        ...dto.records.map((record) =>
+          this.prisma.attendanceRecord.upsert({
+            where: {
+              attendanceSessionId_studentId: {
+                attendanceSessionId: sessionId,
+                studentId: record.studentId,
+              },
+            },
+            update: {
+              status: record.status,
+              remark: record.remark ?? null,
+            },
+            create: {
+              attendanceSessionId: sessionId,
+              studentId: record.studentId,
+              date: existingSession.date,
+              status: record.status,
+              remark: record.remark ?? null,
+            },
+          }),
+        ),
+      ],
+    );
+
+    return this.getSessionById(user, sessionId);
+  }
+
   async updateSession(
     user: AuthUser,
     sessionId: string,
     dto: UpdateAttendanceSessionDto,
   ) {
-    const existingSession = await this.getAttendanceSessionOrThrow(sessionId);
-    const classIds = existingSession.classes.map(
-      (sessionClass) => sessionClass.classId,
-    );
-
-    await this.ensureUserCanAccessClasses(user, classIds);
-
-    const allowedStudentIds = await this.getStudentIdsForClasses(classIds);
-    this.validateAttendanceRecords(dto.records, allowedStudentIds);
-
-    await this.prisma.$transaction(
-      dto.records.map((record) =>
-        this.prisma.attendanceRecord.upsert({
-          where: {
-            attendanceSessionId_studentId: {
-              attendanceSessionId: sessionId,
-              studentId: record.studentId,
-            },
-          },
-          update: {
-            status: record.status,
-            remark: record.remark ?? null,
-          },
-          create: {
-            attendanceSessionId: sessionId,
-            studentId: record.studentId,
-            date: existingSession.date,
-            status: record.status,
-            remark: record.remark ?? null,
-          },
-        }),
-      ),
-    );
-
-    return this.getSessionById(user, sessionId);
+    return this.updateSessionWithScope(user, sessionId, dto);
   }
 
   async getSessionsByDate(user: AuthUser, schoolId: string, date: string) {

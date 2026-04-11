@@ -1,10 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
@@ -27,6 +28,9 @@ import {
 @Injectable()
 export class ClassesService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private readonly duplicateClassNameMessage =
+    'A class with this name already exists for this school year';
 
   private isAdminLike(role: UserRole) {
     return isBypassRole(role) || isSchoolAdminRole(role);
@@ -58,6 +62,32 @@ export class ClassesService {
         select: safeUserSelect,
       },
     } as const;
+  }
+
+  private isDuplicateClassNameError(error: unknown) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+      return false;
+    }
+
+    if (error.code !== 'P2002') {
+      return false;
+    }
+
+    const target = Array.isArray(error.meta?.target) ? error.meta.target : [];
+
+    return (
+      target.includes('schoolId') &&
+      target.includes('schoolYearId') &&
+      target.includes('name')
+    );
+  }
+
+  private rethrowDuplicateClassNameError(error: unknown): never {
+    if (this.isDuplicateClassNameError(error)) {
+      throw new ConflictException(this.duplicateClassNameMessage);
+    }
+
+    throw error;
   }
 
   private buildClassSelect(includeStudents = true) {
@@ -263,16 +293,20 @@ export class ClassesService {
       throw new BadRequestException('schoolYearId does not belong to schoolId');
     }
 
-    return this.prisma.class.create({
-      data: {
-        schoolId: data.schoolId,
-        schoolYearId: data.schoolYearId,
-        name: data.name,
-        subject: data.subject,
-        isHomeroom: data.isHomeroom ?? false,
-      },
-      select: this.buildClassSelect(),
-    });
+    try {
+      return await this.prisma.class.create({
+        data: {
+          schoolId: data.schoolId,
+          schoolYearId: data.schoolYearId,
+          name: data.name,
+          subject: data.subject,
+          isHomeroom: data.isHomeroom ?? false,
+        },
+        select: this.buildClassSelect(),
+      });
+    } catch (error) {
+      this.rethrowDuplicateClassNameError(error);
+    }
   }
 
   findAll(user: AuthenticatedUser) {
@@ -543,16 +577,20 @@ export class ClassesService {
       throw new BadRequestException('No valid fields provided for update');
     }
 
-    return this.prisma.class.update({
-      where: { id: classId },
-      data: {
-        name: data.name,
-        subject: data.subject,
-        isHomeroom: data.isHomeroom,
-        isActive: data.isActive,
-      },
-      select: this.buildClassSelect(),
-    });
+    try {
+      return await this.prisma.class.update({
+        where: { id: classId },
+        data: {
+          name: data.name,
+          subject: data.subject,
+          isHomeroom: data.isHomeroom,
+          isActive: data.isActive,
+        },
+        select: this.buildClassSelect(),
+      });
+    } catch (error) {
+      this.rethrowDuplicateClassNameError(error);
+    }
   }
 
   async findTeachers(user: AuthenticatedUser, classId: string) {

@@ -118,6 +118,12 @@ describe('SchoolsController (HTTP)', () => {
 
     expect(prisma.school.create).toHaveBeenCalledWith({
       data: {
+        memberships: {
+          create: {
+            userId: 'admin-1',
+            isActive: true,
+          },
+        },
         name: 'South School',
         shortName: 'SS',
       },
