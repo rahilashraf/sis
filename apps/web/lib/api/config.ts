@@ -4,7 +4,7 @@ const baseUrl =
 export const apiConfig = {
   baseUrl,
   endpoints: {
-    login: `${baseUrl}/auth/login`,
-    me: `${baseUrl}/auth/me`,
+    login: "/auth/login",
+    me: "/auth/me",
   },
 };
