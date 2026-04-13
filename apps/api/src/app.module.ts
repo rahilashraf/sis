@@ -14,6 +14,12 @@ import { StudentsModule } from './students/students.module';
 import { SchoolYearsModule } from './school-years/school-years.module';
 import { GradesModule } from './grades/grades.module';
 import { ReportingPeriodsModule } from './reporting-periods/reporting-periods.module';
+import { GradeLevelsModule } from './grade-levels/grade-levels.module';
+import { AssessmentsModule } from './assessments/assessments.module';
+import { GradeScalesModule } from './grade-scales/grade-scales.module';
+import { ReRegistrationModule } from './re-registration/re-registration.module';
+import { StudentDocumentsModule } from './student-documents/student-documents.module';
+import { FormsModule } from './forms/forms.module';
 
 @Module({
   imports: [
@@ -32,6 +38,12 @@ import { ReportingPeriodsModule } from './reporting-periods/reporting-periods.mo
     SchoolYearsModule,
     GradesModule,
     ReportingPeriodsModule,
+    GradeLevelsModule,
+    AssessmentsModule,
+    GradeScalesModule,
+    ReRegistrationModule,
+    StudentDocumentsModule,
+    FormsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -7,14 +7,18 @@ import {
 } from '@nestjs/common';
 import {
   AttendanceScopeType,
+  AttendanceStatusCountBehavior,
   AttendanceStatus,
   Prisma,
+  TeacherClassAssignmentType,
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { UpdateAttendanceRecordDto } from './dto/update-attendance-record.dto';
 import { UpdateAttendanceSessionDto } from './dto/update-attendance-session.dto';
+import { CreateAttendanceCustomStatusDto } from './dto/create-attendance-custom-status.dto';
+import { UpdateAttendanceCustomStatusDto } from './dto/update-attendance-custom-status.dto';
 import { AuthenticatedUser } from '../common/auth/auth-user';
 import {
   ensureUserHasSchoolAccess,
@@ -55,6 +59,38 @@ type AttendanceSessionWithClassesAndRecords = {
 type AttendanceSessionWithClassLinks = {
   classes: { classId: string }[];
 };
+
+type AttendanceStatusRuleValue = {
+  status: AttendanceStatus;
+  behavior: AttendanceStatusCountBehavior;
+};
+
+type AttendanceCustomStatusMap = Map<
+  string,
+  {
+    id: string;
+    behavior: AttendanceStatusCountBehavior;
+    label: string;
+    isActive: boolean;
+  }
+>;
+
+const defaultStatusBehaviorByStatus: Record<
+  AttendanceStatus,
+  AttendanceStatusCountBehavior
+> = {
+  PRESENT: AttendanceStatusCountBehavior.PRESENT,
+  ABSENT: AttendanceStatusCountBehavior.ABSENT,
+  LATE: AttendanceStatusCountBehavior.LATE,
+  EXCUSED: AttendanceStatusCountBehavior.INFORMATIONAL,
+};
+
+function isSchemaMissingError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    (error.code === 'P2021' || error.code === 'P2022')
+  );
+}
 
 const attendanceClassSummarySelect = Prisma.validator<Prisma.ClassSelect>()({
   id: true,
@@ -110,6 +146,15 @@ const attendanceSessionSelect =
         studentId: true,
         date: true,
         status: true,
+        customStatusId: true,
+        customStatus: {
+          select: {
+            id: true,
+            label: true,
+            behavior: true,
+            isActive: true,
+          },
+        },
         remark: true,
         createdAt: true,
         updatedAt: true,
@@ -128,6 +173,15 @@ const attendanceRecordSelect =
     studentId: true,
     date: true,
     status: true,
+    customStatusId: true,
+    customStatus: {
+      select: {
+        id: true,
+        label: true,
+        behavior: true,
+        isActive: true,
+      },
+    },
     remark: true,
     createdAt: true,
     updatedAt: true,
@@ -194,6 +248,308 @@ export class AttendanceService {
     return isTeacherRole(role);
   }
 
+  private isAttendanceStatus(status: string): status is AttendanceStatus {
+    return Object.values(AttendanceStatus).includes(status as AttendanceStatus);
+  }
+
+  private normalizeCustomStatusId(value?: string | null) {
+    const trimmed = value?.trim() ?? '';
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private getStatusForBehavior(behavior: AttendanceStatusCountBehavior) {
+    if (behavior === AttendanceStatusCountBehavior.ABSENT) {
+      return AttendanceStatus.ABSENT;
+    }
+
+    if (behavior === AttendanceStatusCountBehavior.LATE) {
+      return AttendanceStatus.LATE;
+    }
+
+    if (behavior === AttendanceStatusCountBehavior.PRESENT) {
+      return AttendanceStatus.PRESENT;
+    }
+
+    return AttendanceStatus.EXCUSED;
+  }
+
+  private async getActiveCustomStatusMapForSchool(
+    schoolId: string,
+    statusIds: string[],
+  ): Promise<AttendanceCustomStatusMap> {
+    const uniqueStatusIds = [...new Set(statusIds.filter(Boolean))];
+    const map: AttendanceCustomStatusMap = new Map();
+
+    if (uniqueStatusIds.length === 0) {
+      return map;
+    }
+
+    const statuses = await this.prisma.attendanceCustomStatus.findMany({
+      where: {
+        id: { in: uniqueStatusIds },
+        schoolId,
+      },
+      select: {
+        id: true,
+        label: true,
+        behavior: true,
+        isActive: true,
+      },
+    });
+
+    for (const status of statuses) {
+      map.set(status.id, status);
+    }
+
+    return map;
+  }
+
+  private resolveRecordStatus(
+    record: {
+      studentId: string;
+      status: AttendanceStatus;
+      customStatusId?: string | null;
+      remark?: string | null;
+    },
+    customStatusesById: AttendanceCustomStatusMap,
+  ) {
+    const normalizedCustomStatusId = this.normalizeCustomStatusId(
+      record.customStatusId,
+    );
+    const customStatus = normalizedCustomStatusId
+      ? customStatusesById.get(normalizedCustomStatusId)
+      : null;
+
+    if (normalizedCustomStatusId && !customStatus) {
+      throw new BadRequestException(
+        `Invalid custom attendance status for student ${record.studentId}`,
+      );
+    }
+
+    const status = customStatus
+      ? this.getStatusForBehavior(customStatus.behavior)
+      : record.status;
+
+    return {
+      studentId: record.studentId,
+      status,
+      customStatusId: normalizedCustomStatusId,
+      remark: record.remark ?? null,
+    };
+  }
+
+  private buildDefaultStatusRules() {
+    return Object.entries(defaultStatusBehaviorByStatus).map(
+      ([status, behavior]) => ({
+        status: status as AttendanceStatus,
+        behavior,
+      }),
+    );
+  }
+
+  private buildBehaviorMapFromRules(rules: AttendanceStatusRuleValue[]) {
+    const map = new Map<AttendanceStatus, AttendanceStatusCountBehavior>();
+    for (const rule of rules) {
+      map.set(rule.status, rule.behavior);
+    }
+
+    for (const [status, behavior] of Object.entries(defaultStatusBehaviorByStatus)) {
+      if (!map.has(status as AttendanceStatus)) {
+        map.set(status as AttendanceStatus, behavior);
+      }
+    }
+
+    return map;
+  }
+
+  private async getStatusRulesForSchool(schoolId: string) {
+    const defaults = this.buildDefaultStatusRules();
+
+    try {
+      const rules = await this.prisma.attendanceStatusRule.findMany({
+        where: { schoolId },
+        select: {
+          status: true,
+          behavior: true,
+        },
+      });
+
+      if (rules.length === 0) {
+        return defaults;
+      }
+
+      return defaults.map((entry) => ({
+        ...entry,
+        behavior:
+          rules.find((rule) => rule.status === entry.status)?.behavior ??
+          entry.behavior,
+      }));
+    } catch (error) {
+      if (isSchemaMissingError(error)) {
+        return defaults;
+      }
+
+      throw error;
+    }
+  }
+
+  private async getStatusBehaviorMapForSchool(schoolId: string) {
+    const rules = await this.getStatusRulesForSchool(schoolId);
+    return this.buildBehaviorMapFromRules(rules);
+  }
+
+  private async getStatusBehaviorMapsForSchools(schoolIds: string[]) {
+    const uniqueSchoolIds = [...new Set(schoolIds.filter(Boolean))];
+    const map = new Map<string, Map<AttendanceStatus, AttendanceStatusCountBehavior>>();
+
+    if (uniqueSchoolIds.length === 0) {
+      return map;
+    }
+
+    for (const schoolId of uniqueSchoolIds) {
+      map.set(schoolId, await this.getStatusBehaviorMapForSchool(schoolId));
+    }
+
+    return map;
+  }
+
+  private buildActiveSupplyAssignmentWhere(now = new Date()) {
+    return {
+      assignmentType: TeacherClassAssignmentType.SUPPLY,
+      startsAt: { lte: now },
+      OR: [{ endsAt: null }, { endsAt: { gte: now } }],
+    } satisfies Prisma.TeacherClassAssignmentWhereInput;
+  }
+
+  private buildTeacherAssignmentAccessFilter(role: UserRole, now = new Date()) {
+    if (role !== UserRole.SUPPLY_TEACHER) {
+      return {} satisfies Prisma.TeacherClassAssignmentWhereInput;
+    }
+
+    return {
+      OR: [
+        { assignmentType: TeacherClassAssignmentType.REGULAR },
+        this.buildActiveSupplyAssignmentWhere(now),
+      ],
+    } satisfies Prisma.TeacherClassAssignmentWhereInput;
+  }
+
+  private summarizeByStatusRules(
+    records: Array<{
+      status: AttendanceStatus;
+      schoolId: string;
+      customBehavior?: AttendanceStatusCountBehavior | null;
+    }>,
+    behaviorBySchoolId: Map<
+      string,
+      Map<AttendanceStatus, AttendanceStatusCountBehavior>
+    >,
+  ) {
+    const summary = {
+      totalSessions: records.length,
+      presentCount: 0,
+      absentCount: 0,
+      lateCount: 0,
+    };
+
+    let countAsPresent = 0;
+    let countAsAbsent = 0;
+    let countAsLate = 0;
+
+    for (const record of records) {
+      switch (record.status) {
+        case AttendanceStatus.PRESENT:
+          summary.presentCount += 1;
+          break;
+        case AttendanceStatus.ABSENT:
+          summary.absentCount += 1;
+          break;
+        case AttendanceStatus.LATE:
+          summary.lateCount += 1;
+          break;
+        case AttendanceStatus.EXCUSED:
+          break;
+      }
+
+      const statusBehavior =
+        record.customBehavior ??
+        behaviorBySchoolId.get(record.schoolId)?.get(record.status) ??
+        defaultStatusBehaviorByStatus[record.status];
+
+      if (statusBehavior === AttendanceStatusCountBehavior.PRESENT) {
+        countAsPresent += 1;
+        continue;
+      }
+
+      if (statusBehavior === AttendanceStatusCountBehavior.LATE) {
+        countAsLate += 1;
+        continue;
+      }
+
+      if (statusBehavior === AttendanceStatusCountBehavior.ABSENT) {
+        countAsAbsent += 1;
+      }
+    }
+
+    const countableTotal = countAsPresent + countAsLate + countAsAbsent;
+    const attendancePercentage =
+      countableTotal === 0
+        ? null
+        : Number((((countAsPresent + countAsLate) / countableTotal) * 100).toFixed(2));
+
+    return {
+      ...summary,
+      attendancePercentage,
+      attendanceRate: attendancePercentage,
+    };
+  }
+
+  private async ensureUserCanReadStatusRules(
+    user: AuthUser,
+    schoolId: string,
+  ) {
+    if (this.isAdminLike(user.role)) {
+      ensureUserHasSchoolAccess(user, schoolId);
+      return;
+    }
+
+    if (!this.isTeacherLike(user.role)) {
+      throw new ForbiddenException(
+        'You do not have access to attendance status rules',
+      );
+    }
+
+    const assignment = await this.prisma.teacherClassAssignment.findFirst({
+      where: {
+        teacherId: user.id,
+        ...this.buildTeacherAssignmentAccessFilter(user.role),
+        class: {
+          schoolId,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!assignment) {
+      throw new ForbiddenException(
+        'You do not have access to attendance status rules',
+      );
+    }
+  }
+
+  private async ensureUserCanManageStatusRules(
+    user: AuthUser,
+    schoolId: string,
+  ) {
+    if (!this.isAdminLike(user.role)) {
+      throw new ForbiddenException(
+        'You do not have access to attendance status rules',
+      );
+    }
+
+    ensureUserHasSchoolAccess(user, schoolId);
+  }
+
   private async ensureUserCanAccessClasses(user: AuthUser, classIds: string[]) {
     if (isBypassRole(user.role)) {
       return;
@@ -201,20 +557,26 @@ export class AttendanceService {
 
     if (isSchoolAdminRole(user.role)) {
       const uniqueClassIds = [...new Set(classIds)];
-      const classes = await this.prisma.class.findMany({
-        where: {
-          id: { in: uniqueClassIds },
-        },
-        select: {
-          id: true,
-          schoolId: true,
-        },
-      });
+      const classes = await Promise.all(
+        uniqueClassIds.map((id) =>
+          this.prisma.class.findUnique({
+            where: { id },
+            select: {
+              id: true,
+              schoolId: true,
+            },
+          }),
+        ),
+      );
 
       const accessibleSchoolIds = new Set(getAccessibleSchoolIds(user));
-      const inaccessibleClass = classes.find(
-        (existingClass) => !accessibleSchoolIds.has(existingClass.schoolId),
-      );
+      const inaccessibleClass = classes.find((existingClass) => {
+        if (!existingClass) {
+          return true;
+        }
+
+        return !accessibleSchoolIds.has(existingClass.schoolId);
+      });
 
       if (inaccessibleClass) {
         throw new ForbiddenException('You do not have access to these classes');
@@ -231,6 +593,7 @@ export class AttendanceService {
       where: {
         teacherId: user.id,
         classId: { in: classIds },
+        ...this.buildTeacherAssignmentAccessFilter(user.role),
       },
       select: {
         classId: true,
@@ -277,23 +640,24 @@ export class AttendanceService {
       throw new ForbiddenException('You do not have access to this student');
     }
 
-    const enrollment = await this.prisma.studentClassEnrollment.findFirst({
+    const assignment = await this.prisma.teacherClassAssignment.findFirst({
       where: {
-        studentId,
+        teacherId: user.id,
         class: {
-          teachers: {
+          students: {
             some: {
-              teacherId: user.id,
+              studentId,
             },
           },
         },
+        ...this.buildTeacherAssignmentAccessFilter(user.role),
       },
       select: {
         id: true,
       },
     });
 
-    if (!enrollment) {
+    if (!assignment) {
       throw new ForbiddenException('You do not have access to this student');
     }
   }
@@ -384,6 +748,7 @@ export class AttendanceService {
   private async getTeacherAssignedClassIds(
     teacherId: string,
     classIds: string[],
+    teacherRole: UserRole,
   ): Promise<Set<string>> {
     const uniqueClassIds = [...new Set(classIds)];
 
@@ -395,6 +760,7 @@ export class AttendanceService {
       where: {
         teacherId,
         classId: { in: uniqueClassIds },
+        ...this.buildTeacherAssignmentAccessFilter(teacherRole),
       },
       select: {
         classId: true,
@@ -414,14 +780,13 @@ export class AttendanceService {
     }
 
     if (!this.isTeacherLike(user.role)) {
-      throw new ForbiddenException(
-        'You do not have access to these classes',
-      );
+      throw new ForbiddenException('You do not have access to these classes');
     }
 
     const assignedClassIds = await this.getTeacherAssignedClassIds(
       user.id,
       classIds,
+      user.role,
     );
     const writableClassIds = classIds.filter((classId) =>
       assignedClassIds.has(classId),
@@ -497,12 +862,13 @@ export class AttendanceService {
 
   private async sanitizeAttendanceRecordForTeacher<
     T extends RecordWithSessionClasses,
-  >(teacherId: string, record: T): Promise<T> {
+  >(teacherId: string, teacherRole: UserRole, record: T): Promise<T> {
     const assignedClassIds = await this.getTeacherAssignedClassIds(
       teacherId,
       record.attendanceSession.classes.map(
         (sessionClass) => sessionClass.classId,
       ),
+      teacherRole,
     );
 
     if (assignedClassIds.size === 0) {
@@ -524,7 +890,7 @@ export class AttendanceService {
 
   private async sanitizeAttendanceRecordsForTeacher<
     T extends RecordWithSessionClasses,
-  >(teacherId: string, records: T[]): Promise<T[]> {
+  >(teacherId: string, teacherRole: UserRole, records: T[]): Promise<T[]> {
     const assignedClassIds = await this.getTeacherAssignedClassIds(
       teacherId,
       records.flatMap((record) =>
@@ -532,6 +898,7 @@ export class AttendanceService {
           (sessionClass) => sessionClass.classId,
         ),
       ),
+      teacherRole,
     );
 
     return records
@@ -549,12 +916,13 @@ export class AttendanceService {
 
   private async sanitizeAttendanceSessionsForTeacher<
     T extends AttendanceSessionWithClassesAndRecords,
-  >(teacherId: string, sessions: T[]): Promise<T[]> {
+  >(teacherId: string, teacherRole: UserRole, sessions: T[]): Promise<T[]> {
     const assignedClassIds = await this.getTeacherAssignedClassIds(
       teacherId,
       sessions.flatMap((session) =>
         session.classes.map((sessionClass) => sessionClass.classId),
       ),
+      teacherRole,
     );
 
     const allowedStudentIds = await this.getStudentIdsForClasses(
@@ -576,9 +944,10 @@ export class AttendanceService {
 
   private async sanitizeAttendanceSessionForTeacher<
     T extends AttendanceSessionWithClassesAndRecords,
-  >(teacherId: string, session: T): Promise<T> {
+  >(teacherId: string, teacherRole: UserRole, session: T): Promise<T> {
     const [sanitized] = await this.sanitizeAttendanceSessionsForTeacher(
       teacherId,
+      teacherRole,
       [session],
     );
 
@@ -605,8 +974,14 @@ export class AttendanceService {
   }
 
   private validateAttendanceRecords(
-    records: { studentId: string; status: AttendanceStatus; remark?: string | null }[],
+    records: {
+      studentId: string;
+      status: AttendanceStatus;
+      customStatusId?: string | null;
+      remark?: string | null;
+    }[],
     allowedStudentIds: Set<string>,
+    customStatusesById: AttendanceCustomStatusMap,
   ) {
     const seenStudentIds = new Set<string>();
 
@@ -628,6 +1003,19 @@ export class AttendanceService {
       if (!Object.values(AttendanceStatus).includes(record.status)) {
         throw new BadRequestException(
           `Invalid attendance status for student ${record.studentId}`,
+        );
+      }
+
+      const normalizedCustomStatusId = this.normalizeCustomStatusId(
+        record.customStatusId,
+      );
+
+      if (
+        normalizedCustomStatusId &&
+        !customStatusesById.has(normalizedCustomStatusId)
+      ) {
+        throw new BadRequestException(
+          `Invalid custom attendance status for student ${record.studentId}`,
         );
       }
     }
@@ -818,7 +1206,21 @@ export class AttendanceService {
       }
     }
 
-    this.validateAttendanceRecords(dto.records, allowedStudentIds);
+    const customStatusesById = await this.getActiveCustomStatusMapForSchool(
+      dto.schoolId,
+      dto.records
+        .map((record) => this.normalizeCustomStatusId(record.customStatusId))
+        .filter((statusId): statusId is string => Boolean(statusId)),
+    );
+
+    this.validateAttendanceRecords(
+      dto.records,
+      allowedStudentIds,
+      customStatusesById,
+    );
+    const normalizedRecords = dto.records.map((record) =>
+      this.resolveRecordStatus(record, customStatusesById),
+    );
 
     if (uniqueClassIds.length === 1) {
       const existingSession = await this.findExistingSessionForClassDate(
@@ -828,15 +1230,20 @@ export class AttendanceService {
       );
 
       if (existingSession) {
-        return this.updateSessionWithScope(user, existingSession.id, {
-          records: dto.records,
-        }, uniqueClassIds);
+        return this.updateSessionWithScope(
+          user,
+          existingSession.id,
+          {
+            records: dto.records,
+          },
+          uniqueClassIds,
+        );
       }
     }
 
     const existingRecords = await this.prisma.attendanceRecord.findMany({
       where: {
-        studentId: { in: dto.records.map((r) => r.studentId) },
+        studentId: { in: normalizedRecords.map((record) => record.studentId) },
         date: normalizedDate,
       },
       select: {
@@ -855,9 +1262,14 @@ export class AttendanceService {
         );
 
         if (existingSession) {
-          return this.updateSessionWithScope(user, existingSession.id, {
-            records: dto.records,
-          }, uniqueClassIds);
+          return this.updateSessionWithScope(
+            user,
+            existingSession.id,
+            {
+              records: dto.records,
+            },
+            uniqueClassIds,
+          );
         }
       }
 
@@ -886,10 +1298,11 @@ export class AttendanceService {
           })),
         },
         records: {
-          create: dto.records.map((record) => ({
+          create: normalizedRecords.map((record) => ({
             studentId: record.studentId,
             date: normalizedDate,
             status: record.status,
+            customStatusId: record.customStatusId,
             remark: record.remark ?? null,
           })),
         },
@@ -915,7 +1328,20 @@ export class AttendanceService {
     const allowedStudentIds = await this.getStudentIdsForClasses(
       writableClassIds,
     );
-    this.validateAttendanceRecords(dto.records, allowedStudentIds);
+    const customStatusesById = await this.getActiveCustomStatusMapForSchool(
+      existingSession.schoolId,
+      dto.records
+        .map((record) => this.normalizeCustomStatusId(record.customStatusId))
+        .filter((statusId): statusId is string => Boolean(statusId)),
+    );
+    this.validateAttendanceRecords(
+      dto.records,
+      allowedStudentIds,
+      customStatusesById,
+    );
+    const normalizedRecords = dto.records.map((record) =>
+      this.resolveRecordStatus(record, customStatusesById),
+    );
 
     const attachSessionClassesOperation = this.buildAttachSessionClassesOperation(
       sessionId,
@@ -926,7 +1352,7 @@ export class AttendanceService {
     await this.prisma.$transaction(
       [
         ...(attachSessionClassesOperation ? [attachSessionClassesOperation] : []),
-        ...dto.records.map((record) =>
+        ...normalizedRecords.map((record) =>
           this.prisma.attendanceRecord.upsert({
             where: {
               attendanceSessionId_studentId: {
@@ -936,6 +1362,7 @@ export class AttendanceService {
             },
             update: {
               status: record.status,
+              customStatusId: record.customStatusId,
               remark: record.remark ?? null,
             },
             create: {
@@ -943,6 +1370,7 @@ export class AttendanceService {
               studentId: record.studentId,
               date: existingSession.date,
               status: record.status,
+              customStatusId: record.customStatusId,
               remark: record.remark ?? null,
             },
           }),
@@ -1003,6 +1431,7 @@ export class AttendanceService {
               teachers: {
                 some: {
                   teacherId: user.id,
+                  ...this.buildTeacherAssignmentAccessFilter(user.role),
                 },
               },
             },
@@ -1015,7 +1444,11 @@ export class AttendanceService {
       },
     });
 
-    return this.sanitizeAttendanceSessionsForTeacher(user.id, sessions);
+    return this.sanitizeAttendanceSessionsForTeacher(
+      user.id,
+      user.role,
+      sessions,
+    );
   }
 
   async getSessionById(user: AuthUser, sessionId: string) {
@@ -1032,7 +1465,344 @@ export class AttendanceService {
       );
     }
 
-    return this.sanitizeAttendanceSessionForTeacher(user.id, session);
+    return this.sanitizeAttendanceSessionForTeacher(
+      user.id,
+      user.role,
+      session,
+    );
+  }
+
+  async getClassRecordsByDateRange(
+    user: AuthUser,
+    classId: string,
+    startDate: string,
+    endDate: string,
+  ) {
+    await this.ensureUserCanAccessClasses(user, [classId]);
+    const { normalizedStartDate, normalizedEndDate } = this.normalizeDateRange(
+      startDate,
+      endDate,
+    );
+
+    const [classContext, roster] = await Promise.all([
+      this.prisma.class.findUnique({
+        where: { id: classId },
+        select: { id: true, schoolId: true, schoolYearId: true, name: true },
+      }),
+      this.prisma.studentClassEnrollment.findMany({
+        where: { classId },
+        select: { studentId: true },
+      }),
+    ]);
+
+    if (!classContext) {
+      throw new NotFoundException('Class not found');
+    }
+
+    const classStudentIds = roster.map((entry) => entry.studentId);
+    const sessions = await this.prisma.attendanceSession.findMany({
+      where: {
+        schoolId: classContext.schoolId,
+        date: {
+          gte: normalizedStartDate,
+          lte: normalizedEndDate,
+        },
+        classes: {
+          some: {
+            classId,
+          },
+        },
+      },
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+      select: {
+        id: true,
+        schoolId: true,
+        schoolYearId: true,
+        date: true,
+        scopeType: true,
+        scopeLabel: true,
+        createdAt: true,
+        updatedAt: true,
+        takenBy: {
+          select: safeUserSelect,
+        },
+        records: {
+          where: {
+            studentId: { in: classStudentIds },
+          },
+          orderBy: attendanceSessionRecordOrderBy,
+          select: {
+            id: true,
+            attendanceSessionId: true,
+            studentId: true,
+            status: true,
+            customStatusId: true,
+            customStatus: {
+              select: {
+                id: true,
+                label: true,
+                behavior: true,
+                isActive: true,
+              },
+            },
+            remark: true,
+            date: true,
+            updatedAt: true,
+            student: {
+              select: safeUserSelect,
+            },
+          },
+        },
+      },
+    });
+
+    const totalRecords = sessions.reduce(
+      (sum, session) => sum + session.records.length,
+      0,
+    );
+
+    return {
+      classId,
+      schoolId: classContext.schoolId,
+      schoolYearId: classContext.schoolYearId,
+      className: classContext.name,
+      startDate: normalizedStartDate.toISOString().slice(0, 10),
+      endDate: normalizedEndDate.toISOString().slice(0, 10),
+      totalSessions: sessions.length,
+      totalRecords,
+      sessions,
+    };
+  }
+
+  async getStatusRules(user: AuthUser, schoolId: string) {
+    if (!schoolId) {
+      throw new BadRequestException('schoolId is required');
+    }
+
+    await this.ensureUserCanReadStatusRules(user, schoolId);
+    const rules = await this.getStatusRulesForSchool(schoolId);
+
+    return rules.map((rule) => ({
+      schoolId,
+      status: rule.status,
+      behavior: rule.behavior,
+    }));
+  }
+
+  async updateStatusRule(
+    user: AuthUser,
+    schoolId: string,
+    status: string,
+    behavior: AttendanceStatusCountBehavior,
+  ) {
+    if (!schoolId) {
+      throw new BadRequestException('schoolId is required');
+    }
+
+    await this.ensureUserCanManageStatusRules(user, schoolId);
+
+    const normalizedStatus = status.trim().toUpperCase();
+    if (!this.isAttendanceStatus(normalizedStatus)) {
+      throw new BadRequestException('Invalid attendance status');
+    }
+
+    try {
+      const updated = await this.prisma.attendanceStatusRule.upsert({
+        where: {
+          schoolId_status: {
+            schoolId,
+            status: normalizedStatus,
+          },
+        },
+        update: {
+          behavior,
+        },
+        create: {
+          schoolId,
+          status: normalizedStatus,
+          behavior,
+        },
+        select: {
+          schoolId: true,
+          status: true,
+          behavior: true,
+        },
+      });
+
+      return updated;
+    } catch (error) {
+      if (isSchemaMissingError(error)) {
+        throw new ConflictException(
+          'Attendance status rule migrations are required before managing status behavior. Apply the latest Prisma migrations and try again.',
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  async getCustomStatuses(
+    user: AuthUser,
+    schoolId: string,
+    includeInactive = false,
+  ) {
+    if (!schoolId) {
+      throw new BadRequestException('schoolId is required');
+    }
+
+    await this.ensureUserCanReadStatusRules(user, schoolId);
+
+    try {
+      return await this.prisma.attendanceCustomStatus.findMany({
+        where: {
+          schoolId,
+          ...(includeInactive ? {} : { isActive: true }),
+        },
+        select: {
+          id: true,
+          schoolId: true,
+          label: true,
+          behavior: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: [{ isActive: 'desc' }, { label: 'asc' }],
+      });
+    } catch (error) {
+      if (isSchemaMissingError(error)) {
+        return [];
+      }
+
+      throw error;
+    }
+  }
+
+  async createCustomStatus(user: AuthUser, dto: CreateAttendanceCustomStatusDto) {
+    const schoolId = dto.schoolId?.trim();
+    const label = dto.label?.trim();
+
+    if (!schoolId) {
+      throw new BadRequestException('schoolId is required');
+    }
+
+    if (!label) {
+      throw new BadRequestException('label is required');
+    }
+
+    await this.ensureUserCanManageStatusRules(user, schoolId);
+
+    const existing = await this.prisma.attendanceCustomStatus.findFirst({
+      where: {
+        schoolId,
+        label: { equals: label, mode: 'insensitive' },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existing) {
+      throw new BadRequestException('A custom status with this label already exists');
+    }
+
+    try {
+      return await this.prisma.attendanceCustomStatus.create({
+        data: {
+          schoolId,
+          label,
+          behavior: dto.behavior,
+          isActive: dto.isActive ?? true,
+        },
+        select: {
+          id: true,
+          schoolId: true,
+          label: true,
+          behavior: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (error) {
+      if (isSchemaMissingError(error)) {
+        throw new ConflictException(
+          'Attendance custom status migrations are required before managing custom statuses. Apply the latest Prisma migrations and try again.',
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  async updateCustomStatus(
+    user: AuthUser,
+    customStatusId: string,
+    dto: UpdateAttendanceCustomStatusDto,
+  ) {
+    const existing = await this.prisma.attendanceCustomStatus.findUnique({
+      where: { id: customStatusId },
+      select: {
+        id: true,
+        schoolId: true,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Attendance custom status not found');
+    }
+
+    await this.ensureUserCanManageStatusRules(user, existing.schoolId);
+
+    const nextLabel = dto.label?.trim();
+    if (dto.label !== undefined && !nextLabel) {
+      throw new BadRequestException('label cannot be empty');
+    }
+
+    if (nextLabel) {
+      const duplicate = await this.prisma.attendanceCustomStatus.findFirst({
+        where: {
+          schoolId: existing.schoolId,
+          id: { not: customStatusId },
+          label: { equals: nextLabel, mode: 'insensitive' },
+        },
+        select: { id: true },
+      });
+
+      if (duplicate) {
+        throw new BadRequestException(
+          'A custom status with this label already exists',
+        );
+      }
+    }
+
+    try {
+      return await this.prisma.attendanceCustomStatus.update({
+        where: { id: customStatusId },
+        data: {
+          ...(nextLabel !== undefined ? { label: nextLabel } : {}),
+          ...(dto.behavior !== undefined ? { behavior: dto.behavior } : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        },
+        select: {
+          id: true,
+          schoolId: true,
+          label: true,
+          behavior: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (error) {
+      if (isSchemaMissingError(error)) {
+        throw new ConflictException(
+          'Attendance custom status migrations are required before managing custom statuses. Apply the latest Prisma migrations and try again.',
+        );
+      }
+
+      throw error;
+    }
   }
 
   async getStudentAttendanceByDate(
@@ -1065,7 +1835,11 @@ export class AttendanceService {
     }
 
     if (this.isTeacherLike(user.role)) {
-      return this.sanitizeAttendanceRecordForTeacher(user.id, record);
+      return this.sanitizeAttendanceRecordForTeacher(
+        user.id,
+        user.role,
+        record,
+      );
     }
 
     return record;
@@ -1083,7 +1857,11 @@ export class AttendanceService {
     });
 
     if (this.isTeacherLike(user.role)) {
-      return this.sanitizeAttendanceRecordsForTeacher(user.id, records);
+      return this.sanitizeAttendanceRecordsForTeacher(
+        user.id,
+        user.role,
+        records,
+      );
     }
 
     return records;
@@ -1112,49 +1890,232 @@ export class AttendanceService {
       },
       select: {
         status: true,
+        customStatus: {
+          select: {
+            behavior: true,
+          },
+        },
+        attendanceSession: {
+          select: {
+            schoolId: true,
+          },
+        },
       },
       orderBy: {
         date: 'asc',
       },
     });
 
-    const summary = {
-      totalDays: records.length,
-      presentCount: 0,
-      absentCount: 0,
-      lateCount: 0,
-      excusedCount: 0,
-    };
+    const behaviorBySchoolId = await this.getStatusBehaviorMapsForSchools(
+      records.map((record) => record.attendanceSession.schoolId),
+    );
 
-    for (const record of records) {
-      switch (record.status) {
-        case AttendanceStatus.PRESENT:
-          summary.presentCount += 1;
-          break;
-        case AttendanceStatus.ABSENT:
-          summary.absentCount += 1;
-          break;
-        case AttendanceStatus.LATE:
-          summary.lateCount += 1;
-          break;
-        case AttendanceStatus.EXCUSED:
-          summary.excusedCount += 1;
-          break;
-      }
-    }
-
-    const attendedDays = summary.presentCount + summary.lateCount;
-    const attendancePercentage =
-      summary.totalDays === 0
-        ? 0
-        : Number(((attendedDays / summary.totalDays) * 100).toFixed(2));
+    const summarized = this.summarizeByStatusRules(
+      records.map((record) => ({
+        status: record.status,
+        schoolId: record.attendanceSession.schoolId,
+        customBehavior: record.customStatus?.behavior ?? null,
+      })),
+      behaviorBySchoolId,
+    );
 
     return {
       studentId,
       startDate: normalizedStartDate.toISOString().slice(0, 10),
       endDate: normalizedEndDate.toISOString().slice(0, 10),
-      ...summary,
-      attendancePercentage,
+      totalDays: summarized.totalSessions,
+      presentCount: summarized.presentCount,
+      absentCount: summarized.absentCount,
+      lateCount: summarized.lateCount,
+      attendancePercentage: summarized.attendancePercentage ?? 0,
+    };
+  }
+
+  async getStudentAllTimeSummary(user: AuthUser, studentId: string) {
+    await this.ensureUserCanAccessStudentAttendance(user, studentId);
+
+    const records = await this.prisma.attendanceRecord.findMany({
+      where: {
+        studentId,
+      },
+      select: {
+        status: true,
+        customStatus: {
+          select: {
+            behavior: true,
+          },
+        },
+        attendanceSession: {
+          select: {
+            schoolId: true,
+          },
+        },
+      },
+      orderBy: {
+        date: 'asc',
+      },
+    });
+
+    const behaviorBySchoolId = await this.getStatusBehaviorMapsForSchools(
+      records.map((record) => record.attendanceSession.schoolId),
+    );
+    const summary = this.summarizeByStatusRules(
+      records.map((record) => ({
+        status: record.status,
+        schoolId: record.attendanceSession.schoolId,
+        customBehavior: record.customStatus?.behavior ?? null,
+      })),
+      behaviorBySchoolId,
+    );
+
+    return {
+      studentId,
+      totalSessions: summary.totalSessions,
+      presentCount: summary.presentCount,
+      absentCount: summary.absentCount,
+      lateCount: summary.lateCount,
+      attendanceRate: summary.attendanceRate,
+    };
+  }
+
+  async getClassAllTimeSummary(user: AuthUser, classId: string) {
+    await this.ensureUserCanAccessClasses(user, [classId]);
+
+    const classContext = await this.prisma.class.findUnique({
+      where: { id: classId },
+      select: { schoolId: true },
+    });
+
+    if (!classContext) {
+      throw new NotFoundException('Class not found');
+    }
+
+    const records = await this.prisma.attendanceRecord.findMany({
+      where: {
+        attendanceSession: {
+          schoolId: classContext.schoolId,
+          classes: {
+            some: {
+              classId,
+            },
+          },
+        },
+      },
+      select: {
+        status: true,
+        customStatus: {
+          select: {
+            behavior: true,
+          },
+        },
+        attendanceSession: {
+          select: {
+            schoolId: true,
+          },
+        },
+      },
+      orderBy: {
+        date: 'asc',
+      },
+    });
+
+    const behaviorBySchoolId = await this.getStatusBehaviorMapsForSchools([
+      classContext.schoolId,
+    ]);
+    const summary = this.summarizeByStatusRules(
+      records.map((record) => ({
+        status: record.status,
+        schoolId: record.attendanceSession.schoolId,
+        customBehavior: record.customStatus?.behavior ?? null,
+      })),
+      behaviorBySchoolId,
+    );
+
+    return {
+      classId,
+      totalSessions: summary.totalSessions,
+      presentCount: summary.presentCount,
+      absentCount: summary.absentCount,
+      lateCount: summary.lateCount,
+      attendanceRate: summary.attendanceRate,
+    };
+  }
+
+  async getClassSummary(
+    user: AuthUser,
+    classId: string,
+    startDate: string,
+    endDate: string,
+  ) {
+    await this.ensureUserCanAccessClasses(user, [classId]);
+    const { normalizedStartDate, normalizedEndDate } = this.normalizeDateRange(
+      startDate,
+      endDate,
+    );
+
+    const classContext = await this.prisma.class.findUnique({
+      where: { id: classId },
+      select: { schoolId: true },
+    });
+
+    if (!classContext) {
+      throw new NotFoundException('Class not found');
+    }
+
+    const records = await this.prisma.attendanceRecord.findMany({
+      where: {
+        date: {
+          gte: normalizedStartDate,
+          lte: normalizedEndDate,
+        },
+        attendanceSession: {
+          schoolId: classContext.schoolId,
+          classes: {
+            some: {
+              classId,
+            },
+          },
+        },
+      },
+      select: {
+        status: true,
+        customStatus: {
+          select: {
+            behavior: true,
+          },
+        },
+        attendanceSession: {
+          select: {
+            schoolId: true,
+          },
+        },
+      },
+      orderBy: {
+        date: 'asc',
+      },
+    });
+
+    const behaviorBySchoolId = await this.getStatusBehaviorMapsForSchools([
+      classContext.schoolId,
+    ]);
+    const summary = this.summarizeByStatusRules(
+      records.map((record) => ({
+        status: record.status,
+        schoolId: record.attendanceSession.schoolId,
+        customBehavior: record.customStatus?.behavior ?? null,
+      })),
+      behaviorBySchoolId,
+    );
+
+    return {
+      classId,
+      startDate: normalizedStartDate.toISOString().slice(0, 10),
+      endDate: normalizedEndDate.toISOString().slice(0, 10),
+      totalSessions: summary.totalSessions,
+      presentCount: summary.presentCount,
+      absentCount: summary.absentCount,
+      lateCount: summary.lateCount,
+      attendanceRate: summary.attendanceRate,
     };
   }
 
@@ -1181,11 +2142,28 @@ export class AttendanceService {
     const classIds = existing.attendanceSession.classes.map((c) => c.classId);
     await this.ensureUserCanAccessClasses(user, classIds);
 
+    const customStatusesById = await this.getActiveCustomStatusMapForSchool(
+      existing.attendanceSession.schoolId,
+      [this.normalizeCustomStatusId(dto.customStatusId)].filter(
+        (statusId): statusId is string => Boolean(statusId),
+      ),
+    );
+    const resolved = this.resolveRecordStatus(
+      {
+        studentId: existing.studentId,
+        status: dto.status,
+        customStatusId: dto.customStatusId,
+        remark: dto.remark ?? null,
+      },
+      customStatusesById,
+    );
+
     return this.prisma.attendanceRecord.update({
       where: { id: recordId },
       data: {
-        status: dto.status,
-        remark: dto.remark ?? null,
+        status: resolved.status,
+        customStatusId: resolved.customStatusId,
+        remark: resolved.remark ?? null,
       },
       select: attendanceRecordSelect,
     });

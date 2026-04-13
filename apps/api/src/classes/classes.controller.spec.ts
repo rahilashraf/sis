@@ -15,6 +15,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClassesController } from './classes.controller';
 import { ClassesService } from './classes.service';
+import { GradebookService } from '../gradebook/gradebook.service';
 
 @Injectable()
 class TestJwtAuthGuard implements CanActivate {
@@ -49,6 +50,7 @@ class TestRolesGuard implements CanActivate {
 
 describe('ClassesController (HTTP)', () => {
   let app: INestApplication;
+  let gradebook: { getClassSummary: jest.Mock };
   let prisma: {
     class: { findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     teacherClassAssignment: {
@@ -65,6 +67,10 @@ describe('ClassesController (HTTP)', () => {
   };
 
   beforeEach(async () => {
+    gradebook = {
+      getClassSummary: jest.fn(),
+    };
+
     prisma = {
       class: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       teacherClassAssignment: {
@@ -84,6 +90,10 @@ describe('ClassesController (HTTP)', () => {
       controllers: [ClassesController],
       providers: [
         ClassesService,
+        {
+          provide: GradebookService,
+          useValue: gradebook,
+        },
         Reflector,
         {
           provide: PrismaService,

@@ -288,7 +288,7 @@ export class GradesService {
 
     if (this.isAdminLike(user.role)) {
       ensureUserHasSchoolAccess(user, classContext.schoolId);
-      return;
+      return classContext;
     }
 
     if (!this.isTeacherLike(user.role)) {
@@ -296,6 +296,7 @@ export class GradesService {
     }
 
     await this.ensureTeacherAssignedToClass(user.id, classId);
+    return classContext;
   }
 
   private async ensureUserCanReadStudentGrades(
@@ -602,7 +603,6 @@ export class GradesService {
 
     const gradedAt = this.parseGradedAt(data.gradedAt);
 
-    await this.ensureClassExists(data.classId);
     await this.ensureUserCanManageClass(user, data.classId);
     await this.ensureStudentEnrolledInClass(data.studentId, data.classId);
     await this.ensureUserCanWriteGradeForDate(user, data.classId, gradedAt);
@@ -674,7 +674,6 @@ export class GradesService {
   }
 
   async findByClass(user: AuthUser, classId: string) {
-    await this.ensureClassExists(classId);
     await this.ensureUserCanManageClass(user, classId);
 
     return this.prisma.gradeRecord.findMany({
@@ -733,8 +732,7 @@ export class GradesService {
   }
 
   async getClassSummary(user: AuthUser, classId: string, periodKey?: string) {
-    await this.ensureClassExists(classId);
-    await this.ensureUserCanManageClass(user, classId);
+    const classContext = await this.ensureUserCanManageClass(user, classId);
 
     const grades = await this.prisma.gradeRecord.findMany({
       where: { classId },
@@ -756,7 +754,6 @@ export class GradesService {
       return this.buildSummary('classId', classId, grades);
     }
 
-    const classContext = await this.getClassContext(classId);
     const allowedReportingPeriodsByContext =
       await this.buildAllowedReportingPeriodsByContext(
         [classContext],

@@ -15,6 +15,7 @@ import {
   ensureUserHasSchoolAccess,
   getAccessibleSchoolIds,
   isBypassRole,
+  isHighPrivilegeRole,
 } from '../common/access/school-access.util';
 import { safeUserSelect } from '../common/prisma/safe-user-response';
 
@@ -50,7 +51,7 @@ export class UsersService {
       return existingUser;
     }
 
-    if (isBypassRole(existingUser.role)) {
+    if (isHighPrivilegeRole(existingUser.role)) {
       throw new ForbiddenException('You cannot manage this user');
     }
 
@@ -70,28 +71,75 @@ export class UsersService {
     actor: AuthenticatedUser,
     targetRole: AppUserRole | UserRole,
   ) {
-    if (!isBypassRole(actor.role) && isBypassRole(targetRole)) {
+    if (!isHighPrivilegeRole(actor.role) && isHighPrivilegeRole(targetRole)) {
       throw new ForbiddenException('You cannot assign this role');
     }
   }
 
-  findAll(user: AuthenticatedUser) {
+  findAll(
+    user: AuthenticatedUser,
+    options?: {
+      includeInactive?: boolean;
+      role?: string;
+      gradeLevelId?: string;
+      sort?: string;
+    },
+  ) {
+    const includeInactive = options?.includeInactive ?? false;
+    const roleFilter = options?.role?.trim() ?? '';
+    const gradeLevelId = options?.gradeLevelId?.trim() ?? '';
+    const sort = options?.sort?.trim() ?? '';
+
+    const requestedRole = roleFilter
+      ? (Object.values(UserRole).includes(roleFilter as UserRole)
+          ? (roleFilter as UserRole)
+          : null)
+      : null;
+
+    if (roleFilter && !requestedRole) {
+      throw new BadRequestException('Invalid role filter');
+    }
+
+    if (gradeLevelId && requestedRole !== UserRole.STUDENT) {
+      throw new BadRequestException('gradeLevelId filter requires role=STUDENT');
+    }
+
     const accessibleSchoolIds = getAccessibleSchoolIds(user);
+    const orderBy =
+      sort === 'createdAt'
+        ? [{ createdAt: 'desc' as const }]
+        : [
+            { lastName: 'asc' as const },
+            { firstName: 'asc' as const },
+            { createdAt: 'desc' as const },
+          ];
 
     return this.prisma.user.findMany({
-      where: isBypassRole(user.role)
-        ? undefined
-        : {
-            memberships: {
-              some: {
-                schoolId: {
-                  in: accessibleSchoolIds,
+      where: {
+        ...(includeInactive ? {} : { isActive: true }),
+        ...(requestedRole ? { role: requestedRole } : {}),
+        ...(gradeLevelId ? { gradeLevelId } : {}),
+        ...(isBypassRole(user.role)
+          ? {}
+          : {
+              memberships: {
+                some: {
+                  schoolId: {
+                    in: accessibleSchoolIds,
+                  },
+                  ...(includeInactive
+                    ? {}
+                    : {
+                        isActive: true,
+                        school: {
+                          isActive: true,
+                        },
+                      }),
                 },
-                isActive: true,
               },
-            },
-          },
-      orderBy: { createdAt: 'desc' },
+            }),
+      },
+      orderBy,
       select: safeUserSelect,
     });
   }
@@ -101,7 +149,7 @@ export class UsersService {
 
     this.ensureActorCanAssignRole(user, data.role);
 
-    if (!schoolId && !isBypassRole(user.role)) {
+    if (!schoolId && !isHighPrivilegeRole(user.role)) {
       throw new BadRequestException(
         'schoolId is required for school-scoped user creation',
       );
@@ -126,6 +174,13 @@ export class UsersService {
       data: {
         ...userData,
         passwordHash,
+        school: schoolId
+          ? {
+              connect: {
+                id: schoolId,
+              },
+            }
+          : undefined,
         memberships: schoolId
           ? {
               create: {
@@ -238,7 +293,7 @@ export class UsersService {
       throw new ConflictException('You cannot delete your own account');
     }
 
-    if (isBypassRole(existingUser.role)) {
+    if (isHighPrivilegeRole(existingUser.role)) {
       throw new ConflictException('High-privilege users cannot be deleted');
     }
 
@@ -254,18 +309,38 @@ export class UsersService {
       ['grade records', existingUser._count.studentGradeRecords],
     ].flatMap(([label, count]: [string, number]) => (count > 0 ? [label] : []));
 
-    if (dependencyLabels.length > 0) {
-      throw new ConflictException(
-        `User cannot be deleted because related ${dependencyLabels.join(', ')} still exist`,
-      );
+    if (dependencyLabels.length === 0) {
+      await this.prisma.user.delete({
+        where: { id: existingUser.id },
+      });
+
+      return {
+        success: true,
+        removalMode: 'deleted' as const,
+      };
     }
 
-    await this.prisma.user.delete({
-      where: { id: existingUser.id },
-    });
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          isActive: false,
+        },
+      }),
+      this.prisma.userSchoolMembership.updateMany({
+        where: {
+          userId: existingUser.id,
+        },
+        data: {
+          isActive: false,
+        },
+      }),
+    ]);
 
     return {
       success: true,
+      removalMode: 'deactivated' as const,
+      reason: `User was deactivated because related ${dependencyLabels.join(', ')} still exist`,
     };
   }
 }

@@ -1,4 +1,3 @@
-import { ConflictException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { SchoolsService } from './schools.service';
 
@@ -9,8 +8,16 @@ describe('SchoolsService', () => {
       create: jest.Mock;
       findMany: jest.Mock;
       findUnique: jest.Mock;
+      update: jest.Mock;
       delete: jest.Mock;
     };
+    schoolYear: {
+      updateMany: jest.Mock;
+    };
+    class: {
+      updateMany: jest.Mock;
+    };
+    $transaction: jest.Mock;
   };
 
   beforeEach(() => {
@@ -19,8 +26,16 @@ describe('SchoolsService', () => {
         create: jest.fn(),
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        update: jest.fn(),
         delete: jest.fn(),
       },
+      schoolYear: {
+        updateMany: jest.fn(),
+      },
+      class: {
+        updateMany: jest.fn(),
+      },
+      $transaction: jest.fn().mockResolvedValue([]),
     };
 
     service = new SchoolsService(prisma as never);
@@ -67,7 +82,7 @@ describe('SchoolsService', () => {
     });
   });
 
-  it('blocks deleting schools that still have dependent records', async () => {
+  it('archives schools that still have dependent records', async () => {
     prisma.school.findUnique.mockResolvedValue({
       id: 'school-1',
       _count: {
@@ -88,9 +103,14 @@ describe('SchoolsService', () => {
         } as never,
         'school-1',
       ),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).resolves.toEqual({
+      success: true,
+      removalMode: 'archived',
+      reason: 'School was archived because related memberships still exist',
+    });
 
     expect(prisma.school.delete).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalled();
   });
 
   it('deletes an empty school', async () => {
@@ -115,7 +135,7 @@ describe('SchoolsService', () => {
         } as never,
         'school-1',
       ),
-    ).resolves.toEqual({ success: true });
+    ).resolves.toEqual({ success: true, removalMode: 'deleted' });
 
     expect(prisma.school.delete).toHaveBeenCalledWith({
       where: { id: 'school-1' },

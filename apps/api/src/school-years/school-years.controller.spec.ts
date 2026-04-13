@@ -197,6 +197,42 @@ describe('SchoolYearsController (HTTP)', () => {
       ]);
   });
 
+  it('accepts includeInactive=true on the list request under strict validation', async () => {
+    prisma.schoolYear.findMany.mockResolvedValue([
+      {
+        id: 'year-1',
+        schoolId: 'school-1',
+        name: '2025-2026',
+        isActive: false,
+      },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/school-years')
+      .query({ schoolId: 'school-1', includeInactive: true })
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(200);
+
+    expect(prisma.schoolYear.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ schoolId: 'school-1' }),
+      }),
+    );
+  });
+
+  it('rejects unknown query parameters under strict validation', async () => {
+    await request(app.getHttpServer())
+      .get('/school-years')
+      .query({ schoolId: 'school-1', includeInactive: true, unexpected: 'value' })
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body.message).toContain('property unexpected should not exist');
+      });
+  });
+
   it('returns 400 when schoolId is missing from the list request', async () => {
     await request(app.getHttpServer())
       .get('/school-years')

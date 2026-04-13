@@ -7,5 +7,9 @@ export class UpdateAttendanceRecordDto {
 
   @IsOptional()
   @IsString()
+  customStatusId?: string;
+
+  @IsOptional()
+  @IsString()
   remark?: string;
 }

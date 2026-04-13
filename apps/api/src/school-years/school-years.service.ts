@@ -74,17 +74,23 @@ export class SchoolYearsService {
         name: data.name,
         startDate,
         endDate,
+        isActive: true,
       },
       include: this.buildInclude(),
     });
   }
 
-  findAllForSchool(user: AuthenticatedUser, schoolId: string) {
+  findAllForSchool(
+    user: AuthenticatedUser,
+    schoolId: string,
+    includeInactive = false,
+  ) {
     ensureUserHasSchoolAccess(user, schoolId);
 
     return this.prisma.schoolYear.findMany({
       where: {
         schoolId,
+        ...(includeInactive ? {} : { isActive: true }),
       },
       orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
       include: this.buildInclude(),
@@ -233,18 +239,38 @@ export class SchoolYearsService {
         ['reporting periods', existing._count.reportingPeriods],
       ].flatMap(([label, count]: [string, number]) => (count > 0 ? [label] : []));
 
-      if (dependencyLabels.length > 0) {
-        throw new ConflictException(
-          `School year cannot be deleted because related ${dependencyLabels.join(', ')} still exist`,
-        );
+      if (dependencyLabels.length === 0) {
+        await this.prisma.schoolYear.delete({
+          where: { id: existing.id },
+        });
+
+        return {
+          success: true,
+          removalMode: 'deleted' as const,
+        };
       }
 
-      await this.prisma.schoolYear.delete({
-        where: { id: existing.id },
-      });
+      await this.prisma.$transaction([
+        this.prisma.schoolYear.update({
+          where: { id: existing.id },
+          data: {
+            isActive: false,
+          },
+        }),
+        this.prisma.class.updateMany({
+          where: {
+            schoolYearId: existing.id,
+          },
+          data: {
+            isActive: false,
+          },
+        }),
+      ]);
 
       return {
         success: true,
+        removalMode: 'archived' as const,
+        reason: `School year was archived because related ${dependencyLabels.join(', ')} still exist`,
       };
     } catch (error) {
       this.handleRemoveError(error);

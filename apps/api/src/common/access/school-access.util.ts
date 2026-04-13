@@ -3,11 +3,19 @@ import { UserRole } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/auth-user';
 
 export function isBypassRole(role: UserRole) {
+  return (
+    role === UserRole.OWNER ||
+    role === UserRole.SUPER_ADMIN ||
+    role === UserRole.ADMIN
+  );
+}
+
+export function isHighPrivilegeRole(role: UserRole) {
   return role === UserRole.OWNER || role === UserRole.SUPER_ADMIN;
 }
 
 export function isSchoolAdminRole(role: UserRole) {
-  return role === UserRole.ADMIN || role === UserRole.STAFF;
+  return role === UserRole.STAFF;
 }
 
 export function isTeacherRole(role: UserRole) {

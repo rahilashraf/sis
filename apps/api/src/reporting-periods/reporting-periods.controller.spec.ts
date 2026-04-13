@@ -148,7 +148,7 @@ describe('ReportingPeriodsController (HTTP)', () => {
     await request(app.getHttpServer())
       .post('/reporting-periods')
       .set('x-test-user-id', 'staff-1')
-      .set('x-test-role', UserRole.STAFF)
+      .set('x-test-role', UserRole.OWNER)
       .set('x-test-school-ids', 'school-1')
       .send({
         schoolId: 'school-1',
@@ -230,6 +230,8 @@ describe('ReportingPeriodsController (HTTP)', () => {
         id: 'period-1',
         schoolId: 'school-1',
         schoolYearId: 'year-1',
+        isActive: true,
+        isLocked: false,
         startsAt: new Date('2025-09-01T00:00:00.000Z'),
         endsAt: new Date('2025-11-15T00:00:00.000Z'),
       })
@@ -265,7 +267,7 @@ describe('ReportingPeriodsController (HTTP)', () => {
     await request(app.getHttpServer())
       .patch('/reporting-periods/period-1')
       .set('x-test-user-id', 'admin-1')
-      .set('x-test-role', UserRole.ADMIN)
+      .set('x-test-role', UserRole.OWNER)
       .set('x-test-school-ids', 'school-1')
       .send({
         name: 'Term 1 Updated',
@@ -283,25 +285,64 @@ describe('ReportingPeriodsController (HTTP)', () => {
       });
   });
 
-  it('deletes a reporting period for an admin-like user with school access', async () => {
+  it('archives a reporting period for a high privilege user with school access', async () => {
     prisma.reportingPeriod.findUnique.mockResolvedValue({
       id: 'period-1',
       schoolId: 'school-1',
     });
-    prisma.reportingPeriod.delete.mockResolvedValue({
+    prisma.reportingPeriod.update.mockResolvedValue({
       id: 'period-1',
       schoolId: 'school-1',
+      isActive: false,
+      school: { id: 'school-1', name: 'North School' },
+      schoolYear: { id: 'year-1', name: '2025-2026' },
     });
 
     await request(app.getHttpServer())
-      .delete('/reporting-periods/period-1')
-      .set('x-test-user-id', 'staff-1')
-      .set('x-test-role', UserRole.STAFF)
+      .patch('/reporting-periods/period-1/archive')
+      .set('x-test-user-id', 'owner-1')
+      .set('x-test-role', UserRole.OWNER)
       .set('x-test-school-ids', 'school-1')
       .expect(200)
       .expect({
         id: 'period-1',
         schoolId: 'school-1',
+        isActive: false,
+        school: { id: 'school-1', name: 'North School' },
+        schoolYear: { id: 'year-1', name: '2025-2026' },
+      });
+  });
+
+  it('locks a reporting period for a high privilege user with school access', async () => {
+    prisma.reportingPeriod.findUnique.mockResolvedValue({
+      id: 'period-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+      isActive: true,
+      isLocked: false,
+      school: { id: 'school-1', name: 'North School' },
+      schoolYear: { id: 'year-1', name: '2025-2026' },
+    });
+    prisma.reportingPeriod.update.mockResolvedValue({
+      id: 'period-1',
+      schoolId: 'school-1',
+      isLocked: true,
+      school: { id: 'school-1', name: 'North School' },
+      schoolYear: { id: 'year-1', name: '2025-2026' },
+    });
+
+    await request(app.getHttpServer())
+      .patch('/reporting-periods/period-1/lock')
+      .set('x-test-user-id', 'owner-1')
+      .set('x-test-role', UserRole.OWNER)
+      .set('x-test-school-ids', 'school-1')
+      .expect(200)
+      .expect({
+        id: 'period-1',
+        schoolId: 'school-1',
+        isLocked: true,
+        school: { id: 'school-1', name: 'North School' },
+        schoolYear: { id: 'year-1', name: '2025-2026' },
       });
   });
 
@@ -320,7 +361,7 @@ describe('ReportingPeriodsController (HTTP)', () => {
     await request(app.getHttpServer())
       .post('/reporting-periods')
       .set('x-test-user-id', 'staff-1')
-      .set('x-test-role', UserRole.STAFF)
+      .set('x-test-role', UserRole.OWNER)
       .set('x-test-school-ids', 'school-1')
       .send({
         schoolId: 'school-1',
@@ -348,7 +389,7 @@ describe('ReportingPeriodsController (HTTP)', () => {
     await request(app.getHttpServer())
       .post('/reporting-periods')
       .set('x-test-user-id', 'admin-1')
-      .set('x-test-role', UserRole.ADMIN)
+      .set('x-test-role', UserRole.OWNER)
       .set('x-test-school-ids', 'school-1')
       .send({
         schoolId: 'school-1',

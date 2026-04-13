@@ -5,22 +5,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, UserRole } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import type { AuthenticatedUser } from '../common/auth/auth-user';
+import {
+  ensureUserHasSchoolAccess,
+  isBypassRole,
+  isHighPrivilegeRole,
+} from '../common/access/school-access.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportingPeriodDto } from './dto/create-reporting-period.dto';
 import { QueryReportingPeriodsDto } from './dto/query-reporting-periods.dto';
 import { UpdateReportingPeriodDto } from './dto/update-reporting-period.dto';
 
-type AuthUserMembership = {
-  schoolId: string;
-  isActive: boolean;
-};
-
-type AuthUser = {
-  id: string;
-  role: UserRole;
-  memberships?: AuthUserMembership[];
-};
+type AuthUser = AuthenticatedUser;
 
 @Injectable()
 export class ReportingPeriodsService {
@@ -33,8 +30,10 @@ export class ReportingPeriodsService {
     };
   }
 
-  private isBypassRole(role: UserRole) {
-    return role === 'OWNER' || role === 'SUPER_ADMIN';
+  private ensureHighPrivilege(user: AuthUser) {
+    if (!isHighPrivilegeRole(user.role)) {
+      throw new ForbiddenException('You do not have reporting period access');
+    }
   }
 
   private ensureDateRange(startsAt: Date, endsAt: Date) {
@@ -66,20 +65,6 @@ export class ReportingPeriodsService {
     }
 
     return date;
-  }
-
-  private ensureUserCanAccessSchool(user: AuthUser, schoolId: string) {
-    if (this.isBypassRole(user.role)) {
-      return;
-    }
-
-    const hasMembership = (user.memberships ?? []).some(
-      (membership) => membership.schoolId === schoolId && membership.isActive,
-    );
-
-    if (!hasMembership) {
-      throw new ForbiddenException('You do not have school access');
-    }
   }
 
   private async ensureSchoolAndYearAreValid(
@@ -114,6 +99,19 @@ export class ReportingPeriodsService {
     }
 
     return schoolYear;
+  }
+
+  private async getPeriodOrThrow(id: string) {
+    const period = await this.prisma.reportingPeriod.findUnique({
+      where: { id },
+      include: this.buildInclude(),
+    });
+
+    if (!period) {
+      throw new NotFoundException('Reporting period not found');
+    }
+
+    return period;
   }
 
   private async ensureNoOverlap(
@@ -165,7 +163,8 @@ export class ReportingPeriodsService {
   }
 
   async create(user: AuthUser, data: CreateReportingPeriodDto) {
-    this.ensureUserCanAccessSchool(user, data.schoolId);
+    this.ensureHighPrivilege(user);
+    ensureUserHasSchoolAccess(user, data.schoolId);
 
     const schoolYear = await this.ensureSchoolAndYearAreValid(
       data.schoolId,
@@ -193,6 +192,8 @@ export class ReportingPeriodsService {
           order: data.order,
           startsAt,
           endsAt,
+          isActive: true,
+          isLocked: false,
         },
         include: this.buildInclude(),
       });
@@ -202,13 +203,18 @@ export class ReportingPeriodsService {
   }
 
   async findAll(user: AuthUser, query: QueryReportingPeriodsDto) {
-    this.ensureUserCanAccessSchool(user, query.schoolId);
+    if (!isBypassRole(user.role)) {
+      ensureUserHasSchoolAccess(user, query.schoolId);
+    }
     await this.ensureSchoolAndYearAreValid(query.schoolId, query.schoolYearId);
+
+    const includeInactive = query.includeInactive ?? false;
 
     return this.prisma.reportingPeriod.findMany({
       where: {
         schoolId: query.schoolId,
         schoolYearId: query.schoolYearId,
+        ...(includeInactive ? {} : { isActive: true }),
       },
       orderBy: [{ order: 'asc' }, { startsAt: 'asc' }, { createdAt: 'asc' }],
       include: this.buildInclude(),
@@ -216,27 +222,26 @@ export class ReportingPeriodsService {
   }
 
   async findOne(user: AuthUser, id: string) {
-    const reportingPeriod = await this.prisma.reportingPeriod.findUnique({
-      where: { id },
-      include: this.buildInclude(),
-    });
+    const reportingPeriod = await this.getPeriodOrThrow(id);
 
-    if (!reportingPeriod) {
-      throw new NotFoundException('Reporting period not found');
+    if (!isBypassRole(user.role)) {
+      ensureUserHasSchoolAccess(user, reportingPeriod.schoolId);
     }
-
-    this.ensureUserCanAccessSchool(user, reportingPeriod.schoolId);
 
     return reportingPeriod;
   }
 
   async update(user: AuthUser, id: string, data: UpdateReportingPeriodDto) {
+    this.ensureHighPrivilege(user);
+
     const existing = await this.prisma.reportingPeriod.findUnique({
       where: { id },
       select: {
         id: true,
         schoolId: true,
         schoolYearId: true,
+        isActive: true,
+        isLocked: true,
         startsAt: true,
         endsAt: true,
       },
@@ -246,7 +251,22 @@ export class ReportingPeriodsService {
       throw new NotFoundException('Reporting period not found');
     }
 
-    this.ensureUserCanAccessSchool(user, existing.schoolId);
+    ensureUserHasSchoolAccess(user, existing.schoolId);
+
+    const hasNonLockUpdates =
+      data.name !== undefined ||
+      data.key !== undefined ||
+      data.order !== undefined ||
+      data.startsAt !== undefined ||
+      data.endsAt !== undefined;
+
+    if (existing.isLocked && hasNonLockUpdates) {
+      throw new BadRequestException('Reporting period is locked');
+    }
+
+    if (!existing.isActive && hasNonLockUpdates) {
+      throw new BadRequestException('Reporting period is archived');
+    }
 
     const schoolYear = await this.ensureSchoolAndYearAreValid(
       existing.schoolId,
@@ -287,7 +307,9 @@ export class ReportingPeriodsService {
     }
   }
 
-  async remove(user: AuthUser, id: string) {
+  async setActive(user: AuthUser, id: string, isActive: boolean) {
+    this.ensureHighPrivilege(user);
+
     const existing = await this.prisma.reportingPeriod.findUnique({
       where: { id },
       select: {
@@ -300,10 +322,29 @@ export class ReportingPeriodsService {
       throw new NotFoundException('Reporting period not found');
     }
 
-    this.ensureUserCanAccessSchool(user, existing.schoolId);
+    ensureUserHasSchoolAccess(user, existing.schoolId);
 
-    return this.prisma.reportingPeriod.delete({
+    return this.prisma.reportingPeriod.update({
       where: { id: existing.id },
+      data: { isActive },
+      include: this.buildInclude(),
+    });
+  }
+
+  async setLocked(user: AuthUser, id: string, isLocked: boolean) {
+    this.ensureHighPrivilege(user);
+
+    const existing = await this.getPeriodOrThrow(id);
+    ensureUserHasSchoolAccess(user, existing.schoolId);
+
+    if (!existing.isActive) {
+      throw new BadRequestException('Reporting period is archived');
+    }
+
+    return this.prisma.reportingPeriod.update({
+      where: { id: existing.id },
+      data: { isLocked },
+      include: this.buildInclude(),
     });
   }
 }

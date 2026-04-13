@@ -1,9 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLinkDto } from './dto/create-link.dto';
 import { AuthenticatedUser } from '../common/auth/auth-user';
@@ -16,6 +18,9 @@ import { safeUserSelect } from '../common/prisma/safe-user-response';
 @Injectable()
 export class LinksService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private readonly duplicateLinkMessage =
+    'Student is already linked to this parent';
 
   private async getUserMembershipSchoolIds(userId: string) {
     const existingUser = await this.prisma.user.findUnique({
@@ -46,6 +51,28 @@ export class LinksService {
     };
   }
 
+  private isDuplicateLinkError(error: unknown) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+      return false;
+    }
+
+    if (error.code !== 'P2002') {
+      return false;
+    }
+
+    const target = Array.isArray(error.meta?.target) ? error.meta.target : [];
+
+    return target.includes('parentId') && target.includes('studentId');
+  }
+
+  private rethrowDuplicateLinkError(error: unknown): never {
+    if (this.isDuplicateLinkError(error)) {
+      throw new ConflictException(this.duplicateLinkMessage);
+    }
+
+    throw error;
+  }
+
   private ensureActorCanAccessLinkedSchools(
     actor: AuthenticatedUser,
     schoolIds: string[],
@@ -64,7 +91,28 @@ export class LinksService {
     }
   }
 
+  private buildLinkSelect() {
+    return {
+      id: true,
+      parentId: true,
+      studentId: true,
+      createdAt: true,
+      parent: {
+        select: safeUserSelect,
+      },
+      student: {
+        select: safeUserSelect,
+      },
+    } as const;
+  }
+
   async create(actor: AuthenticatedUser, data: CreateLinkDto) {
+    if (data.parentId === data.studentId) {
+      throw new BadRequestException(
+        'parentId and studentId must refer to different users',
+      );
+    }
+
     const parent = await this.getUserMembershipSchoolIds(data.parentId);
     const student = await this.getUserMembershipSchoolIds(data.studentId);
 
@@ -74,6 +122,18 @@ export class LinksService {
 
     if (student.role !== 'STUDENT') {
       throw new BadRequestException('studentId must belong to a student user');
+    }
+
+    if (parent.schoolIds.length === 0) {
+      throw new BadRequestException(
+        'parentId must belong to a parent with an active school membership',
+      );
+    }
+
+    if (student.schoolIds.length === 0) {
+      throw new BadRequestException(
+        'studentId must belong to a student with an active school membership',
+      );
     }
 
     const sharedSchoolIds = parent.schoolIds.filter((schoolId) =>
@@ -88,62 +148,71 @@ export class LinksService {
 
     this.ensureActorCanAccessLinkedSchools(actor, sharedSchoolIds);
 
-    return this.prisma.studentParentLink.create({
-      data,
+    try {
+      return await this.prisma.studentParentLink.create({
+        data,
+        select: this.buildLinkSelect(),
+      });
+    } catch (error) {
+      this.rethrowDuplicateLinkError(error);
+    }
+  }
+
+  async remove(actor: AuthenticatedUser, id: string) {
+    const existingLink = await this.prisma.studentParentLink.findUnique({
+      where: { id },
       select: {
         id: true,
-        parentId: true,
-        studentId: true,
-        createdAt: true,
         parent: {
-          select: safeUserSelect,
+          select: {
+            memberships: {
+              where: {
+                isActive: true,
+              },
+              select: {
+                schoolId: true,
+              },
+            },
+          },
         },
         student: {
-          select: safeUserSelect,
+          select: {
+            memberships: {
+              where: {
+                isActive: true,
+              },
+              select: {
+                schoolId: true,
+              },
+            },
+          },
         },
       },
     });
-  }
 
-  async findByParent(actor: AuthenticatedUser, parentId: string) {
-    const parent = await this.getUserMembershipSchoolIds(parentId);
-    this.ensureActorCanAccessLinkedSchools(actor, parent.schoolIds);
+    if (!existingLink) {
+      throw new NotFoundException('Student-parent link not found');
+    }
 
-    return this.prisma.studentParentLink.findMany({
-      where: { parentId },
-      select: {
-        id: true,
-        parentId: true,
-        studentId: true,
-        createdAt: true,
-        student: {
-          select: safeUserSelect,
-        },
-      },
-    });
-  }
+    const linkedSchoolIds = [
+      ...new Set([
+        ...existingLink.parent.memberships.map((membership) => membership.schoolId),
+        ...existingLink.student.memberships.map(
+          (membership) => membership.schoolId,
+        ),
+      ]),
+    ];
 
-  async findByStudent(actor: AuthenticatedUser, studentId: string) {
-    const student = await this.getUserMembershipSchoolIds(studentId);
-    this.ensureActorCanAccessLinkedSchools(actor, student.schoolIds);
+    this.ensureActorCanAccessLinkedSchools(actor, linkedSchoolIds);
 
-    return this.prisma.studentParentLink.findMany({
-      where: { studentId },
-      select: {
-        id: true,
-        parentId: true,
-        studentId: true,
-        createdAt: true,
-        parent: {
-          select: safeUserSelect,
-        },
-      },
-    });
-  }
-
-  remove(id: string) {
     return this.prisma.studentParentLink.delete({
       where: { id },
+      select: {
+        id: true,
+        parentId: true,
+        studentId: true,
+        createdAt: true,
+      },
     });
   }
 }

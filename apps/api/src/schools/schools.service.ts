@@ -38,23 +38,26 @@ export class SchoolsService {
     return existingSchool;
   }
 
-  findAll(user: AuthenticatedUser) {
+  findAll(user: AuthenticatedUser, includeInactive = false) {
     const accessibleSchoolIds = getAccessibleSchoolIds(user);
 
     return this.prisma.school.findMany({
-      where: isBypassRole(user.role)
-        ? undefined
-        : {
-            id: {
-              in: accessibleSchoolIds,
-            },
-          },
+      where: {
+        ...(includeInactive ? {} : { isActive: true }),
+        ...(isBypassRole(user.role)
+          ? {}
+          : {
+              id: {
+                in: accessibleSchoolIds,
+              },
+            }),
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async create(user: AuthenticatedUser, data: CreateSchoolDto) {
-    if (!isBypassRole(user.role) && user.role !== UserRole.ADMIN) {
+    if (!isBypassRole(user.role)) {
       throw new ForbiddenException(
         'Only owner, super admin, and admin roles can create schools',
       );
@@ -157,18 +160,46 @@ export class SchoolsService {
       ['reporting periods', existingSchool._count.reportingPeriods],
     ].flatMap(([label, count]: [string, number]) => (count > 0 ? [label] : []));
 
-    if (dependencyLabels.length > 0) {
-      throw new ConflictException(
-        `School cannot be deleted because related ${dependencyLabels.join(', ')} still exist`,
-      );
+    if (dependencyLabels.length === 0) {
+      await this.prisma.school.delete({
+        where: { id: existingSchool.id },
+      });
+
+      return {
+        success: true,
+        removalMode: 'deleted' as const,
+      };
     }
 
-    await this.prisma.school.delete({
-      where: { id: existingSchool.id },
-    });
+    await this.prisma.$transaction([
+      this.prisma.school.update({
+        where: { id: existingSchool.id },
+        data: {
+          isActive: false,
+        },
+      }),
+      this.prisma.schoolYear.updateMany({
+        where: {
+          schoolId: existingSchool.id,
+        },
+        data: {
+          isActive: false,
+        },
+      }),
+      this.prisma.class.updateMany({
+        where: {
+          schoolId: existingSchool.id,
+        },
+        data: {
+          isActive: false,
+        },
+      }),
+    ]);
 
     return {
       success: true,
+      removalMode: 'archived' as const,
+      reason: `School was archived because related ${dependencyLabels.join(', ')} still exist`,
     };
   }
 }

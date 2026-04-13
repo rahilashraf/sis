@@ -25,13 +25,13 @@ export class GradesController {
   constructor(private readonly gradesService: GradesService) {}
 
   @Post()
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER')
   create(@Req() req: AuthenticatedRequest, @Body() body: CreateGradeRecordDto) {
     return this.gradesService.create(req.user, body);
   }
 
   @Patch(':id')
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER')
   update(
     @Req() req: AuthenticatedRequest,
     @Param('id', NonEmptyStringPipe) id: string,
@@ -41,7 +41,7 @@ export class GradesController {
   }
 
   @Get('classes/:classId')
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER')
   findByClass(
     @Req() req: AuthenticatedRequest,
     @Param('classId', NonEmptyStringPipe) classId: string,
@@ -50,7 +50,7 @@ export class GradesController {
   }
 
   @Get('classes/:classId/summary')
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER')
   getClassSummary(
     @Req() req: AuthenticatedRequest,
     @Param('classId', NonEmptyStringPipe) classId: string,
@@ -70,7 +70,6 @@ export class GradesController {
     'ADMIN',
     'STAFF',
     'TEACHER',
-    'SUPPLY_TEACHER',
     'PARENT',
     'STUDENT',
   )
@@ -88,7 +87,6 @@ export class GradesController {
     'ADMIN',
     'STAFF',
     'TEACHER',
-    'SUPPLY_TEACHER',
     'PARENT',
     'STUDENT',
   )

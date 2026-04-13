@@ -5,11 +5,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, UserRole } from '@prisma/client';
+import { Prisma, TeacherClassAssignmentType, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
+import { UpdateTeacherAssignmentDto } from './dto/update-teacher-assignment.dto';
 import { EnrollStudentDto } from './dto/enroll-student.dto';
 import { AuthenticatedUser } from '../common/auth/auth-user';
 import {
@@ -45,7 +46,11 @@ export class ClassesService {
       id: true,
       classId: true,
       teacherId: true,
+      assignmentType: true,
+      startsAt: true,
+      endsAt: true,
       createdAt: true,
+      updatedAt: true,
       teacher: {
         select: safeUserSelect,
       },
@@ -110,6 +115,11 @@ export class ClassesService {
       teachers: {
         select: this.buildTeacherAssignmentSelect(),
       },
+      _count: {
+        select: {
+          students: true,
+        },
+      },
       ...(includeStudents
         ? {
             students: {
@@ -168,15 +178,56 @@ export class ClassesService {
     return user.memberships.map((membership) => membership.schoolId);
   }
 
-  private async ensureTeacherAssignedToClass(
+  private buildActiveSupplyAssignmentWindowWhere(now: Date) {
+    return {
+      assignmentType: TeacherClassAssignmentType.SUPPLY,
+      startsAt: { lte: now },
+      OR: [{ endsAt: null }, { endsAt: { gte: now } }],
+    } satisfies Prisma.TeacherClassAssignmentWhereInput;
+  }
+
+  private buildTeacherClassAccessWhere(
     teacherId: string,
+    classId: string,
+    role: UserRole,
+    now = new Date(),
+  ) {
+    if (role === UserRole.SUPPLY_TEACHER) {
+      return {
+        teacherId,
+        classId,
+        OR: [
+          { assignmentType: TeacherClassAssignmentType.REGULAR },
+          this.buildActiveSupplyAssignmentWindowWhere(now),
+        ],
+      } satisfies Prisma.TeacherClassAssignmentWhereInput;
+    }
+
+    return {
+      teacherId,
+      classId,
+    } satisfies Prisma.TeacherClassAssignmentWhereInput;
+  }
+
+  private buildTeacherAssignmentAccessFilter(role: UserRole, now = new Date()) {
+    if (role !== UserRole.SUPPLY_TEACHER) {
+      return {} satisfies Prisma.TeacherClassAssignmentWhereInput;
+    }
+
+    return {
+      OR: [
+        { assignmentType: TeacherClassAssignmentType.REGULAR },
+        this.buildActiveSupplyAssignmentWindowWhere(now),
+      ],
+    } satisfies Prisma.TeacherClassAssignmentWhereInput;
+  }
+
+  private async ensureTeacherAssignedToClass(
+    user: AuthenticatedUser,
     classId: string,
   ) {
     const assignment = await this.prisma.teacherClassAssignment.findFirst({
-      where: {
-        teacherId,
-        classId,
-      },
+      where: this.buildTeacherClassAccessWhere(user.id, classId, user.role),
       select: {
         id: true,
       },
@@ -213,19 +264,21 @@ export class ClassesService {
     user: AuthenticatedUser,
     classId: string,
   ) {
-    const existingClass = await this.getClassOrThrow(classId);
+    if (isBypassRole(user.role)) {
+      return;
+    }
 
-    if (this.isAdminLike(user.role)) {
+    if (isSchoolAdminRole(user.role)) {
+      const existingClass = await this.getClassOrThrow(classId);
       ensureUserHasSchoolAccess(user, existingClass.schoolId);
-      return existingClass;
+      return;
     }
 
     if (!this.isTeacherLike(user.role)) {
       throw new ForbiddenException('You do not have class access');
     }
 
-    await this.ensureTeacherAssignedToClass(user.id, classId);
-    return existingClass;
+    await this.ensureTeacherAssignedToClass(user, classId);
   }
 
   private async ensureParentLinkedToStudent(
@@ -253,25 +306,74 @@ export class ClassesService {
     user: AuthenticatedUser,
     studentId: string,
   ) {
-    const enrollment = await this.prisma.studentClassEnrollment.findFirst({
+    const now = new Date();
+    const assignment = await this.prisma.teacherClassAssignment.findFirst({
       where: {
-        studentId,
+        teacherId: user.id,
         class: {
-          teachers: {
+          students: {
             some: {
-              teacherId: user.id,
+              studentId,
             },
           },
         },
+        ...(user.role === UserRole.SUPPLY_TEACHER
+          ? {
+              OR: [
+                { assignmentType: TeacherClassAssignmentType.REGULAR },
+                this.buildActiveSupplyAssignmentWindowWhere(now),
+              ],
+            }
+          : {}),
       },
       select: {
         id: true,
       },
     });
 
-    if (!enrollment) {
+    if (!assignment) {
       throw new ForbiddenException('You do not have student access');
     }
+  }
+
+  private parseDateTimeOrThrow(value: string, fieldName: string) {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`${fieldName} must be a valid datetime`);
+    }
+
+    return parsed;
+  }
+
+  private resolveTeacherAssignmentWindow(
+    assignmentType: TeacherClassAssignmentType,
+    startsAtInput: string | null | undefined,
+    endsAtInput: string | null | undefined,
+  ) {
+    if (assignmentType === TeacherClassAssignmentType.REGULAR) {
+      return {
+        startsAt: null,
+        endsAt: null,
+      } as const;
+    }
+
+    if (!startsAtInput || !endsAtInput) {
+      throw new BadRequestException(
+        'startsAt and endsAt are required for supply teacher assignments',
+      );
+    }
+
+    const startsAt = this.parseDateTimeOrThrow(startsAtInput, 'startsAt');
+    const endsAt = this.parseDateTimeOrThrow(endsAtInput, 'endsAt');
+
+    if (startsAt >= endsAt) {
+      throw new BadRequestException('startsAt must be before endsAt');
+    }
+
+    return {
+      startsAt,
+      endsAt,
+    } as const;
   }
 
   async create(user: AuthenticatedUser, data: CreateClassDto) {
@@ -309,19 +411,22 @@ export class ClassesService {
     }
   }
 
-  findAll(user: AuthenticatedUser) {
+  findAll(user: AuthenticatedUser, includeInactive = false) {
     const accessibleSchoolIds = getAccessibleSchoolIds(user);
 
     return this.prisma.class.findMany({
-      where: isBypassRole(user.role)
-        ? undefined
-        : {
-            schoolId: {
-              in: accessibleSchoolIds,
-            },
-          },
+      where: {
+        ...(includeInactive ? {} : { isActive: true }),
+        ...(isBypassRole(user.role)
+          ? {}
+          : {
+              schoolId: {
+                in: accessibleSchoolIds,
+              },
+            }),
+      },
       orderBy: { createdAt: 'desc' },
-      select: this.buildClassSelect(),
+      select: this.buildClassSelect(false),
     });
   }
 
@@ -331,7 +436,7 @@ export class ClassesService {
     if (this.isAdminLike(user.role)) {
       ensureUserHasSchoolAccess(user, existingClass.schoolId);
     } else if (this.isTeacherLike(user.role)) {
-      await this.ensureTeacherAssignedToClass(user.id, classId);
+      await this.ensureTeacherAssignedToClass(user, classId);
     } else {
       throw new ForbiddenException('You do not have class access');
     }
@@ -365,7 +470,13 @@ export class ClassesService {
     }
 
     const assignments = await this.prisma.teacherClassAssignment.findMany({
-      where: { teacherId: user.id },
+      where: {
+        teacherId: user.id,
+        class: {
+          isActive: true,
+        },
+        ...this.buildTeacherAssignmentAccessFilter(user.role),
+      },
       select: {
         class: {
           select: this.buildClassSelect(false),
@@ -407,22 +518,70 @@ export class ClassesService {
       throw new BadRequestException('teacherId must belong to a teacher user');
     }
 
+    const assignmentType =
+      data.assignmentType ??
+      (teacher.role === UserRole.SUPPLY_TEACHER
+        ? TeacherClassAssignmentType.SUPPLY
+        : TeacherClassAssignmentType.REGULAR);
+
+    if (
+      teacher.role === UserRole.SUPPLY_TEACHER &&
+      assignmentType !== TeacherClassAssignmentType.SUPPLY
+    ) {
+      throw new BadRequestException(
+        'Supply teachers must use supply assignments',
+      );
+    }
+
+    if (
+      teacher.role !== UserRole.SUPPLY_TEACHER &&
+      assignmentType === TeacherClassAssignmentType.SUPPLY
+    ) {
+      throw new BadRequestException(
+        'Supply assignments can only be used with supply teachers',
+      );
+    }
+
     if (!teacherSchoolIds.includes(existingClass.schoolId)) {
       throw new BadRequestException(
         'Teacher must belong to the same school as the class',
       );
     }
 
-    return this.prisma.teacherClassAssignment.create({
-      data: {
+    const assignmentWindow = this.resolveTeacherAssignmentWindow(
+      assignmentType,
+      data.startsAt,
+      data.endsAt,
+    );
+
+    return this.prisma.teacherClassAssignment.upsert({
+      where: {
+        teacherId_classId: {
+          teacherId: data.teacherId,
+          classId,
+        },
+      },
+      create: {
         classId,
         teacherId: data.teacherId,
+        assignmentType,
+        startsAt: assignmentWindow.startsAt,
+        endsAt: assignmentWindow.endsAt,
+      },
+      update: {
+        assignmentType,
+        startsAt: assignmentWindow.startsAt,
+        endsAt: assignmentWindow.endsAt,
       },
       select: {
         id: true,
         classId: true,
         teacherId: true,
+        assignmentType: true,
+        startsAt: true,
+        endsAt: true,
         createdAt: true,
+        updatedAt: true,
         teacher: {
           select: safeUserSelect,
         },
@@ -438,8 +597,10 @@ export class ClassesService {
     classId: string,
     teacherId: string,
   ) {
-    const existingClass = await this.getClassOrThrow(classId);
-    ensureUserHasSchoolAccess(user, existingClass.schoolId);
+    if (!isBypassRole(user.role)) {
+      const existingClass = await this.getClassOrThrow(classId);
+      ensureUserHasSchoolAccess(user, existingClass.schoolId);
+    }
 
     const assignment = await this.prisma.teacherClassAssignment.findFirst({
       where: {
@@ -463,7 +624,107 @@ export class ClassesService {
         id: true,
         classId: true,
         teacherId: true,
+        assignmentType: true,
+        startsAt: true,
+        endsAt: true,
         createdAt: true,
+        updatedAt: true,
+        teacher: {
+          select: safeUserSelect,
+        },
+        class: {
+          select: this.buildClassSelect(false),
+        },
+      },
+    });
+  }
+
+  async updateTeacherAssignment(
+    user: AuthenticatedUser,
+    classId: string,
+    teacherId: string,
+    data: UpdateTeacherAssignmentDto,
+  ) {
+    const existingClass = await this.getClassOrThrow(classId);
+    ensureUserHasSchoolAccess(user, existingClass.schoolId);
+
+    const assignment = await this.prisma.teacherClassAssignment.findFirst({
+      where: {
+        classId,
+        teacherId,
+      },
+      select: {
+        id: true,
+        assignmentType: true,
+        startsAt: true,
+        endsAt: true,
+        teacher: {
+          select: {
+            id: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!assignment) {
+      throw new NotFoundException('Teacher assignment not found');
+    }
+
+    const nextAssignmentType =
+      data.assignmentType ?? assignment.assignmentType;
+
+    if (
+      assignment.teacher.role === UserRole.SUPPLY_TEACHER &&
+      nextAssignmentType !== TeacherClassAssignmentType.SUPPLY
+    ) {
+      throw new BadRequestException(
+        'Supply teachers must use supply assignments',
+      );
+    }
+
+    if (
+      assignment.teacher.role !== UserRole.SUPPLY_TEACHER &&
+      nextAssignmentType === TeacherClassAssignmentType.SUPPLY
+    ) {
+      throw new BadRequestException(
+        'Supply assignments can only be used with supply teachers',
+      );
+    }
+
+    const startsAtInput =
+      data.startsAt === undefined
+        ? assignment.startsAt?.toISOString() ?? null
+        : data.startsAt;
+    const endsAtInput =
+      data.endsAt === undefined
+        ? assignment.endsAt?.toISOString() ?? null
+        : data.endsAt;
+
+    const assignmentWindow = this.resolveTeacherAssignmentWindow(
+      nextAssignmentType,
+      startsAtInput,
+      endsAtInput,
+    );
+
+    return this.prisma.teacherClassAssignment.update({
+      where: {
+        id: assignment.id,
+      },
+      data: {
+        assignmentType: nextAssignmentType,
+        startsAt: assignmentWindow.startsAt,
+        endsAt: assignmentWindow.endsAt,
+      },
+      select: {
+        id: true,
+        classId: true,
+        teacherId: true,
+        assignmentType: true,
+        startsAt: true,
+        endsAt: true,
+        createdAt: true,
+        updatedAt: true,
         teacher: {
           select: safeUserSelect,
         },
@@ -518,8 +779,10 @@ export class ClassesService {
     classId: string,
     studentId: string,
   ) {
-    const existingClass = await this.getClassOrThrow(classId);
-    ensureUserHasSchoolAccess(user, existingClass.schoolId);
+    if (!isBypassRole(user.role)) {
+      const existingClass = await this.getClassOrThrow(classId);
+      ensureUserHasSchoolAccess(user, existingClass.schoolId);
+    }
 
     const enrollment = await this.prisma.studentClassEnrollment.findFirst({
       where: {
@@ -593,6 +856,63 @@ export class ClassesService {
     }
   }
 
+  async remove(user: AuthenticatedUser, classId: string) {
+    const existingClass = await this.prisma.class.findUnique({
+      where: { id: classId },
+      select: {
+        id: true,
+        schoolId: true,
+        _count: {
+          select: {
+            teachers: true,
+            students: true,
+            gradeRecords: true,
+            attendanceSessionClasses: true,
+          },
+        },
+      },
+    });
+
+    if (!existingClass) {
+      throw new NotFoundException('Class not found');
+    }
+
+    ensureUserHasSchoolAccess(user, existingClass.schoolId);
+
+    const dependencyLabels: string[] = [
+      ['teacher assignments', existingClass._count.teachers],
+      ['student enrollments', existingClass._count.students],
+      ['grade records', existingClass._count.gradeRecords],
+      ['attendance sessions', existingClass._count.attendanceSessionClasses],
+    ].flatMap(([label, count]: [string, number]) => (count > 0 ? [label] : []));
+
+    if (dependencyLabels.length === 0) {
+      await this.prisma.class.delete({
+        where: {
+          id: existingClass.id,
+        },
+      });
+
+      return {
+        success: true,
+        removalMode: 'deleted' as const,
+      };
+    }
+
+    await this.prisma.class.update({
+      where: { id: existingClass.id },
+      data: {
+        isActive: false,
+      },
+    });
+
+    return {
+      success: true,
+      removalMode: 'archived' as const,
+      reason: `Class was archived because related ${dependencyLabels.join(', ')} still exist`,
+    };
+  }
+
   async findTeachers(user: AuthenticatedUser, classId: string) {
     await this.ensureUserCanReadClassRoster(user, classId);
 
@@ -618,9 +938,14 @@ export class ClassesService {
       }
     }
 
+    const applyRoleFilter = !this.isAdminLike(user.role) && user.id === teacherId;
+
     return this.prisma.teacherClassAssignment.findMany({
       where: {
         teacherId,
+        ...(applyRoleFilter
+          ? this.buildTeacherAssignmentAccessFilter(user.role)
+          : {}),
         ...(isBypassRole(user.role) || !this.isAdminLike(user.role)
           ? {}
           : {
@@ -635,7 +960,11 @@ export class ClassesService {
         id: true,
         classId: true,
         teacherId: true,
+        assignmentType: true,
+        startsAt: true,
+        endsAt: true,
         createdAt: true,
+        updatedAt: true,
         class: {
           select: this.buildClassSelect(false),
         },

@@ -16,9 +16,9 @@ import { RolesGuard } from '../auth/roles.guard';
 import { CreateSchoolYearDto } from './dto/create-school-year.dto';
 import { SchoolYearsService } from './school-years.service';
 import type { AuthenticatedRequest } from '../common/auth/auth-user';
-import { SchoolIdQueryDto } from '../common/dto/school-id-query.dto';
 import { NonEmptyStringPipe } from '../common/pipes/non-empty-string.pipe';
 import { UpdateSchoolYearDto } from './dto/update-school-year.dto';
+import { QuerySchoolYearsDto } from './dto/query-school-years.dto';
 
 @Controller('school-years')
 export class SchoolYearsController {
@@ -35,9 +35,13 @@ export class SchoolYearsController {
   @Get()
   findAllForSchool(
     @Req() req: AuthenticatedRequest,
-    @Query() query: SchoolIdQueryDto,
+    @Query() query: QuerySchoolYearsDto,
   ) {
-    return this.schoolYearsService.findAllForSchool(req.user, query.schoolId);
+    return this.schoolYearsService.findAllForSchool(
+      req.user,
+      query.schoolId,
+      query.includeInactive ?? false,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -84,10 +88,11 @@ export class SchoolYearsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
   @Delete(':id')
-  remove(
+  async remove(
     @Req() req: AuthenticatedRequest,
     @Param('id', NonEmptyStringPipe) id: string,
   ) {
-    return this.schoolYearsService.remove(req.user, id);
+    const result = await this.schoolYearsService.remove(req.user, id);
+    return { success: result.success };
   }
 }

@@ -9,11 +9,16 @@ describe('UsersService', () => {
       findMany: jest.Mock;
       create: jest.Mock;
       findUnique: jest.Mock;
+      update: jest.Mock;
       delete: jest.Mock;
+    };
+    userSchoolMembership: {
+      updateMany: jest.Mock;
     };
     school: {
       findUnique: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
 
   beforeEach(() => {
@@ -22,17 +27,22 @@ describe('UsersService', () => {
         findMany: jest.fn(),
         create: jest.fn(),
         findUnique: jest.fn(),
+        update: jest.fn(),
         delete: jest.fn(),
+      },
+      userSchoolMembership: {
+        updateMany: jest.fn(),
       },
       school: {
         findUnique: jest.fn(),
       },
+      $transaction: jest.fn().mockResolvedValue([]),
     };
 
     service = new UsersService(prisma as never);
   });
 
-  it('scopes list queries for admins to their active schools', async () => {
+  it('does not scope list queries for admins', async () => {
     prisma.user.findMany.mockResolvedValue([]);
 
     await service.findAll({
@@ -44,14 +54,7 @@ describe('UsersService', () => {
     expect(prisma.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          memberships: {
-            some: {
-              schoolId: {
-                in: ['school-1'],
-              },
-              isActive: true,
-            },
-          },
+          isActive: true,
         },
       }),
     );
@@ -106,7 +109,7 @@ describe('UsersService', () => {
     expect(prisma.user.delete).not.toHaveBeenCalled();
   });
 
-  it('blocks deleting users with related records', async () => {
+  it('deactivates users with related records instead of blocking removal', async () => {
     prisma.user.findUnique
       .mockResolvedValueOnce({
         id: 'teacher-1',
@@ -137,9 +140,15 @@ describe('UsersService', () => {
         } as never,
         'teacher-1',
       ),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).resolves.toEqual({
+      success: true,
+      removalMode: 'deactivated',
+      reason:
+        'User was deactivated because related teacher assignments still exist',
+    });
 
     expect(prisma.user.delete).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalled();
   });
 
   it('deletes a manageable user with no dependent records', async () => {
@@ -175,7 +184,7 @@ describe('UsersService', () => {
         } as never,
         'teacher-1',
       ),
-    ).resolves.toEqual({ success: true });
+    ).resolves.toEqual({ success: true, removalMode: 'deleted' });
 
     expect(prisma.user.delete).toHaveBeenCalledWith({
       where: { id: 'teacher-1' },

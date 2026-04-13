@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { SchoolYearsService } from './school-years.service';
 
@@ -8,8 +8,13 @@ describe('SchoolYearsService', () => {
     schoolYear: {
       findMany: jest.Mock;
       findUnique: jest.Mock;
+      update: jest.Mock;
       delete: jest.Mock;
     };
+    class: {
+      updateMany: jest.Mock;
+    };
+    $transaction: jest.Mock;
   };
 
   beforeEach(() => {
@@ -17,8 +22,13 @@ describe('SchoolYearsService', () => {
       schoolYear: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        update: jest.fn(),
         delete: jest.fn(),
       },
+      class: {
+        updateMany: jest.fn(),
+      },
+      $transaction: jest.fn().mockResolvedValue([]),
     };
 
     service = new SchoolYearsService(prisma as never);
@@ -37,7 +47,7 @@ describe('SchoolYearsService', () => {
     ).toThrow(ForbiddenException);
   });
 
-  it('blocks deleting school years with dependent records', async () => {
+  it('archives school years with dependent records', async () => {
     prisma.schoolYear.findUnique.mockResolvedValue({
       id: 'year-1',
       schoolId: 'school-1',
@@ -57,9 +67,14 @@ describe('SchoolYearsService', () => {
         } as never,
         'year-1',
       ),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).resolves.toEqual({
+      success: true,
+      removalMode: 'archived',
+      reason: 'School year was archived because related classes still exist',
+    });
 
     expect(prisma.schoolYear.delete).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalled();
   });
 
   it('deletes an empty school year', async () => {
@@ -83,7 +98,7 @@ describe('SchoolYearsService', () => {
         } as never,
         'year-1',
       ),
-    ).resolves.toEqual({ success: true });
+    ).resolves.toEqual({ success: true, removalMode: 'deleted' });
 
     expect(prisma.schoolYear.delete).toHaveBeenCalledWith({
       where: { id: 'year-1' },

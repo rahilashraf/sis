@@ -19,6 +19,10 @@ class CreateAttendanceRecordDto {
 
   @IsOptional()
   @IsString()
+  customStatusId?: string;
+
+  @IsOptional()
+  @IsString()
   remark?: string;
 }
 

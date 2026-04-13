@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   Patch,
@@ -21,14 +20,13 @@ import type { AuthenticatedRequest } from '../common/auth/auth-user';
 import { NonEmptyStringPipe } from '../common/pipes/non-empty-string.pipe';
 
 @Controller('reporting-periods')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class ReportingPeriodsController {
   constructor(
     private readonly reportingPeriodsService: ReportingPeriodsService,
   ) {}
 
-  @UseGuards(RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Post()
   create(
     @Req() req: AuthenticatedRequest,
@@ -37,6 +35,13 @@ export class ReportingPeriodsController {
     return this.reportingPeriodsService.create(req.user, body);
   }
 
+  @Roles(
+    'OWNER',
+    'SUPER_ADMIN',
+    'ADMIN',
+    'STAFF',
+    'TEACHER',
+  )
   @Get()
   findAll(
     @Req() req: AuthenticatedRequest,
@@ -45,6 +50,13 @@ export class ReportingPeriodsController {
     return this.reportingPeriodsService.findAll(req.user, query);
   }
 
+  @Roles(
+    'OWNER',
+    'SUPER_ADMIN',
+    'ADMIN',
+    'STAFF',
+    'TEACHER',
+  )
   @Get(':id')
   findOne(
     @Req() req: AuthenticatedRequest,
@@ -53,8 +65,7 @@ export class ReportingPeriodsController {
     return this.reportingPeriodsService.findOne(req.user, id);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Patch(':id')
   update(
     @Req() req: AuthenticatedRequest,
@@ -64,13 +75,39 @@ export class ReportingPeriodsController {
     return this.reportingPeriodsService.update(req.user, id, body);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
-  @Delete(':id')
-  remove(
+  @Patch(':id/archive')
+  @Roles('OWNER', 'SUPER_ADMIN')
+  archive(
     @Req() req: AuthenticatedRequest,
     @Param('id', NonEmptyStringPipe) id: string,
   ) {
-    return this.reportingPeriodsService.remove(req.user, id);
+    return this.reportingPeriodsService.setActive(req.user, id, false);
+  }
+
+  @Patch(':id/activate')
+  @Roles('OWNER', 'SUPER_ADMIN')
+  activate(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
+    return this.reportingPeriodsService.setActive(req.user, id, true);
+  }
+
+  @Patch(':id/lock')
+  @Roles('OWNER', 'SUPER_ADMIN')
+  lock(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
+    return this.reportingPeriodsService.setLocked(req.user, id, true);
+  }
+
+  @Patch(':id/unlock')
+  @Roles('OWNER', 'SUPER_ADMIN')
+  unlock(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
+    return this.reportingPeriodsService.setLocked(req.user, id, false);
   }
 }

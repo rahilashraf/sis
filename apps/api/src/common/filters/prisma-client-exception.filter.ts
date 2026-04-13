@@ -5,6 +5,8 @@ import {
   ExceptionFilter,
   HttpStatus,
   NotFoundException,
+  ServiceUnavailableException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Response } from 'express';
@@ -37,8 +39,15 @@ export class PrismaClientExceptionFilter implements ExceptionFilter {
         return new ConflictException(
           'The requested relation is invalid or still in use',
         );
+      case 'P2000':
+        return new BadRequestException('A provided value is too long or invalid');
       case 'P2025':
         return new NotFoundException('The requested record was not found');
+      case 'P2021':
+      case 'P2022':
+        return new ServiceUnavailableException(
+          'Database schema is out of date. Run migrations and retry.',
+        );
       default:
         return {
           getStatus: () => HttpStatus.INTERNAL_SERVER_ERROR,

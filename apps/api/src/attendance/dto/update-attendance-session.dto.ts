@@ -18,6 +18,10 @@ class UpdateAttendanceSessionRecordDto {
 
   @IsOptional()
   @IsString()
+  customStatusId?: string;
+
+  @IsOptional()
+  @IsString()
   remark?: string;
 }
 

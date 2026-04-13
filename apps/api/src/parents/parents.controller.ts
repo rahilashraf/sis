@@ -17,19 +17,31 @@ import type { AuthenticatedRequest } from '../common/auth/auth-user';
 import { NonEmptyStringPipe } from '../common/pipes/non-empty-string.pipe';
 
 @Controller('parents')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('PARENT')
 export class ParentsController {
   constructor(
     private readonly parentsService: ParentsService,
     private readonly attendanceService: AttendanceService,
   ) {}
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PARENT')
   @Get('me/students')
   getMyStudents(@Req() req: AuthenticatedRequest) {
-    return this.parentsService.findMyStudents(req.user.id);
+    return this.parentsService.findStudents(req.user, req.user.id);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'PARENT')
+  @Get(':parentId/students')
+  getStudentsForParent(
+    @Req() req: AuthenticatedRequest,
+    @Param('parentId', NonEmptyStringPipe) parentId: string,
+  ) {
+    return this.parentsService.findStudents(req.user, parentId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PARENT')
   @Get('me/students/:studentId/attendance/summary')
   getStudentAttendanceSummary(
     @Req() req: AuthenticatedRequest,

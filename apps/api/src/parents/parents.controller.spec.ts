@@ -55,12 +55,14 @@ class TestRolesGuard implements CanActivate {
 describe('ParentsController (HTTP)', () => {
   let app: INestApplication;
   let prisma: {
+    user: { findUnique: jest.Mock };
     studentParentLink: { findMany: jest.Mock; findUnique: jest.Mock };
     attendanceRecord: { findMany: jest.Mock };
   };
 
   beforeEach(async () => {
     prisma = {
+      user: { findUnique: jest.fn() },
       studentParentLink: { findMany: jest.fn(), findUnique: jest.fn() },
       attendanceRecord: { findMany: jest.fn() },
     };
@@ -102,6 +104,10 @@ describe('ParentsController (HTTP)', () => {
     prisma.studentParentLink.findMany.mockResolvedValue([
       {
         id: 'link-1',
+        parentId: 'parent-1',
+        studentId: 'student-1',
+        createdAt: '2026-04-11T00:00:00.000Z',
+        updatedAt: '2026-04-11T00:00:00.000Z',
         student: {
           id: 'student-1',
           firstName: 'Ada',
@@ -123,6 +129,10 @@ describe('ParentsController (HTTP)', () => {
       .expect([
         {
           id: 'link-1',
+          parentId: 'parent-1',
+          studentId: 'student-1',
+          createdAt: '2026-04-11T00:00:00.000Z',
+          updatedAt: '2026-04-11T00:00:00.000Z',
           student: {
             id: 'student-1',
             firstName: 'Ada',
@@ -137,11 +147,63 @@ describe('ParentsController (HTTP)', () => {
       ]);
   });
 
+  it('lists linked students for a parent to owner access', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'parent-1',
+      role: UserRole.PARENT,
+      memberships: [{ schoolId: 'school-1' }],
+    });
+    prisma.studentParentLink.findMany.mockResolvedValue([
+      {
+        id: 'link-1',
+        parentId: 'parent-1',
+        studentId: 'student-1',
+        createdAt: '2026-04-11T00:00:00.000Z',
+        updatedAt: '2026-04-11T00:00:00.000Z',
+        student: {
+          id: 'student-1',
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+        },
+      },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/parents/parent-1/students')
+      .set('x-test-user-id', 'owner-1')
+      .set('x-test-role', UserRole.OWNER)
+      .expect(200)
+      .expect([
+        {
+          id: 'link-1',
+          parentId: 'parent-1',
+          studentId: 'student-1',
+          createdAt: '2026-04-11T00:00:00.000Z',
+          updatedAt: '2026-04-11T00:00:00.000Z',
+          student: {
+            id: 'student-1',
+            firstName: 'Ada',
+            lastName: 'Lovelace',
+          },
+        },
+      ]);
+  });
+
   it('returns 403 when a non-parent requests linked students', async () => {
     await request(app.getHttpServer())
       .get('/parents/me/students')
       .set('x-test-user-id', 'student-1')
       .set('x-test-role', UserRole.STUDENT)
+      .expect(403);
+
+    expect(prisma.studentParentLink.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when a parent requests another parent link list', async () => {
+    await request(app.getHttpServer())
+      .get('/parents/parent-2/students')
+      .set('x-test-user-id', 'parent-1')
+      .set('x-test-role', UserRole.PARENT)
       .expect(403);
 
     expect(prisma.studentParentLink.findMany).not.toHaveBeenCalled();

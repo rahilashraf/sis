@@ -1,11 +1,14 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   Get,
   Param,
   Patch,
   Post,
+  ParseBoolPipe,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -25,8 +28,20 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
   @Get()
-  findAll(@Req() req: AuthenticatedRequest) {
-    return this.usersService.findAll(req.user);
+  findAll(
+    @Req() req: AuthenticatedRequest,
+    @Query('includeInactive', new DefaultValuePipe(false), ParseBoolPipe)
+    includeInactive: boolean,
+    @Query('role') role?: string,
+    @Query('gradeLevelId') gradeLevelId?: string,
+    @Query('sort') sort?: string,
+  ) {
+    return this.usersService.findAll(req.user, {
+      includeInactive,
+      role,
+      gradeLevelId,
+      sort,
+    });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -50,10 +65,11 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
   @Delete(':id')
-  remove(
+  async remove(
     @Req() req: AuthenticatedRequest,
     @Param('id', NonEmptyStringPipe) id: string,
   ) {
-    return this.usersService.remove(req.user, id);
+    const result = await this.usersService.remove(req.user, id);
+    return { success: result.success };
   }
 }

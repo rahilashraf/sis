@@ -2,9 +2,11 @@ import {
   BadRequestException,
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   Get,
   Patch,
+  ParseBoolPipe,
   Post,
   Query,
   Req,
@@ -18,6 +20,13 @@ import { UpdateAttendanceSessionDto } from './dto/update-attendance-session.dto'
 import { GetAttendanceSessionsQueryDto } from './dto/get-attendance-sessions-query.dto';
 import { GetStudentAttendanceByDateQueryDto } from './dto/get-student-attendance-by-date-query.dto';
 import { GetStudentSummaryQueryDto } from './dto/get-student-summary-query.dto';
+import { GetClassSummaryQueryDto } from './dto/get-class-summary-query.dto';
+import { GetClassAttendanceRecordsQueryDto } from './dto/get-class-attendance-records-query.dto';
+import { GetAttendanceStatusRulesQueryDto } from './dto/get-attendance-status-rules-query.dto';
+import { UpdateAttendanceStatusRuleDto } from './dto/update-attendance-status-rule.dto';
+import { GetAttendanceCustomStatusesQueryDto } from './dto/get-attendance-custom-statuses-query.dto';
+import { CreateAttendanceCustomStatusDto } from './dto/create-attendance-custom-status.dto';
+import { UpdateAttendanceCustomStatusDto } from './dto/update-attendance-custom-status.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -137,16 +146,112 @@ export class AttendanceController {
     @Param('studentId', NonEmptyStringPipe) studentId: string,
     @Query() query: GetStudentSummaryQueryDto,
   ) {
+    if (!query.startDate && !query.endDate) {
+      return this.attendanceService.getStudentAllTimeSummary(req.user, studentId);
+    }
+
     if (!query.startDate || !query.endDate) {
       throw new BadRequestException('startDate and endDate are required');
     }
 
-    return this.attendanceService.getStudentSummary(
+    return this.attendanceService.getStudentSummary(req.user, studentId, query.startDate, query.endDate);
+  }
+
+  @Get('classes/:classId/summary')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  getClassSummary(
+    @Req() req: AuthenticatedRequest,
+    @Param('classId', NonEmptyStringPipe) classId: string,
+    @Query() query: GetClassSummaryQueryDto,
+  ) {
+    if (!query.startDate && !query.endDate) {
+      return this.attendanceService.getClassAllTimeSummary(req.user, classId);
+    }
+
+    if (!query.startDate || !query.endDate) {
+      throw new BadRequestException('startDate and endDate are required');
+    }
+
+    return this.attendanceService.getClassSummary(
       req.user,
-      studentId,
+      classId,
       query.startDate,
       query.endDate,
     );
+  }
+
+  @Get('classes/:classId/records')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  getClassRecordsByDateRange(
+    @Req() req: AuthenticatedRequest,
+    @Param('classId', NonEmptyStringPipe) classId: string,
+    @Query() query: GetClassAttendanceRecordsQueryDto,
+  ) {
+    return this.attendanceService.getClassRecordsByDateRange(
+      req.user,
+      classId,
+      query.startDate,
+      query.endDate,
+    );
+  }
+
+  @Get('status-rules')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  getStatusRules(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: GetAttendanceStatusRulesQueryDto,
+  ) {
+    return this.attendanceService.getStatusRules(req.user, query.schoolId);
+  }
+
+  @Patch('status-rules/:status')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  updateStatusRule(
+    @Req() req: AuthenticatedRequest,
+    @Param('status', NonEmptyStringPipe) status: string,
+    @Query() query: GetAttendanceStatusRulesQueryDto,
+    @Body() body: UpdateAttendanceStatusRuleDto,
+  ) {
+    return this.attendanceService.updateStatusRule(
+      req.user,
+      query.schoolId,
+      status,
+      body.behavior,
+    );
+  }
+
+  @Get('custom-statuses')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  getCustomStatuses(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: GetAttendanceCustomStatusesQueryDto,
+    @Query('includeInactive', new DefaultValuePipe(false), ParseBoolPipe)
+    includeInactive?: boolean,
+  ) {
+    return this.attendanceService.getCustomStatuses(
+      req.user,
+      query.schoolId,
+      includeInactive ?? false,
+    );
+  }
+
+  @Post('custom-statuses')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  createCustomStatus(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: CreateAttendanceCustomStatusDto,
+  ) {
+    return this.attendanceService.createCustomStatus(req.user, body);
+  }
+
+  @Patch('custom-statuses/:id')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  updateCustomStatus(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+    @Body() body: UpdateAttendanceCustomStatusDto,
+  ) {
+    return this.attendanceService.updateCustomStatus(req.user, id, body);
   }
 
   @Patch('records/:recordId')

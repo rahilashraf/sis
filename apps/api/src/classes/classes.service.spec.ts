@@ -10,6 +10,7 @@ describe('ClassesService', () => {
       findMany: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
+      delete: jest.Mock;
     };
     schoolYear: {
       findUnique: jest.Mock;
@@ -29,6 +30,7 @@ describe('ClassesService', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+        delete: jest.fn(),
       },
       schoolYear: {
         findUnique: jest.fn(),
@@ -56,6 +58,7 @@ describe('ClassesService', () => {
     expect(prisma.class.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
+          isActive: true,
           schoolId: {
             in: ['school-1'],
           },

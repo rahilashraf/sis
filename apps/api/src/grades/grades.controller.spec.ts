@@ -607,7 +607,6 @@ describe('GradesController (HTTP)', () => {
 
   it('returns period-filtered class summary for an assigned teacher', async () => {
     prisma.class.findUnique
-      .mockResolvedValueOnce({ id: 'class-1' })
       .mockResolvedValueOnce({
         id: 'class-1',
         schoolId: 'school-1',
@@ -668,7 +667,6 @@ describe('GradesController (HTTP)', () => {
 
   it('returns cumulative class summary when periodKey targets a later reporting period', async () => {
     prisma.class.findUnique
-      .mockResolvedValueOnce({ id: 'class-1' })
       .mockResolvedValueOnce({
         id: 'class-1',
         schoolId: 'school-1',
@@ -729,7 +727,6 @@ describe('GradesController (HTTP)', () => {
 
   it('returns 400 when periodKey is invalid for class summary', async () => {
     prisma.class.findUnique
-      .mockResolvedValueOnce({ id: 'class-1' })
       .mockResolvedValueOnce({
         id: 'class-1',
         schoolId: 'school-1',
@@ -941,24 +938,6 @@ describe('GradesController (HTTP)', () => {
         totalScore: 24,
         totalMaxScore: 30,
         percentage: 80,
-        classes: [
-          {
-            classId: 'class-1',
-            className: 'Math',
-            gradeCount: 1,
-            totalScore: 8,
-            totalMaxScore: 10,
-            percentage: 80,
-          },
-          {
-            classId: 'class-2',
-            className: 'Science',
-            gradeCount: 1,
-            totalScore: 16,
-            totalMaxScore: 20,
-            percentage: 80,
-          },
-        ],
       });
   });
 
@@ -976,7 +955,6 @@ describe('GradesController (HTTP)', () => {
         totalScore: 0,
         totalMaxScore: 0,
         percentage: null,
-        classes: [],
       });
   });
 
@@ -1014,16 +992,6 @@ describe('GradesController (HTTP)', () => {
         totalScore: 17,
         totalMaxScore: 20,
         percentage: 85,
-        classes: [
-          {
-            classId: 'class-1',
-            className: 'Math',
-            gradeCount: 1,
-            totalScore: 17,
-            totalMaxScore: 20,
-            percentage: 85,
-          },
-        ],
       });
 
     expect(prisma.gradeRecord.findMany).toHaveBeenCalledWith(
@@ -1074,24 +1042,6 @@ describe('GradesController (HTTP)', () => {
         totalScore: 24,
         totalMaxScore: 30,
         percentage: 80,
-        students: [
-          {
-            studentId: 'student-1',
-            studentName: 'Ada Lovelace',
-            gradeCount: 2,
-            totalScore: 17,
-            totalMaxScore: 20,
-            percentage: 85,
-          },
-          {
-            studentId: 'student-2',
-            studentName: 'Alan Turing',
-            gradeCount: 1,
-            totalScore: 7,
-            totalMaxScore: 10,
-            percentage: 70,
-          },
-        ],
       });
   });
 
@@ -1111,7 +1061,6 @@ describe('GradesController (HTTP)', () => {
         totalScore: 0,
         totalMaxScore: 0,
         percentage: null,
-        students: [],
       });
   });
 

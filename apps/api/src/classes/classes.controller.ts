@@ -1,11 +1,14 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   Get,
   Param,
   Patch,
   Post,
+  ParseBoolPipe,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -13,16 +16,21 @@ import { ClassesService } from './classes.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
+import { UpdateTeacherAssignmentDto } from './dto/update-teacher-assignment.dto';
 import { EnrollStudentDto } from './dto/enroll-student.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import type { AuthenticatedRequest } from '../common/auth/auth-user';
 import { NonEmptyStringPipe } from '../common/pipes/non-empty-string.pipe';
+import { GradebookService } from '../gradebook/gradebook.service';
 
 @Controller('classes')
 export class ClassesController {
-  constructor(private readonly classesService: ClassesService) {}
+  constructor(
+    private readonly classesService: ClassesService,
+    private readonly gradebookService: GradebookService,
+  ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
@@ -34,8 +42,12 @@ export class ClassesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
   @Get()
-  findAll(@Req() req: AuthenticatedRequest) {
-    return this.classesService.findAll(req.user);
+  findAll(
+    @Req() req: AuthenticatedRequest,
+    @Query('includeInactive', new DefaultValuePipe(false), ParseBoolPipe)
+    includeInactive: boolean,
+  ) {
+    return this.classesService.findAll(req.user, includeInactive);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -46,7 +58,7 @@ export class ClassesController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER')
   @Get(':id')
   findOne(
     @Req() req: AuthenticatedRequest,
@@ -64,6 +76,18 @@ export class ClassesController {
     @Body() body: AssignTeacherDto,
   ) {
     return this.classesService.assignTeacher(req.user, id, body);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Patch(':id/teachers/:teacherId')
+  updateTeacherAssignment(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+    @Param('teacherId', NonEmptyStringPipe) teacherId: string,
+    @Body() body: UpdateTeacherAssignmentDto,
+  ) {
+    return this.classesService.updateTeacherAssignment(req.user, id, teacherId, body);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -131,7 +155,17 @@ export class ClassesController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Delete(':id')
+  remove(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
+    return this.classesService.remove(req.user, id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER')
   @Get(':id/teachers')
   findTeachers(
     @Req() req: AuthenticatedRequest,
@@ -141,7 +175,7 @@ export class ClassesController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER')
   @Get(':id/students')
   findStudents(
     @Req() req: AuthenticatedRequest,
@@ -151,7 +185,7 @@ export class ClassesController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER')
   @Get('teacher/:teacherId')
   findClassesForTeacher(
     @Req() req: AuthenticatedRequest,
@@ -167,7 +201,6 @@ export class ClassesController {
     'ADMIN',
     'STAFF',
     'TEACHER',
-    'SUPPLY_TEACHER',
     'PARENT',
     'STUDENT',
   )
@@ -177,5 +210,44 @@ export class ClassesController {
     @Param('studentId', NonEmptyStringPipe) studentId: string,
   ) {
     return this.classesService.findClassesForStudent(req.user, studentId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER')
+  @Get(':id/grade-summary')
+  getGradeSummary(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
+    return this.gradebookService.getClassSummary(req.user, id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER')
+  @Get(':id/gradebook-grid')
+  getGradebookGrid(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
+    return this.gradebookService.getClassGradebookGrid(req.user, id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(
+    'OWNER',
+    'SUPER_ADMIN',
+    'ADMIN',
+    'STAFF',
+    'TEACHER',
+    'PARENT',
+    'STUDENT',
+  )
+  @Get(':id/students/:studentId/summary')
+  getStudentSummaryForClass(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) classId: string,
+    @Param('studentId', NonEmptyStringPipe) studentId: string,
+  ) {
+    return this.gradebookService.getStudentInClassSummary(req.user, classId, studentId);
   }
 }

@@ -23,11 +23,23 @@ enum UserRole {
   STUDENT
 }
 
+enum StudentGender {
+  MALE
+  FEMALE
+}
+
 enum AttendanceStatus {
   PRESENT
   ABSENT
   LATE
   EXCUSED
+}
+
+enum AttendanceStatusCountBehavior {
+  PRESENT
+  LATE
+  ABSENT
+  INFORMATIONAL
 }
 
 enum AttendanceScopeType {
@@ -38,18 +50,87 @@ enum AttendanceScopeType {
   CUSTOM
 }
 
+enum StudentDocumentType {
+  HEALTH_CARD
+  IMMUNIZATION_RECORD
+  REGISTRATION_FORM
+  OTHER
+}
+
+enum StudentDocumentVisibility {
+  STAFF_ONLY
+  PARENT_PORTAL
+}
+
+enum TeacherClassAssignmentType {
+  REGULAR
+  SUPPLY
+}
+
+enum GradebookWeightingMode {
+  UNWEIGHTED
+  ASSESSMENT_WEIGHTED
+  CATEGORY_WEIGHTED
+}
+
+enum ResultCalculationBehavior {
+  COUNT_AS_ZERO
+  EXCLUDE_FROM_CALCULATION
+  INFORMATION_ONLY
+}
+
+enum FormFieldType {
+  SHORT_TEXT
+  LONG_TEXT
+  SELECT
+  CHECKBOX
+  DATE
+}
+
 model User {
   id           String   @id @default(cuid())
+  schoolId     String?
+  gradeLevelId String?
   username     String   @unique
   email        String?  @unique
   passwordHash String
   firstName    String
   lastName     String
+  studentNumber String?
+  oen          String?
+  dateOfBirth  DateTime?
+  gender       StudentGender?
+  studentEmail String?
+  allergies    String?
+  medicalConditions String?
+  healthCardNumber  String?
+  guardian1Name         String?
+  guardian1Email        String?
+  guardian1Phone        String?
+  guardian1Address      String?
+  guardian1Relationship String?
+  guardian1WorkPhone    String?
+  guardian2Name         String?
+  guardian2Email        String?
+  guardian2Phone        String?
+  guardian2Address      String?
+  guardian2Relationship String?
+  guardian2WorkPhone    String?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  province     String?
+  postalCode   String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  emergencyContactRelationship String?
   role         UserRole
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  school      School?     @relation("PrimaryUserSchool", fields: [schoolId], references: [id], onDelete: SetNull)
+  gradeLevel  GradeLevel? @relation("StudentGradeLevel", fields: [gradeLevelId], references: [id], onDelete: SetNull)
   memberships UserSchoolMembership[]
 
   parentLinks  StudentParentLink[] @relation("ParentLinks")
@@ -61,6 +142,18 @@ model User {
   takenAttendanceSessions AttendanceSession[] @relation("AttendanceTakenBy")
   attendanceRecords       AttendanceRecord[]  @relation("AttendanceStudent")
   studentGradeRecords     GradeRecord[]       @relation("StudentGradeRecords")
+  createdAssessments      Assessment[]        @relation("AssessmentCreatedBy")
+  assessmentResults       AssessmentResult[]  @relation("AssessmentResultStudent")
+  gradeOverridesAsStudent GradeOverride[]     @relation("GradeOverrideStudent")
+  gradeOverridesSet       GradeOverride[]     @relation("GradeOverrideOverriddenBy")
+
+  studentDocuments        StudentDocument[]   @relation("StudentDocumentsStudent")
+  uploadedStudentDocuments StudentDocument[]  @relation("StudentDocumentsUploadedBy")
+  createdForms           Form[]             @relation("FormCreatedBy")
+  formResponsesAsParent  FormResponse[]     @relation("FormResponseParent")
+  formResponsesAsStudent FormResponse[]     @relation("FormResponseStudent")
+
+  @@unique([schoolId, studentNumber])
 }
 
 model School {
@@ -72,10 +165,69 @@ model School {
   updatedAt DateTime @updatedAt
 
   memberships       UserSchoolMembership[]
+  users             User[]       @relation("PrimaryUserSchool")
+  gradeLevels       GradeLevel[]
+  gradeScales       GradeScale[]
   schoolYears       SchoolYear[]
   classes           Class[]
   attendanceSessions AttendanceSession[]
+  attendanceStatusRules AttendanceStatusRule[]
+  attendanceCustomStatuses AttendanceCustomStatus[]
   reportingPeriods  ReportingPeriod[]
+  assessmentTypes   AssessmentType[]
+  assessments       Assessment[]
+  studentDocuments  StudentDocument[]
+  assessmentResultStatusLabels AssessmentResultStatusLabel[]
+  reRegistrationWindows ReRegistrationWindow[]
+  forms                  Form[]
+  formResponses          FormResponse[]
+}
+
+model GradeScale {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  rules  GradeScaleRule[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId, isActive, isDefault])
+}
+
+model GradeScaleRule {
+  id           String   @id @default(cuid())
+  gradeScaleId String
+  minPercent   Float
+  maxPercent   Float
+  letterGrade  String
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  gradeScale GradeScale @relation(fields: [gradeScaleId], references: [id], onDelete: Cascade)
+
+  @@index([gradeScaleId, sortOrder, minPercent])
+}
+
+model GradeLevel {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  students User[] @relation("StudentGradeLevel")
+
+  @@unique([schoolId, name])
+  @@index([schoolId, isActive, sortOrder])
 }
 
 model UserSchoolMembership {
@@ -105,6 +257,8 @@ model SchoolYear {
   classes            Class[]
   attendanceSessions AttendanceSession[]
   reportingPeriods   ReportingPeriod[]
+  assessments        Assessment[]
+  reRegistrationWindows ReRegistrationWindow[]
 
   @@unique([schoolId, name])
 }
@@ -116,6 +270,7 @@ model ReportingPeriod {
   name         String
   key          String
   order        Int
+  isActive     Boolean  @default(true)
   isLocked     Boolean  @default(false)
   startsAt     DateTime
   endsAt       DateTime
@@ -124,9 +279,12 @@ model ReportingPeriod {
 
   school     School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   schoolYear SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+  assessments Assessment[]
+  gradeOverrides GradeOverride[]
 
   @@unique([schoolId, schoolYearId, key])
   @@unique([schoolId, schoolYearId, order])
+  @@index([schoolId, schoolYearId, isActive, order])
 }
 
 model StudentParentLink {
@@ -134,11 +292,37 @@ model StudentParentLink {
   parentId  String
   studentId String
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   parent  User @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
   student User @relation("StudentLinks", fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([parentId, studentId])
+}
+
+model StudentDocument {
+  id             String              @id @default(cuid())
+  studentId      String
+  schoolId       String?
+  type           StudentDocumentType
+  visibility     StudentDocumentVisibility @default(STAFF_ONLY)
+  label          String?
+  fileName       String
+  mimeType       String
+  fileSize       Int
+  storagePath    String
+  uploadedByUserId String
+  isActive       Boolean             @default(true)
+  archivedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  student     User   @relation("StudentDocumentsStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  uploadedBy  User   @relation("StudentDocumentsUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  school      School? @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, isActive, visibility, createdAt])
+  @@index([schoolId, isActive, createdAt])
 }
 
 model Class {
@@ -150,6 +334,7 @@ model Class {
   subject    String?
   isHomeroom Boolean @default(false)
   isActive   Boolean @default(true)
+  gradebookWeightingMode GradebookWeightingMode @default(UNWEIGHTED)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -160,6 +345,9 @@ model Class {
   teachers TeacherClassAssignment[]
   students StudentClassEnrollment[]
   gradeRecords GradeRecord[]
+  assessments Assessment[]
+  assessmentCategories AssessmentCategory[]
+  gradeOverrides GradeOverride[]
 
   attendanceSessionClasses AttendanceSessionClass[]
 
@@ -167,15 +355,21 @@ model Class {
 }
 
 model TeacherClassAssignment {
-  id        String   @id @default(cuid())
-  teacherId String
-  classId   String
-  createdAt DateTime @default(now())
+  id             String                     @id @default(cuid())
+  teacherId      String
+  classId        String
+  assignmentType TeacherClassAssignmentType @default(REGULAR)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
 
   teacher User  @relation("TeacherClasses", fields: [teacherId], references: [id], onDelete: Cascade)
   class   Class @relation(fields: [classId], references: [id], onDelete: Cascade)
 
   @@unique([teacherId, classId])
+  @@index([classId, teacherId, assignmentType])
+  @@index([teacherId, assignmentType, startsAt, endsAt])
 }
 
 model StudentClassEnrollment {
@@ -231,17 +425,50 @@ model AttendanceRecord {
   studentId           String
   date                DateTime
   status              AttendanceStatus
+  customStatusId      String?
   remark              String?
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
 
   attendanceSession AttendanceSession @relation(fields: [attendanceSessionId], references: [id], onDelete: Cascade)
   student           User              @relation("AttendanceStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  customStatus      AttendanceCustomStatus? @relation(fields: [customStatusId], references: [id], onDelete: SetNull)
 
   @@unique([studentId, date])
   @@unique([attendanceSessionId, studentId])
   @@index([date])
   @@index([studentId, date])
+  @@index([customStatusId])
+}
+
+model AttendanceStatusRule {
+  id         String                        @id @default(cuid())
+  schoolId   String
+  status     AttendanceStatus
+  behavior   AttendanceStatusCountBehavior @default(INFORMATIONAL)
+  createdAt  DateTime                      @default(now())
+  updatedAt  DateTime                      @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, status])
+  @@index([schoolId])
+}
+
+model AttendanceCustomStatus {
+  id        String                        @id @default(cuid())
+  schoolId  String
+  label     String
+  behavior  AttendanceStatusCountBehavior @default(INFORMATIONAL)
+  isActive  Boolean                       @default(true)
+  createdAt DateTime                      @default(now())
+  updatedAt DateTime                      @updatedAt
+
+  school  School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  records AttendanceRecord[]
+
+  @@unique([schoolId, label])
+  @@index([schoolId, isActive, label])
 }
 
 model GradeRecord {
@@ -262,4 +489,230 @@ model GradeRecord {
   @@index([classId, gradedAt])
   @@index([studentId, gradedAt])
   @@index([classId, studentId])
+}
+
+model AssessmentType {
+  id         String   @id @default(cuid())
+  key        String   @unique
+  schoolId   String?
+  name       String
+  sortOrder  Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  school      School? @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  assessments Assessment[]
+
+  @@index([schoolId, isActive, sortOrder, name])
+}
+
+model Assessment {
+  id                   String   @id @default(cuid())
+  classId              String
+  schoolId             String
+  schoolYearId         String
+  reportingPeriodId    String?
+  categoryId           String?
+  title                String
+  assessmentTypeId     String
+  maxScore             Float
+  weight               Float    @default(1)
+  dueAt                DateTime?
+  isPublishedToParents Boolean  @default(false)
+  isActive             Boolean  @default(true)
+  createdByUserId      String
+  archivedAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  class           Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
+  school          School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolYear      SchoolYear      @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+  reportingPeriod ReportingPeriod? @relation(fields: [reportingPeriodId], references: [id], onDelete: SetNull)
+  category        AssessmentCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  assessmentType  AssessmentType  @relation(fields: [assessmentTypeId], references: [id], onDelete: Restrict)
+  createdBy       User            @relation("AssessmentCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  results AssessmentResult[]
+
+  @@index([classId, isActive, dueAt])
+  @@index([schoolId, schoolYearId])
+  @@index([reportingPeriodId])
+  @@index([categoryId])
+}
+
+model AssessmentResult {
+  id           String   @id @default(cuid())
+  assessmentId String
+  studentId    String
+  score        Float?
+  statusLabelId String?
+  comment      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student    User       @relation("AssessmentResultStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  statusLabel AssessmentResultStatusLabel? @relation(fields: [statusLabelId], references: [id], onDelete: SetNull)
+
+  @@unique([assessmentId, studentId])
+  @@index([studentId, assessmentId])
+  @@index([statusLabelId])
+}
+
+model AssessmentCategory {
+  id        String   @id @default(cuid())
+  classId   String
+  name      String
+  sortOrder Int      @default(0)
+  weight    Float?   @default(1)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  class       Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  assessments Assessment[]
+
+  @@unique([classId, name])
+  @@index([classId, isActive, sortOrder, name])
+}
+
+model AssessmentResultStatusLabel {
+  id        String                    @id @default(cuid())
+  schoolId  String
+  key       String
+  label     String
+  behavior  ResultCalculationBehavior @default(INFORMATION_ONLY)
+  sortOrder Int                       @default(0)
+  isSystem  Boolean                   @default(false)
+  isActive  Boolean                   @default(true)
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+
+  school  School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  results AssessmentResult[]
+
+  @@unique([schoolId, key])
+  @@index([schoolId, isActive, sortOrder, label])
+}
+
+model GradeOverride {
+  id                String   @id @default(cuid())
+  classId            String
+  studentId          String
+  reportingPeriodId  String?
+  overridePercent    Float?
+  overrideLetterGrade String?
+  overrideReason     String?
+  overriddenByUserId String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  class            Class            @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student          User             @relation("GradeOverrideStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  reportingPeriod  ReportingPeriod? @relation(fields: [reportingPeriodId], references: [id], onDelete: SetNull)
+  overriddenBy     User             @relation("GradeOverrideOverriddenBy", fields: [overriddenByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([classId, studentId, reportingPeriodId])
+  @@index([studentId])
+  @@index([classId])
+  @@index([reportingPeriodId])
+}
+
+model Form {
+  id                     String   @id @default(cuid())
+  schoolId               String
+  createdByUserId        String
+  title                  String
+  description            String?
+  isActive               Boolean  @default(true)
+  opensAt                DateTime?
+  closesAt               DateTime?
+  requiresStudentContext Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  school     School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdBy  User   @relation("FormCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  fields    FormField[]
+  responses FormResponse[]
+
+  @@index([schoolId, isActive, opensAt, closesAt])
+  @@index([createdByUserId])
+}
+
+model FormField {
+  id         String      @id @default(cuid())
+  formId     String
+  key        String
+  label      String
+  type       FormFieldType
+  optionsJson Json?
+  sortOrder  Int         @default(0)
+  isRequired Boolean     @default(false)
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  form           Form                @relation(fields: [formId], references: [id], onDelete: Cascade)
+  responseValues FormResponseValue[]
+
+  @@unique([formId, key])
+  @@index([formId, isActive, sortOrder])
+}
+
+model FormResponse {
+  id          String   @id @default(cuid())
+  formId      String
+  schoolId    String
+  parentId    String
+  studentId   String?
+  submittedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  form    Form   @relation(fields: [formId], references: [id], onDelete: Cascade)
+  school  School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  parent  User   @relation("FormResponseParent", fields: [parentId], references: [id], onDelete: Cascade)
+  student User?  @relation("FormResponseStudent", fields: [studentId], references: [id], onDelete: SetNull)
+
+  values FormResponseValue[]
+
+  @@unique([formId, parentId, studentId])
+  @@index([formId, submittedAt])
+  @@index([schoolId, submittedAt])
+}
+
+model FormResponseValue {
+  id         String   @id @default(cuid())
+  responseId String
+  fieldId    String
+  valueText  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  response FormResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  field    FormField    @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([responseId, fieldId])
+  @@index([fieldId])
+}
+
+model ReRegistrationWindow {
+  id         String   @id @default(cuid())
+  schoolId   String
+  schoolYearId String
+  opensAt    DateTime
+  closesAt   DateTime
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  school     School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolYear SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, schoolYearId, isActive])
+  @@index([opensAt, closesAt])
 }
