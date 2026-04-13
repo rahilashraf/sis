@@ -1,3 +1,7 @@
+/**
+ * Demo seed data for the Student Information System (SIS).
+ * All data is fictional and safe for public repositories.
+ */
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -21,10 +25,9 @@ async function hash(password: string) {
 }
 
 async function main() {
-  console.log('calling main()');
   console.log('🌱 Seeding SIS database...');
 
-  const schoolName = 'IOK Islamic School';
+  const schoolName = 'Demo Academy';
   const schoolYearName = '2025-2026';
 
   const [
@@ -57,9 +60,7 @@ async function main() {
     });
   }
 
-  if (!school) {
-    throw new Error('Failed to create or load school');
-  }
+  if (!school) throw new Error('Failed to create or load school');
 
   const schoolId = school.id;
 
@@ -67,10 +68,7 @@ async function main() {
   // School Year
   // --------------------------------------------------
   let schoolYear = await prisma.schoolYear.findFirst({
-    where: {
-      schoolId,
-      name: schoolYearName,
-    },
+    where: { schoolId, name: schoolYearName },
   });
 
   if (!schoolYear) {
@@ -78,16 +76,14 @@ async function main() {
       data: {
         name: schoolYearName,
         schoolId,
-        startDate: new Date('2025-09-01T00:00:00.000Z'),
-        endDate: new Date('2026-06-30T23:59:59.999Z'),
+        startDate: new Date('2025-09-01'),
+        endDate: new Date('2026-06-30'),
         isActive: true,
       },
     });
   }
 
-  if (!schoolYear) {
-    throw new Error('Failed to create or load school year');
-  }
+  if (!schoolYear) throw new Error('Failed to create or load school year');
 
   // --------------------------------------------------
   // Grade Levels
@@ -107,10 +103,7 @@ async function main() {
 
   for (const level of gradeLevels) {
     const existing = await prisma.gradeLevel.findFirst({
-      where: {
-        schoolId,
-        name: level.name,
-      },
+      where: { schoolId, name: level.name },
     });
 
     if (!existing) {
@@ -126,82 +119,45 @@ async function main() {
   }
 
   const grade1 = await prisma.gradeLevel.findFirst({
-    where: {
-      schoolId,
-      name: 'Grade 1',
-    },
+    where: { schoolId, name: 'Grade 1' },
   });
 
   // --------------------------------------------------
-  // Assessment Types (global defaults)
+  // Assessment Types
   // --------------------------------------------------
   const assessmentTypes = [
     { id: 'assessment_type_quiz', key: 'QUIZ', name: 'Quiz', sortOrder: 10 },
     { id: 'assessment_type_test', key: 'TEST', name: 'Test', sortOrder: 20 },
-    {
-      id: 'assessment_type_assignment',
-      key: 'ASSIGNMENT',
-      name: 'Assignment',
-      sortOrder: 30,
-    },
+    { id: 'assessment_type_assignment', key: 'ASSIGNMENT', name: 'Assignment', sortOrder: 30 },
     { id: 'assessment_type_project', key: 'PROJECT', name: 'Project', sortOrder: 40 },
-    {
-      id: 'assessment_type_participation',
-      key: 'PARTICIPATION',
-      name: 'Participation',
-      sortOrder: 50,
-    },
+    { id: 'assessment_type_participation', key: 'PARTICIPATION', name: 'Participation', sortOrder: 50 },
   ];
 
-  for (const assessmentType of assessmentTypes) {
+  for (const type of assessmentTypes) {
     await prisma.assessmentType.upsert({
-      where: { key: assessmentType.key },
-      create: {
-        id: assessmentType.id,
-        key: assessmentType.key,
-        name: assessmentType.name,
-        sortOrder: assessmentType.sortOrder,
-        isActive: true,
-        schoolId: null,
-      },
-      update: {
-        name: assessmentType.name,
-        sortOrder: assessmentType.sortOrder,
-        isActive: true,
-        schoolId: null,
-      },
+      where: { key: type.key },
+      create: { ...type, isActive: true, schoolId: null },
+      update: { ...type, isActive: true, schoolId: null },
     });
   }
 
   // --------------------------------------------------
-  // Grade scale (default percentage -> letter mapping)
+  // Grade Scale
   // --------------------------------------------------
-  const defaultGradeScaleName = 'Default';
   const gradeScale =
     (await prisma.gradeScale.findFirst({
-      where: { schoolId, name: defaultGradeScaleName },
+      where: { schoolId, name: 'Default' },
       select: { id: true },
     })) ??
     (await prisma.gradeScale.create({
       data: {
         schoolId,
-        name: defaultGradeScaleName,
+        name: 'Default',
         isDefault: true,
         isActive: true,
       },
       select: { id: true },
     }));
-
-  await prisma.gradeScale.updateMany({
-    where: {
-      schoolId,
-      id: { not: gradeScale.id },
-      isDefault: true,
-    },
-    data: {
-      isDefault: false,
-    },
-  });
 
   const existingRules = await prisma.gradeScaleRule.count({
     where: { gradeScaleId: gradeScale.id },
@@ -211,10 +167,10 @@ async function main() {
     await prisma.gradeScaleRule.createMany({
       data: [
         { gradeScaleId: gradeScale.id, minPercent: 90, maxPercent: 100, letterGrade: 'A', sortOrder: 10 },
-        { gradeScaleId: gradeScale.id, minPercent: 80, maxPercent: 89.999, letterGrade: 'B', sortOrder: 20 },
-        { gradeScaleId: gradeScale.id, minPercent: 70, maxPercent: 79.999, letterGrade: 'C', sortOrder: 30 },
-        { gradeScaleId: gradeScale.id, minPercent: 60, maxPercent: 69.999, letterGrade: 'D', sortOrder: 40 },
-        { gradeScaleId: gradeScale.id, minPercent: 0, maxPercent: 59.999, letterGrade: 'F', sortOrder: 50 },
+        { gradeScaleId: gradeScale.id, minPercent: 80, maxPercent: 89.99, letterGrade: 'B', sortOrder: 20 },
+        { gradeScaleId: gradeScale.id, minPercent: 70, maxPercent: 79.99, letterGrade: 'C', sortOrder: 30 },
+        { gradeScaleId: gradeScale.id, minPercent: 60, maxPercent: 69.99, letterGrade: 'D', sortOrder: 40 },
+        { gradeScaleId: gradeScale.id, minPercent: 0, maxPercent: 59.99, letterGrade: 'F', sortOrder: 50 },
       ],
     });
   }
@@ -222,68 +178,24 @@ async function main() {
   // --------------------------------------------------
   // Users
   // --------------------------------------------------
-  async function ensureUser(data: {
-    email: string;
-    username: string;
-    firstName: string;
-    lastName: string;
-    role: 'OWNER' | 'SUPER_ADMIN' | 'ADMIN' | 'TEACHER' | 'PARENT' | 'STUDENT';
-    passwordHash: string;
-    isActive?: boolean;
-    schoolId?: string | null;
-    studentNumber?: string | null;
-    oen?: string | null;
-    gradeLevelId?: string | null;
-    studentEmail?: string | null;
-    gender?: 'MALE' | 'FEMALE' | null;
-  }) {
+  async function ensureUser(data: any) {
     const existing = await prisma.user.findFirst({
-      where: {
-        OR: [{ email: data.email }, { username: data.username }],
-      },
+      where: { OR: [{ email: data.email }, { username: data.username }] },
     });
 
     if (existing) {
       return prisma.user.update({
         where: { id: existing.id },
-        data: {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          role: data.role,
-          isActive: data.isActive ?? true,
-          passwordHash: data.passwordHash,
-          schoolId: data.schoolId ?? existing.schoolId ?? null,
-          studentNumber: data.studentNumber ?? existing.studentNumber ?? null,
-          oen: data.oen ?? existing.oen ?? null,
-          gradeLevelId: data.gradeLevelId ?? existing.gradeLevelId ?? null,
-          studentEmail: data.studentEmail ?? existing.studentEmail ?? null,
-          gender: data.gender ?? existing.gender ?? null,
-        },
+        data: { ...data },
       });
     }
 
-    return prisma.user.create({
-      data: {
-        email: data.email,
-        username: data.username,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        role: data.role,
-        passwordHash: data.passwordHash,
-        isActive: data.isActive ?? true,
-        schoolId: data.schoolId ?? null,
-        studentNumber: data.studentNumber ?? null,
-        oen: data.oen ?? null,
-        gradeLevelId: data.gradeLevelId ?? null,
-        studentEmail: data.studentEmail ?? null,
-        gender: data.gender ?? null,
-      },
-    });
+    return prisma.user.create({ data });
   }
 
   const owner = await ensureUser({
-    email: 'owner@iok.com',
-    username: 'owner1',
+    email: 'owner@demo.edu',
+    username: 'owner',
     firstName: 'Owner',
     lastName: 'User',
     role: 'OWNER',
@@ -293,8 +205,8 @@ async function main() {
   });
 
   const admin = await ensureUser({
-    email: 'admin@iok.com',
-    username: 'admin1',
+    email: 'admin@demo.edu',
+    username: 'admin',
     firstName: 'Admin',
     lastName: 'User',
     role: 'ADMIN',
@@ -304,10 +216,10 @@ async function main() {
   });
 
   const teacher = await ensureUser({
-    email: 'teacher1@iok.com',
-    username: 'teacher1',
-    firstName: 'Ali',
-    lastName: 'Teacher',
+    email: 'teacher@demo.edu',
+    username: 'teacher',
+    firstName: 'John',
+    lastName: 'Doe',
     role: 'TEACHER',
     passwordHash: teacherPasswordHash,
     isActive: true,
@@ -315,10 +227,10 @@ async function main() {
   });
 
   const parent = await ensureUser({
-    email: 'parent1@iok.com',
-    username: 'parent1',
-    firstName: 'Fatima',
-    lastName: 'Parent',
+    email: 'parent@demo.edu',
+    username: 'parent',
+    firstName: 'Jane',
+    lastName: 'Doe',
     role: 'PARENT',
     passwordHash: parentPasswordHash,
     isActive: true,
@@ -326,86 +238,44 @@ async function main() {
   });
 
   const student = await ensureUser({
-    email: 'student1@iok.com',
-    username: 'student1',
+    email: 'student@demo.edu',
+    username: 'student',
     firstName: 'Student',
     lastName: 'One',
     role: 'STUDENT',
     passwordHash: studentPasswordHash,
     isActive: true,
     schoolId,
-    studentNumber: '1001',
-    oen: '123456789',
     gradeLevelId: grade1?.id ?? null,
-    studentEmail: 'student1@iok.com',
+    studentEmail: 'student@demo.edu',
     gender: 'MALE',
   });
 
   // --------------------------------------------------
-  // School Memberships
+  // Memberships
   // --------------------------------------------------
-  async function ensureMembership(userId: string) {
-    const existing = await prisma.userSchoolMembership.findFirst({
+  for (const user of [owner, admin, teacher, parent, student]) {
+    await prisma.userSchoolMembership.upsert({
       where: {
-        userId,
-        schoolId,
+        userId_schoolId: { userId: user.id, schoolId },
       },
-    });
-
-    if (existing) {
-      return prisma.userSchoolMembership.update({
-        where: { id: existing.id },
-        data: {
-          isActive: true,
-        },
-      });
-    }
-
-    return prisma.userSchoolMembership.create({
-      data: {
-        userId,
-        schoolId,
-        isActive: true,
-      },
+      create: { userId: user.id, schoolId, isActive: true },
+      update: { isActive: true },
     });
   }
-
-  await ensureMembership(owner.id);
-  await ensureMembership(admin.id);
-  await ensureMembership(teacher.id);
-  await ensureMembership(parent.id);
-  await ensureMembership(student.id);
 
   // --------------------------------------------------
   // Parent ↔ Student Link
   // --------------------------------------------------
-  const existingLink = await prisma.studentParentLink.findFirst({
+  await prisma.studentParentLink.upsert({
     where: {
-      parentId: parent.id,
-      studentId: student.id,
+      parentId_studentId: { parentId: parent.id, studentId: student.id },
     },
+    create: { parentId: parent.id, studentId: student.id },
+    update: {},
   });
 
-  if (!existingLink) {
-    await prisma.studentParentLink.create({
-      data: {
-        parentId: parent.id,
-        studentId: student.id,
-      },
-    });
-  }
-
   console.log('✅ Seed complete');
-  console.log('');
-  console.log('Login credentials:');
-  console.log(`OWNER   → username: owner1   | password: ${PASSWORDS.owner}`);
-  console.log(`ADMIN   → username: admin1   | password: ${PASSWORDS.admin}`);
-  console.log(`TEACHER → username: teacher1 | password: ${PASSWORDS.teacher}`);
-  console.log(`PARENT  → username: parent1  | password: ${PASSWORDS.parent}`);
-  console.log(`STUDENT → username: student1 | password: ${PASSWORDS.student}`);
-  console.log('');
-  console.log(`School: ${school.name}`);
-  console.log(`School Year: ${schoolYear.name}`);
 }
 
 main()
@@ -417,3 +287,4 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+  
