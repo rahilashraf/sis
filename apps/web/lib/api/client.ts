@@ -60,7 +60,11 @@ export async function apiFetch<T>(
     }
   }
 
-  const response = await fetch(`${apiConfig.baseUrl}${path}`, {
+  const url = path.startsWith("http")
+    ? path
+    : `${apiConfig.baseUrl}${path}`;
+
+  const response = await fetch(url, {
     ...options,
     headers,
     body: options.json !== undefined ? JSON.stringify(options.json) : options.body,
