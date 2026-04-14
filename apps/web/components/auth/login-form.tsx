@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -54,27 +55,43 @@ export function LoginForm() {
 
   return (
     <Card className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/50 md:p-10">
-      <div className="mb-8 flex flex-col items-center text-center">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-900 text-lg font-semibold text-white shadow-md">
-          A
-        </div>
+      
+      {/* Logos */}
+      <div className="mb-8 mt-2 flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
+        <Image
+          src="/aiok-logo.png"
+          alt="AIOK (Darul Ilm)"
+          width={160}
+          height={60}
+          className="object-contain"
+          priority
+        />
 
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-            AIOK (Darul Ilm) SIS
-          </h1>
-          <p className="text-sm leading-6 text-slate-600">
-            Sign in to access the school information system.
-          </p>
-        </div>
+        <div className="hidden sm:block h-10 w-px bg-slate-300" />
+
+        <Image
+          src="/iok-school-logo.png"
+          alt="IOK Islamic School"
+          width={140}
+          height={50}
+          className="object-contain opacity-90"
+        />
       </div>
 
+      {/* Title */}
+      <div className="mb-6 text-center space-y-2">
+        <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+          AIOK EduSIS
+        </h1>
+        <p className="text-sm text-slate-600">
+          Sign in to access the student information system.
+        </p>
+      </div>
+
+      {/* Form */}
       <form className="space-y-5" onSubmit={handleSubmit}>
         <div className="space-y-2">
-          <label
-            className="text-sm font-medium text-slate-700"
-            htmlFor="username"
-          >
+          <label className="text-sm font-medium text-slate-700" htmlFor="username">
             Username
           </label>
           <Input
@@ -89,10 +106,7 @@ export function LoginForm() {
         </div>
 
         <div className="space-y-2">
-          <label
-            className="text-sm font-medium text-slate-700"
-            htmlFor="password"
-          >
+          <label className="text-sm font-medium text-slate-700" htmlFor="password">
             Password
           </label>
           <Input
@@ -107,14 +121,20 @@ export function LoginForm() {
           />
         </div>
 
+        {/* Error */}
         {error ? (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
             <p className="text-sm text-rose-600">{error}</p>
           </div>
         ) : null}
 
+        {/* Button + status */}
         <div className="space-y-3 pt-1">
-          <Button className="h-11 w-full rounded-xl" disabled={isSubmitting} type="submit">
+          <Button
+            className="h-11 w-full rounded-xl"
+            disabled={isSubmitting}
+            type="submit"
+          >
             {isSubmitting ? (
               <span className="flex items-center justify-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
