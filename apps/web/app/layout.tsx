@@ -2,9 +2,12 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
 
-export const metadata: Metadata = {
-  title: "SIS Frontend",
-  description: "Student Information System frontend",
+export const metadata = {
+  title: {
+    default: "AIOK EduSIS",
+    template: "%s | AIOK EduSIS",
+  },
+  description: "AIOK (Darul Ilm) Student Information System",
 };
 
 export default function RootLayout({
