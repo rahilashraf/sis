@@ -33,10 +33,7 @@ export function getNavigationItems(role: UserRole) {
         ? "Parent"
         : "Student";
 
-  const items = [
-    { href: "/dashboard", label: "Home" },
-    { href: primaryRoute, label: `${primaryLabel} Dashboard` },
-  ];
+  const items = [{ href: primaryRoute, label: `${primaryLabel} Dashboard` }];
 
   if (adminManagementRoles.includes(role)) {
     items.push(

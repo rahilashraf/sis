@@ -40,11 +40,7 @@ function getActiveNavigationHref(
     return activeItems[0].href;
   }
 
-  const fallbackItems = [navigationItems[1], navigationItems[0]].filter(
-    (item): item is { href: string } => Boolean(item),
-  );
-
-  for (const item of fallbackItems) {
+  for (const item of navigationItems) {
     if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
       return item.href;
     }
@@ -75,9 +71,9 @@ export function Sidebar({ role, mobileOpen, onNavigate }: SidebarProps) {
       >
         <div className="rounded-2xl bg-slate-950 px-4 py-4 text-white shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
-            Student Information System
+            AIOK (DARUL ILM) OFFICIAL STUDENT INFORMATION SYSTEM
           </p>
-          <p className="mt-2 text-base font-semibold">Operations Console</p>
+          <p className="mt-2 text-base font-semibold">Dashboard</p>
           <p className="mt-1 text-sm text-slate-300">
             {formatRoleLabel(role)} access
           </p>
@@ -124,8 +120,7 @@ export function Sidebar({ role, mobileOpen, onNavigate }: SidebarProps) {
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
           <p className="text-sm font-medium text-slate-900">Keep workflows stable</p>
           <p className="mt-1 text-sm leading-6 text-slate-500">
-            Use the navigation above to manage users, classes, and attendance without
-            leaving the current workspace.
+            Use the navigation above to move throughout the system. If you encounter any issues, please contact support.
           </p>
         </div>
       </aside>
