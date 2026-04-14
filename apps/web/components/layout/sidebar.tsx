@@ -71,10 +71,10 @@ export function Sidebar({ role, mobileOpen, onNavigate }: SidebarProps) {
       >
         <div className="rounded-2xl bg-slate-950 px-4 py-4 text-white shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
-            Student Information System
+            AIOK (Darul Ilm) SIS
           </p>
           <p className="mt-2 text-base font-semibold text-white">
-            Operations Console
+            Official System
           </p>
           <p className="mt-1 text-sm text-slate-300">
             {formatRoleLabel(role)} access
@@ -124,8 +124,7 @@ export function Sidebar({ role, mobileOpen, onNavigate }: SidebarProps) {
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
           <p className="text-sm font-medium text-slate-900">Keep workflows stable</p>
           <p className="mt-1 text-sm leading-6 text-slate-500">
-            Use the navigation above to manage users, classes, and attendance without
-            leaving the current workspace.
+            Use the menu to navigate throughout the system. If you encounter any issues, please contact support.
           </p>
         </div>
       </aside>
