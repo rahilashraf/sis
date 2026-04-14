@@ -29,7 +29,10 @@ export function Topbar({ user, onLogout, onToggleSidebar }: TopbarProps) {
             Menu
           </button>
 
-          <Link href="/dashboard" className="flex items-center gap-2 md:hidden">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 transition hover:opacity-80 md:hidden"
+          >
             <Image
               src="/aiok-logo.png"
               alt="AIOK SIS"
@@ -41,18 +44,21 @@ export function Topbar({ user, onLogout, onToggleSidebar }: TopbarProps) {
             <span className="text-sm font-semibold text-slate-900">AIOK SIS</span>
           </Link>
 
-          <Link href="/dashboard" className="hidden md:flex items-center gap-3">
+          <Link
+            href="/dashboard"
+            className="hidden items-center gap-2 transition hover:opacity-80 md:flex"
+          >
             <Image
               src="/aiok-logo.png"
               alt="AIOK SIS"
               width={40}
               height={40}
-              className="h-10 w-auto object-contain"
+              className="h-8 w-auto object-contain"
               priority
             />
             <div className="leading-tight">
               <p className="text-sm font-semibold text-slate-900">AIOK SIS</p>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 -mt-0.5">
                 {primarySchoolName ?? "Student Information System"}
               </p>
             </div>
@@ -65,9 +71,6 @@ export function Topbar({ user, onLogout, onToggleSidebar }: TopbarProps) {
               {user.firstName} {user.lastName}
             </p>
             <div className="mt-1 flex items-center justify-end gap-2">
-              {primarySchoolName ? (
-                <p className="text-xs text-slate-500">{primarySchoolName}</p>
-              ) : null}
               <Badge variant="neutral">{formatRoleLabel(user.role)}</Badge>
             </div>
           </div>
