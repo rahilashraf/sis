@@ -24,15 +24,7 @@ export function getDefaultRouteForRole(role: UserRole) {
 
 export function getNavigationItems(role: UserRole) {
   const primaryRoute = getDefaultRouteForRole(role);
-  const primaryLabel = adminRoles.includes(role)
-    ? "Admin"
-    : role === "TEACHER" || role === "SUPPLY_TEACHER"
-      ? "Teacher"
-      : role === "PARENT"
-        ? "Parent"
-        : "Student";
-
-  const items = [{ href: primaryRoute, label: `${primaryLabel} Dashboard` }];
+  const items = [{ href: primaryRoute, label: "Dashboard" }];
 
   if (role === "OWNER" || role === "SUPER_ADMIN") {
     items.push(
@@ -41,7 +33,7 @@ export function getNavigationItems(role: UserRole) {
       { href: "/admin/classes", label: "Classes" },
       { href: "/admin/gradebook", label: "Gradebook" },
       { href: "/admin/forms", label: "Forms" },
-      { href: "/admin/re-registration", label: "Re-Registration" },
+      { href: "/admin/re-registration", label: "Re-registration" },
       { href: "/admin/schools", label: "Schools" },
       { href: "/admin/reporting-periods", label: "Reporting Periods" },
       { href: "/admin/grade-scales", label: "Grade Scales" },
@@ -62,7 +54,7 @@ export function getNavigationItems(role: UserRole) {
       { href: "/admin/classes", label: "Classes" },
       { href: "/admin/gradebook", label: "Gradebook" },
       { href: "/admin/forms", label: "Forms" },
-      { href: "/admin/re-registration", label: "Re-Registration" },
+      { href: "/admin/re-registration", label: "Re-registration" },
       { href: "/admin/schools", label: "Schools" },
     );
 
