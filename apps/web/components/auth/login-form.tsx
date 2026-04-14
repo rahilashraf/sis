@@ -15,6 +15,7 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showWakeMessage, setShowWakeMessage] = useState(false);
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -26,6 +27,11 @@ export function LoginForm() {
     event.preventDefault();
     setError(null);
     setIsSubmitting(true);
+    setShowWakeMessage(false);
+
+    const timer = window.setTimeout(() => {
+      setShowWakeMessage(true);
+    }, 3000);
 
     try {
       const response = await login(username, password);
@@ -39,22 +45,29 @@ export function LoginForm() {
 
       setError(message);
     } finally {
+      window.clearTimeout(timer);
       setIsSubmitting(false);
+      setShowWakeMessage(false);
     }
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900">SIS Login</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Sign in with your backend credentials.
+    <Card className="w-full max-w-md p-6 md:p-8">
+      <div className="mb-6 space-y-2">
+        <h1 className="text-2xl font-semibold text-slate-900">
+          AIOK (Darul Ilm) SIS
+        </h1>
+        <p className="text-sm text-slate-600">
+          Sign in with your provided login information.
         </p>
       </div>
 
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-700" htmlFor="username">
+          <label
+            className="text-sm font-medium text-slate-700"
+            htmlFor="username"
+          >
             Username
           </label>
           <Input
@@ -68,7 +81,10 @@ export function LoginForm() {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-700" htmlFor="password">
+          <label
+            className="text-sm font-medium text-slate-700"
+            htmlFor="password"
+          >
             Password
           </label>
           <Input
@@ -84,9 +100,17 @@ export function LoginForm() {
 
         {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
-        <Button className="w-full" disabled={isSubmitting} type="submit">
-          {isSubmitting ? "Signing in..." : "Sign in"}
-        </Button>
+        <div className="space-y-2 pt-2">
+          <Button className="w-full" disabled={isSubmitting} type="submit">
+            {isSubmitting ? "Signing in..." : "Sign in"}
+          </Button>
+
+          {showWakeMessage ? (
+            <p className="text-sm text-slate-500 text-center">
+              Waking up the server. The first login may take a little longer.
+            </p>
+          ) : null}
+        </div>
       </form>
     </Card>
   );
