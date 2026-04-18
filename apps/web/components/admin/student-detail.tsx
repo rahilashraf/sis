@@ -37,6 +37,7 @@ import {
 import { listUsers, type ManagedUser } from "@/lib/api/users";
 import { StudentProfileOverview } from "@/components/students/student-profile-overview";
 import { StudentDocumentsPanel } from "@/components/admin/student-documents-panel";
+import { EnrollmentHistoryPanel } from "@/components/admin/enrollment-history-panel";
 import { formatDateTimeLabel, getDisplayText } from "@/lib/utils";
 
 type StudentProfileFormState = {
@@ -685,6 +686,11 @@ export function StudentDetail({ studentId }: { studentId: string }) {
           <StudentProfileOverview
             showSensitiveHealthInfo={canManageStudent}
             student={student}
+          />
+
+          <EnrollmentHistoryPanel
+            canManage={canManageStudent}
+            studentId={student.id}
           />
 
           <StudentDocumentsPanel

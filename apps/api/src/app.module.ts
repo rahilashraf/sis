@@ -20,6 +20,7 @@ import { GradeScalesModule } from './grade-scales/grade-scales.module';
 import { ReRegistrationModule } from './re-registration/re-registration.module';
 import { StudentDocumentsModule } from './student-documents/student-documents.module';
 import { FormsModule } from './forms/forms.module';
+import { EnrollmentHistoryModule } from './enrollment-history/enrollment-history.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { FormsModule } from './forms/forms.module';
     ReRegistrationModule,
     StudentDocumentsModule,
     FormsModule,
+    EnrollmentHistoryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -87,6 +87,13 @@ enum FormFieldType {
   DATE
 }
 
+enum EnrollmentHistoryStatus {
+  ACTIVE
+  WITHDRAWN
+  TRANSFERRED
+  GRADUATED
+}
+
 model User {
   id           String   @id @default(cuid())
   schoolId     String?
@@ -149,6 +156,7 @@ model User {
 
   studentDocuments        StudentDocument[]   @relation("StudentDocumentsStudent")
   uploadedStudentDocuments StudentDocument[]  @relation("StudentDocumentsUploadedBy")
+  enrollmentHistory      EnrollmentHistory?
   createdForms           Form[]             @relation("FormCreatedBy")
   formResponsesAsParent  FormResponse[]     @relation("FormResponseParent")
   formResponsesAsStudent FormResponse[]     @relation("FormResponseStudent")
@@ -323,6 +331,48 @@ model StudentDocument {
 
   @@index([studentId, isActive, visibility, createdAt])
   @@index([schoolId, isActive, createdAt])
+}
+
+model EnrollmentHistory {
+  id                 String                  @id @default(cuid())
+  studentId          String                  @unique
+  dateOfEnrollment   DateTime
+  dateOfDeparture    DateTime?
+  previousSchoolName String?
+  status             EnrollmentHistoryStatus @default(ACTIVE)
+  notes              String?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  student  User                       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjects EnrollmentHistorySubject[]
+
+  @@index([status, createdAt])
+}
+
+model EnrollmentHistorySubject {
+  id                  String   @id @default(cuid())
+  enrollmentHistoryId String
+  subjectName         String
+  sortOrder           Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  enrollmentHistory EnrollmentHistory @relation(fields: [enrollmentHistoryId], references: [id], onDelete: Cascade)
+
+  @@index([enrollmentHistoryId, sortOrder, subjectName])
+}
+
+model EnrollmentSubjectOption {
+  id        String   @id @default(cuid())
+  name      String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name])
+  @@index([isActive, sortOrder, name])
 }
 
 model Class {

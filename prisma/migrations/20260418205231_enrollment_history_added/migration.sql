@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "EnrollmentHistorySubject_enrollmentHistoryId_sortOrder_subjectN" RENAME TO "EnrollmentHistorySubject_enrollmentHistoryId_sortOrder_subj_idx";

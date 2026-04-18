@@ -39,6 +39,10 @@ export function getNavigationItems(role: UserRole) {
       { href: "/admin/grade-scales", label: "Grade Scales" },
       { href: "/admin/assessment-types", label: "Assessment Types" },
       {
+        href: "/admin/enrollment-subject-options",
+        label: "Enrollment Subjects",
+      },
+      {
         href: "/admin/assessment-result-status-labels",
         label: "Assessment Statuses",
       },
