@@ -9,6 +9,7 @@ import {
   BehaviorRecordType,
   BehaviorRecordStatus,
   BehaviorSeverity,
+  AuditLogSeverity,
   IncidentWitnessRole,
   IncidentLevel,
   Prisma,
@@ -33,6 +34,8 @@ import { ListBehaviorStudentsQueryDto } from './dto/list-behavior-students-query
 import type { IncidentReportDetailsDto } from './dto/incident-report-details.dto';
 import type { BehaviorAttachmentStorage } from './storage/behavior-attachment-storage';
 import { createBehaviorAttachmentStorageFromEnv } from './storage/behavior-attachment-storage.factory';
+import { AuditService } from '../audit/audit.service';
+import { buildAuditDiff } from '../audit/audit-diff.util';
 
 const behaviorRecordSelect = Prisma.validator<Prisma.BehaviorRecordSelect>()({
   id: true,
@@ -160,7 +163,10 @@ const supportedAttachmentMimeTypes = new Set(['application/pdf']);
 export class BehaviorService {
   private attachmentStorage: BehaviorAttachmentStorage | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   private getAttachmentStorage() {
     if (!this.attachmentStorage) {
@@ -918,10 +924,33 @@ export class BehaviorService {
       await this.upsertIncidentReport(created.id, actor, data.incidentReport);
     }
 
-    return this.prisma.behaviorRecord.findUniqueOrThrow({
+    const record = await this.prisma.behaviorRecord.findUniqueOrThrow({
       where: { id: created.id },
       select: behaviorRecordSelect,
     });
+
+    await this.auditService.log({
+      actor,
+      schoolId: record.schoolId,
+      entityType: 'BehaviorRecord',
+      entityId: record.id,
+      action: 'CREATE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Created incident report ${record.title} (${record.incidentLevel})`,
+      targetDisplay: record.title,
+      changesJson:
+        buildAuditDiff({
+          after: {
+            studentId: record.studentId,
+            categoryName: record.categoryName,
+            incidentLevel: record.incidentLevel,
+            status: record.status,
+            severity: record.severity,
+          },
+        }) ?? undefined,
+    });
+
+    return record;
   }
 
   async listForStudent(actor: AuthenticatedUser, studentId: string) {
@@ -1035,10 +1064,50 @@ export class BehaviorService {
       await this.upsertIncidentReport(existing.id, actor, data.incidentReport);
     }
 
-    return this.prisma.behaviorRecord.findUniqueOrThrow({
+    const record = await this.prisma.behaviorRecord.findUniqueOrThrow({
       where: { id: updated.id },
       select: behaviorRecordSelect,
     });
+
+    await this.auditService.log({
+      actor,
+      schoolId: record.schoolId,
+      entityType: 'BehaviorRecord',
+      entityId: record.id,
+      action: 'UPDATE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Updated incident report ${record.title} (${record.incidentLevel})`,
+      targetDisplay: record.title,
+      changesJson:
+        buildAuditDiff({
+          before: {
+            incidentAt: existing.incidentAt,
+            categoryName: existing.categoryName,
+            incidentLevel: existing.incidentLevel,
+            severity: existing.severity,
+            title: existing.title,
+            description: existing.description,
+            actionTaken: existing.actionTaken,
+            followUpRequired: existing.followUpRequired,
+            parentContacted: existing.parentContacted,
+            status: existing.status,
+          },
+          after: {
+            incidentAt: record.incidentAt,
+            categoryName: record.categoryName,
+            incidentLevel: record.incidentLevel,
+            severity: record.severity,
+            title: record.title,
+            description: record.description,
+            actionTaken: record.actionTaken,
+            followUpRequired: record.followUpRequired,
+            parentContacted: record.parentContacted,
+            status: record.status,
+          },
+        }) ?? undefined,
+    });
+
+    return record;
   }
 
   async listCategories(
@@ -1086,7 +1155,7 @@ export class BehaviorService {
     }
 
     try {
-      return await this.prisma.behaviorCategoryOption.create({
+      const created = await this.prisma.behaviorCategoryOption.create({
         data: {
           schoolId,
           name: this.normalizeCategoryName(data.name),
@@ -1094,6 +1163,19 @@ export class BehaviorService {
           sortOrder: data.sortOrder ?? 0,
         },
       });
+
+      await this.auditService.log({
+        actor,
+        schoolId,
+        entityType: 'BehaviorCategoryOption',
+        entityId: created.id,
+        action: 'CREATE',
+        severity: AuditLogSeverity.INFO,
+        summary: `Created behavior category ${created.name}`,
+        targetDisplay: created.name,
+      });
+
+      return created;
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -1137,7 +1219,7 @@ export class BehaviorService {
     }
 
     try {
-      return await this.prisma.behaviorCategoryOption.update({
+      const updated = await this.prisma.behaviorCategoryOption.update({
         where: { id },
         data: {
           schoolId: nextSchoolId,
@@ -1149,6 +1231,29 @@ export class BehaviorService {
           isActive: data.isActive,
         },
       });
+
+      await this.auditService.log({
+        actor,
+        schoolId: updated.schoolId,
+        entityType: 'BehaviorCategoryOption',
+        entityId: updated.id,
+        action: 'UPDATE',
+        severity: AuditLogSeverity.INFO,
+        summary: `Updated behavior category ${updated.name}`,
+        targetDisplay: updated.name,
+        changesJson:
+          buildAuditDiff({
+            before: existing,
+            after: {
+              schoolId: updated.schoolId,
+              name: updated.name,
+              sortOrder: updated.sortOrder,
+              isActive: updated.isActive,
+            },
+          }) ?? undefined,
+      });
+
+      return updated;
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&

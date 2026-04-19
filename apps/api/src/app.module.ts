@@ -22,6 +22,7 @@ import { StudentDocumentsModule } from './student-documents/student-documents.mo
 import { FormsModule } from './forms/forms.module';
 import { EnrollmentHistoryModule } from './enrollment-history/enrollment-history.module';
 import { BehaviorModule } from './behavior/behavior.module';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { BehaviorModule } from './behavior/behavior.module';
     FormsModule,
     EnrollmentHistoryModule,
     BehaviorModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],

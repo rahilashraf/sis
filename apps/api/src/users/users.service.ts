@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole } from '@prisma/client';
+import { AuditLogSeverity, UserRole } from '@prisma/client';
 import { AppUserRole, CreateUserDto } from './dto/create-user.dto';
 import { ManageUserMembershipsDto } from './dto/manage-user-memberships.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -20,10 +20,15 @@ import {
 } from '../common/access/school-access.util';
 import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
 import { safeUserSelect } from '../common/prisma/safe-user-response';
+import { AuditService } from '../audit/audit.service';
+import { buildAuditDiff } from '../audit/audit-diff.util';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   private async getManageableUserOrThrow(
     actor: AuthenticatedUser,
@@ -233,7 +238,7 @@ export class UsersService {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    return this.prisma.user.create({
+    const created = await this.prisma.user.create({
       data: {
         ...userData,
         passwordHash,
@@ -256,10 +261,44 @@ export class UsersService {
       },
       select: safeUserSelect,
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: primarySchoolId,
+      entityType: 'User',
+      entityId: created.id,
+      action: 'CREATE',
+      severity: AuditLogSeverity.INFO,
+      summary: `Created user ${created.firstName} ${created.lastName} (${created.role})`,
+      targetDisplay: `${created.firstName} ${created.lastName}`.trim(),
+      changesJson:
+        buildAuditDiff({
+          after: {
+            role: created.role,
+            isActive: created.isActive,
+            schoolIds: requestedSchoolIds,
+          },
+        }) ?? undefined,
+    });
+
+    return created;
   }
 
   async update(user: AuthenticatedUser, userId: string, data: UpdateUserDto) {
     const existingUser = await this.getManageableUserOrThrow(user, userId);
+    const before = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: {
+        id: true,
+        schoolId: true,
+        username: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+      },
+    });
 
     if (data.role) {
       this.ensureActorCanAssignRole(user, data.role);
@@ -315,11 +354,39 @@ export class UsersService {
       throw new ForbiddenException('You do not have user access');
     }
 
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id: userId },
       data: updateData,
       select: safeUserSelect,
     });
+
+    const roleChanged = before.role !== updated.role;
+    await this.auditService.log({
+      actor: user,
+      schoolId: before.schoolId,
+      entityType: 'User',
+      entityId: updated.id,
+      action: roleChanged ? 'ROLE_CHANGED' : 'UPDATE',
+      severity: roleChanged ? AuditLogSeverity.WARNING : AuditLogSeverity.INFO,
+      summary: roleChanged
+        ? `Changed role for ${updated.firstName} ${updated.lastName} from ${before.role} to ${updated.role}`
+        : `Updated user ${updated.firstName} ${updated.lastName}`,
+      targetDisplay: `${updated.firstName} ${updated.lastName}`.trim(),
+      changesJson:
+        buildAuditDiff({
+          before,
+          after: {
+            username: updated.username,
+            email: updated.email,
+            firstName: updated.firstName,
+            lastName: updated.lastName,
+            role: updated.role,
+            isActive: updated.isActive,
+          },
+        }) ?? undefined,
+    });
+
+    return updated;
   }
 
   async setMemberships(
@@ -384,10 +451,34 @@ export class UsersService {
       });
     });
 
-    return this.prisma.user.findUniqueOrThrow({
+    const updated = await this.prisma.user.findUniqueOrThrow({
       where: { id: existingUser.id },
       select: safeUserSelect,
     });
+
+    await this.auditService.log({
+      actor,
+      schoolId: primarySchoolId,
+      entityType: 'UserSchoolMembership',
+      entityId: existingUser.id,
+      action: 'MEMBERSHIP_CHANGED',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Updated school memberships for user ${updated.firstName} ${updated.lastName}`,
+      targetDisplay: `${updated.firstName} ${updated.lastName}`.trim(),
+      changesJson:
+        buildAuditDiff({
+          before: {
+            schoolIds: existingUser.memberships.map((membership) => membership.schoolId),
+            primarySchoolId: existingUser.schoolId ?? null,
+          },
+          after: {
+            schoolIds: normalizedSchoolIds,
+            primarySchoolId,
+          },
+        }) ?? undefined,
+    });
+
+    return updated;
   }
 
   async remove(actor: AuthenticatedUser, userId: string) {
@@ -395,7 +486,10 @@ export class UsersService {
       where: { id: userId },
       select: {
         id: true,
+        firstName: true,
+        lastName: true,
         role: true,
+        schoolId: true,
         memberships: {
           where: {
             isActive: true,
@@ -447,6 +541,17 @@ export class UsersService {
         where: { id: existingUser.id },
       });
 
+      await this.auditService.log({
+        actor,
+        schoolId: existingUser.schoolId ?? existingUser.memberships[0]?.schoolId,
+        entityType: 'User',
+        entityId: existingUser.id,
+        action: 'DELETE',
+        severity: AuditLogSeverity.HIGH,
+        summary: `Deleted user ${existingUser.firstName} ${existingUser.lastName}`,
+        targetDisplay: `${existingUser.firstName} ${existingUser.lastName}`.trim(),
+      });
+
       return {
         success: true,
         removalMode: 'deleted' as const,
@@ -469,6 +574,20 @@ export class UsersService {
         },
       }),
     ]);
+
+    await this.auditService.log({
+      actor,
+      schoolId: existingUser.schoolId ?? existingUser.memberships[0]?.schoolId,
+      entityType: 'User',
+      entityId: existingUser.id,
+      action: 'DEACTIVATE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Deactivated user ${existingUser.firstName} ${existingUser.lastName} because dependencies exist`,
+      targetDisplay: `${existingUser.firstName} ${existingUser.lastName}`.trim(),
+      changesJson: {
+        dependencyLabels,
+      },
+    });
 
     return {
       success: true,

@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, UserRole } from '@prisma/client';
+import { AuditLogSeverity, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../common/auth/auth-user';
 import {
@@ -25,6 +25,8 @@ import {
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { ReRegistrationDto } from './dto/re-registration.dto';
 import { ReRegistrationService } from '../re-registration/re-registration.service';
+import { AuditService } from '../audit/audit.service';
+import { buildAuditDiff } from '../audit/audit-diff.util';
 
 const legacyStudentProfileFieldNames = [
   'dateOfBirth',
@@ -159,6 +161,7 @@ export class StudentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly reRegistrationService: ReRegistrationService,
+    private readonly auditService: AuditService,
   ) {}
 
   private isAdminLike(role: UserRole) {
@@ -466,6 +469,7 @@ export class StudentsService {
     }
 
     this.ensureAdminCanAccessStudent(actor, student);
+    const beforeProfile = await this.findStudentProfile(studentId);
 
     const updateData: Prisma.UserUpdateInput = {};
     const shouldResolvePrimarySchool =
@@ -661,11 +665,34 @@ export class StudentsService {
     }
 
     try {
-      return await this.prisma.user.update({
+      const updated = await this.prisma.user.update({
         where: { id: studentId },
         data: updateData,
         select: studentProfileSelect,
       });
+
+      await this.auditService.log({
+        actor,
+        schoolId:
+          this.getPrimaryStudentSchoolId(student) ??
+          beforeProfile.memberships[0]?.schoolId ??
+          null,
+        entityType: 'Student',
+        entityId: updated.id,
+        action: 'UPDATE',
+        severity: AuditLogSeverity.WARNING,
+        summary: `Updated student profile for ${updated.firstName} ${updated.lastName}`,
+        targetDisplay: `${updated.firstName} ${updated.lastName}`.trim(),
+        changesJson:
+          buildAuditDiff({
+            before: beforeProfile,
+            after: updated,
+            redactedFields: ['healthCardNumber'],
+            maxFields: 30,
+          }) ?? undefined,
+      });
+
+      return updated;
     } catch (error) {
       if (this.isMissingStudentProfileColumnError(error)) {
         throw new ConflictException(
@@ -718,6 +745,7 @@ export class StudentsService {
       throw new ForbiddenException('You do not have student access');
     }
 
+    const beforeProfile = await this.findStudentProfile(studentId);
     const updateData: Prisma.UserUpdateInput = {};
 
     if (data.dateOfBirth !== undefined) {
@@ -840,6 +868,31 @@ export class StudentsService {
 
       throw error;
     }
+
+    const afterProfile = await this.findStudentProfile(studentId);
+    await this.auditService.log({
+      actor,
+      schoolId:
+        this.getPrimaryStudentSchoolId(student) ??
+        beforeProfile.memberships[0]?.schoolId ??
+        null,
+      entityType: 'Student',
+      entityId: studentId,
+      action: 'RE_REGISTER',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Submitted re-registration profile update for ${afterProfile.firstName} ${afterProfile.lastName}`,
+      targetDisplay: `${afterProfile.firstName} ${afterProfile.lastName}`.trim(),
+      changesJson:
+        buildAuditDiff({
+          before: beforeProfile,
+          after: afterProfile,
+          redactedFields: ['healthCardNumber'],
+          maxFields: 30,
+        }) ?? undefined,
+      metadataJson: {
+        schoolYearId: options.schoolYearId ?? null,
+      },
+    });
 
     return this.findOne(actor, studentId);
   }

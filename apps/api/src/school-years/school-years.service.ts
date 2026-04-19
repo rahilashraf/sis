@@ -6,17 +6,22 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AuditLogSeverity, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSchoolYearDto } from './dto/create-school-year.dto';
 import { AuthenticatedUser } from '../common/auth/auth-user';
 import { ensureUserHasSchoolAccess } from '../common/access/school-access.util';
 import { UpdateSchoolYearDto } from './dto/update-school-year.dto';
 import { parseDateOnlyOrThrow } from '../common/dates/date-only.util';
+import { AuditService } from '../audit/audit.service';
+import { buildAuditDiff } from '../audit/audit-diff.util';
 
 @Injectable()
 export class SchoolYearsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   private buildInclude() {
     return {
@@ -69,7 +74,7 @@ export class SchoolYearsService {
 
     this.ensureValidDateRange(startDate, endDate);
 
-    return this.prisma.schoolYear.create({
+    const created = await this.prisma.schoolYear.create({
       data: {
         schoolId: data.schoolId,
         name: data.name,
@@ -79,6 +84,19 @@ export class SchoolYearsService {
       },
       include: this.buildInclude(),
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: created.schoolId,
+      entityType: 'SchoolYear',
+      entityId: created.id,
+      action: 'CREATE',
+      severity: AuditLogSeverity.INFO,
+      summary: `Created school year ${created.name}`,
+      targetDisplay: created.name,
+    });
+
+    return created;
   }
 
   findAllForSchool(
@@ -114,6 +132,16 @@ export class SchoolYearsService {
     }
 
     ensureUserHasSchoolAccess(user, existing.schoolId);
+    const before = await this.prisma.schoolYear.findUniqueOrThrow({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        startDate: true,
+        endDate: true,
+        isActive: true,
+      },
+    });
 
     const nextStartDate = data.startDate
       ? parseDateOnlyOrThrow(data.startDate, 'startDate')
@@ -146,15 +174,38 @@ export class SchoolYearsService {
       throw new BadRequestException('No valid fields provided for update');
     }
 
-    return this.prisma.schoolYear.update({
+    const updated = await this.prisma.schoolYear.update({
       where: { id },
       data: updateData,
       include: this.buildInclude(),
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: existing.schoolId,
+      entityType: 'SchoolYear',
+      entityId: updated.id,
+      action: 'UPDATE',
+      severity: AuditLogSeverity.INFO,
+      summary: `Updated school year ${updated.name}`,
+      targetDisplay: updated.name,
+      changesJson:
+        buildAuditDiff({
+          before,
+          after: {
+            name: updated.name,
+            startDate: updated.startDate,
+            endDate: updated.endDate,
+            isActive: updated.isActive,
+          },
+        }) ?? undefined,
+    });
+
+    return updated;
   }
 
   async activate(user: AuthenticatedUser, id: string) {
-    return this.prisma.$transaction(async (tx) => {
+    const { updated, schoolId } = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.schoolYear.findUnique({
         where: { id },
         select: {
@@ -179,14 +230,28 @@ export class SchoolYearsService {
         },
       });
 
-      return tx.schoolYear.update({
+      const updated = await tx.schoolYear.update({
         where: { id: existing.id },
         data: {
           isActive: true,
         },
         include: this.buildInclude(),
       });
+      return { updated, schoolId: existing.schoolId };
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId,
+      entityType: 'SchoolYear',
+      entityId: updated.id,
+      action: 'ACTIVATE',
+      severity: AuditLogSeverity.INFO,
+      summary: `Activated school year ${updated.name}`,
+      targetDisplay: updated.name,
+    });
+
+    return updated;
   }
 
   async archive(user: AuthenticatedUser, id: string) {
@@ -204,13 +269,26 @@ export class SchoolYearsService {
 
     ensureUserHasSchoolAccess(user, existing.schoolId);
 
-    return this.prisma.schoolYear.update({
+    const updated = await this.prisma.schoolYear.update({
       where: { id },
       data: {
         isActive: false,
       },
       include: this.buildInclude(),
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: existing.schoolId,
+      entityType: 'SchoolYear',
+      entityId: updated.id,
+      action: 'ARCHIVE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Archived school year ${updated.name}`,
+      targetDisplay: updated.name,
+    });
+
+    return updated;
   }
 
   async remove(user: AuthenticatedUser, id: string) {
@@ -219,6 +297,7 @@ export class SchoolYearsService {
         where: { id },
         select: {
           id: true,
+          name: true,
           schoolId: true,
           _count: {
             select: {
@@ -247,6 +326,17 @@ export class SchoolYearsService {
           where: { id: existing.id },
         });
 
+        await this.auditService.log({
+          actor: user,
+          schoolId: existing.schoolId,
+          entityType: 'SchoolYear',
+          entityId: existing.id,
+          action: 'DELETE',
+          severity: AuditLogSeverity.HIGH,
+          summary: `Deleted school year ${existing.name}`,
+          targetDisplay: existing.name,
+        });
+
         return {
           success: true,
           removalMode: 'deleted' as const,
@@ -269,6 +359,20 @@ export class SchoolYearsService {
           },
         }),
       ]);
+
+      await this.auditService.log({
+        actor: user,
+        schoolId: existing.schoolId,
+        entityType: 'SchoolYear',
+        entityId: existing.id,
+        action: 'ARCHIVE',
+        severity: AuditLogSeverity.WARNING,
+        summary: `Archived school year ${existing.name} because dependencies exist`,
+        targetDisplay: existing.name,
+        changesJson: {
+          dependencyLabels,
+        },
+      });
 
       return {
         success: true,

@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { AuditLogSeverity, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateGradeRecordDto } from './dto/create-grade-record.dto';
 import { UpdateGradeRecordDto } from './dto/update-grade-record.dto';
@@ -22,6 +22,8 @@ import {
   schoolSummarySelect,
   schoolYearSummarySelect,
 } from '../common/prisma/safe-user-response';
+import { AuditService } from '../audit/audit.service';
+import { buildAuditDiff } from '../audit/audit-diff.util';
 
 type AuthUser = AuthenticatedUser;
 
@@ -50,7 +52,10 @@ type GradeSummaryRecord = {
 
 @Injectable()
 export class GradesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   private isAdminLike(role: UserRole) {
     return isBypassRole(role) || isSchoolAdminRole(role);
@@ -613,7 +618,7 @@ export class GradesService {
     await this.ensureStudentEnrolledInClass(data.studentId, data.classId);
     await this.ensureUserCanWriteGradeForDate(user, data.classId, gradedAt);
 
-    return this.prisma.gradeRecord.create({
+    const created = await this.prisma.gradeRecord.create({
       data: {
         classId: data.classId,
         studentId: data.studentId,
@@ -625,6 +630,30 @@ export class GradesService {
       },
       include: this.buildInclude(),
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: created.class.schoolId,
+      entityType: 'GradeRecord',
+      entityId: created.id,
+      action: 'CREATE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Created grade record ${created.title} for student ${created.student.firstName} ${created.student.lastName}`,
+      targetDisplay: created.title,
+      changesJson:
+        buildAuditDiff({
+          after: {
+            classId: created.classId,
+            studentId: created.studentId,
+            title: created.title,
+            score: created.score,
+            maxScore: created.maxScore,
+            gradedAt: created.gradedAt,
+          },
+        }) ?? undefined,
+    });
+
+    return created;
   }
 
   async update(user: AuthUser, id: string, data: UpdateGradeRecordDto) {
@@ -633,9 +662,12 @@ export class GradesService {
       select: {
         id: true,
         classId: true,
+        studentId: true,
+        title: true,
         score: true,
         maxScore: true,
         gradedAt: true,
+        comment: true,
       },
     });
 
@@ -666,7 +698,7 @@ export class GradesService {
       gradedAt,
     );
 
-    return this.prisma.gradeRecord.update({
+    const updated = await this.prisma.gradeRecord.update({
       where: { id: existingGrade.id },
       data: {
         ...(data.title !== undefined ? { title: data.title } : {}),
@@ -677,6 +709,32 @@ export class GradesService {
       },
       include: this.buildInclude(),
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: updated.class.schoolId,
+      entityType: 'GradeRecord',
+      entityId: updated.id,
+      action: 'UPDATE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Updated grade record ${updated.title} for student ${updated.student.firstName} ${updated.student.lastName}`,
+      targetDisplay: updated.title,
+      changesJson:
+        buildAuditDiff({
+          before: existingGrade,
+          after: {
+            classId: updated.classId,
+            studentId: updated.studentId,
+            title: updated.title,
+            score: updated.score,
+            maxScore: updated.maxScore,
+            gradedAt: updated.gradedAt,
+            comment: updated.comment,
+          },
+        }) ?? undefined,
+    });
+
+    return updated;
   }
 
   async findByClass(user: AuthUser, classId: string) {

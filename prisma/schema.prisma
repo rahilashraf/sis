@@ -146,6 +146,19 @@ enum IncidentJhscNotificationStatus {
   NOT_APPLICABLE
 }
 
+enum AuditLogSeverity {
+  INFO
+  WARNING
+  HIGH
+  CRITICAL
+}
+
+enum AuditArchiveAction {
+  EXPORT
+  PURGE
+  RETENTION_PURGE
+}
+
 model User {
   id           String   @id @default(cuid())
   schoolId     String?
@@ -215,6 +228,9 @@ model User {
   createdForms           Form[]             @relation("FormCreatedBy")
   formResponsesAsParent  FormResponse[]     @relation("FormResponseParent")
   formResponsesAsStudent FormResponse[]     @relation("FormResponseStudent")
+  auditLogsAsActor       AuditLog[]         @relation("AuditActor")
+  auditExports           AuditArchiveHistory[] @relation("AuditExportedBy")
+  auditPurges            AuditArchiveHistory[] @relation("AuditPurgedBy")
 
   @@unique([schoolId, studentNumber])
 }
@@ -246,6 +262,7 @@ model School {
   formResponses          FormResponse[]
   behaviorRecords        BehaviorRecord[]
   behaviorCategoryOptions BehaviorCategoryOption[]
+  auditLogs              AuditLog[]
 }
 
 model GradeScale {
@@ -946,4 +963,56 @@ model ReRegistrationWindow {
 
   @@index([schoolId, schoolYearId, isActive])
   @@index([opensAt, closesAt])
+}
+
+model AuditLog {
+  id                String           @id @default(cuid())
+  createdAt         DateTime         @default(now())
+  actorUserId       String?
+  actorNameSnapshot String?
+  actorRoleSnapshot UserRole?
+  schoolId          String?
+  entityType        String
+  entityId          String?
+  action            String
+  severity          AuditLogSeverity @default(INFO)
+  summary           String
+  targetDisplay     String?
+  changesJson       Json?
+  metadataJson      Json?
+
+  actor  User?   @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  school School? @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([schoolId, createdAt])
+  @@index([entityType, action, createdAt])
+  @@index([severity, createdAt])
+}
+
+model AuditArchiveHistory {
+  id                    String             @id @default(cuid())
+  createdAt             DateTime           @default(now())
+  action                AuditArchiveAction
+  fromDate              DateTime
+  toDate                DateTime
+  rowCount              Int                @default(0)
+  exportedAt            DateTime?
+  purgedAt              DateTime?
+  exportedByUserId      String?
+  exportedByNameSnapshot String?
+  exportedByRoleSnapshot UserRole?
+  purgedByUserId        String?
+  purgedByNameSnapshot  String?
+  purgedByRoleSnapshot  UserRole?
+  notes                 String?
+  metadataJson          Json?
+
+  exportedBy User? @relation("AuditExportedBy", fields: [exportedByUserId], references: [id], onDelete: SetNull)
+  purgedBy   User? @relation("AuditPurgedBy", fields: [purgedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([action, createdAt])
+  @@index([fromDate, toDate])
 }

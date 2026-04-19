@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { AuditLogSeverity } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../common/auth/auth-user';
 import {
@@ -15,10 +16,15 @@ import {
 } from '../common/access/school-access.util';
 import { UpdateSchoolDto } from './dto/update-school.dto';
 import { CreateSchoolDto } from './dto/create-school.dto';
+import { AuditService } from '../audit/audit.service';
+import { buildAuditDiff } from '../audit/audit-diff.util';
 
 @Injectable()
 export class SchoolsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   private async getSchoolOrThrow(user: AuthenticatedUser, schoolId: string) {
     const existingSchool = await this.prisma.school.findUnique({
@@ -63,16 +69,37 @@ export class SchoolsService {
       );
     }
 
-    return this.prisma.school.create({
+    const created = await this.prisma.school.create({
       data: {
         name: data.name,
         shortName: data.shortName,
       },
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: created.id,
+      entityType: 'School',
+      entityId: created.id,
+      action: 'CREATE',
+      severity: AuditLogSeverity.INFO,
+      summary: `Created school ${created.name}`,
+      targetDisplay: created.name,
+    });
+
+    return created;
   }
 
   async update(user: AuthenticatedUser, schoolId: string, data: UpdateSchoolDto) {
     await this.getSchoolOrThrow(user, schoolId);
+    const before = await this.prisma.school.findUniqueOrThrow({
+      where: { id: schoolId },
+      select: {
+        id: true,
+        name: true,
+        shortName: true,
+      },
+    });
 
     const updateData: {
       name?: string;
@@ -91,10 +118,31 @@ export class SchoolsService {
       throw new BadRequestException('No valid fields provided for update');
     }
 
-    return this.prisma.school.update({
+    const updated = await this.prisma.school.update({
       where: { id: schoolId },
       data: updateData,
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: updated.id,
+      entityType: 'School',
+      entityId: updated.id,
+      action: 'UPDATE',
+      severity: AuditLogSeverity.INFO,
+      summary: `Updated school ${updated.name}`,
+      targetDisplay: updated.name,
+      changesJson:
+        buildAuditDiff({
+          before,
+          after: {
+            name: updated.name,
+            shortName: updated.shortName,
+          },
+        }) ?? undefined,
+    });
+
+    return updated;
   }
 
   async setActiveState(
@@ -110,10 +158,23 @@ export class SchoolsService {
       });
     }
 
-    return this.prisma.school.update({
+    const updated = await this.prisma.school.update({
       where: { id: schoolId },
       data: { isActive },
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: updated.id,
+      entityType: 'School',
+      entityId: updated.id,
+      action: isActive ? 'ACTIVATE' : 'ARCHIVE',
+      severity: isActive ? AuditLogSeverity.INFO : AuditLogSeverity.WARNING,
+      summary: `${isActive ? 'Activated' : 'Archived'} school ${updated.name}`,
+      targetDisplay: updated.name,
+    });
+
+    return updated;
   }
 
   async remove(user: AuthenticatedUser, schoolId: string) {
@@ -121,6 +182,7 @@ export class SchoolsService {
       where: { id: schoolId },
       select: {
         id: true,
+        name: true,
         _count: {
           select: {
             memberships: true,
@@ -150,6 +212,17 @@ export class SchoolsService {
     if (dependencyLabels.length === 0) {
       await this.prisma.school.delete({
         where: { id: existingSchool.id },
+      });
+
+      await this.auditService.log({
+        actor: user,
+        schoolId: existingSchool.id,
+        entityType: 'School',
+        entityId: existingSchool.id,
+        action: 'DELETE',
+        severity: AuditLogSeverity.HIGH,
+        summary: `Deleted school ${existingSchool.name}`,
+        targetDisplay: existingSchool.name,
       });
 
       return {
@@ -182,6 +255,20 @@ export class SchoolsService {
         },
       }),
     ]);
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: existingSchool.id,
+      entityType: 'School',
+      entityId: existingSchool.id,
+      action: 'ARCHIVE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Archived school ${existingSchool.name} because dependencies exist`,
+      targetDisplay: existingSchool.name,
+      changesJson: {
+        dependencyLabels,
+      },
+    });
 
     return {
       success: true,

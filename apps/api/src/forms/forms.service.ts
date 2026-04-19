@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AuditLogSeverity,
   FormFieldType,
   Prisma,
   UserRole,
@@ -21,6 +22,8 @@ import {
 import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
 import { formatDateOnly, parseDateOnlyOrThrow } from '../common/dates/date-only.util';
 import { safeUserSelect } from '../common/prisma/safe-user-response';
+import { AuditService } from '../audit/audit.service';
+import { buildAuditDiff } from '../audit/audit-diff.util';
 
 type AuthUser = AuthenticatedUser;
 
@@ -33,7 +36,10 @@ function isSchemaMissingError(error: unknown) {
 
 @Injectable()
 export class FormsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   private isManageRole(role: UserRole) {
     return (

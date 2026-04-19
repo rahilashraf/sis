@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AuditLogSeverity, Prisma } from '@prisma/client';
 import type { AuthenticatedUser } from '../common/auth/auth-user';
 import {
   ensureUserHasSchoolAccess,
@@ -17,12 +17,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportingPeriodDto } from './dto/create-reporting-period.dto';
 import { QueryReportingPeriodsDto } from './dto/query-reporting-periods.dto';
 import { UpdateReportingPeriodDto } from './dto/update-reporting-period.dto';
+import { AuditService } from '../audit/audit.service';
+import { buildAuditDiff } from '../audit/audit-diff.util';
 
 type AuthUser = AuthenticatedUser;
 
 @Injectable()
 export class ReportingPeriodsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   private buildInclude() {
     return {
@@ -178,7 +183,7 @@ export class ReportingPeriodsService {
     );
 
     try {
-      return await this.prisma.reportingPeriod.create({
+      const created = await this.prisma.reportingPeriod.create({
         data: {
           schoolId: data.schoolId,
           schoolYearId: data.schoolYearId,
@@ -192,6 +197,19 @@ export class ReportingPeriodsService {
         },
         include: this.buildInclude(),
       });
+
+      await this.auditService.log({
+        actor: user,
+        schoolId: created.schoolId,
+        entityType: 'ReportingPeriod',
+        entityId: created.id,
+        action: 'CREATE',
+        severity: AuditLogSeverity.INFO,
+        summary: `Created reporting period ${created.name} (${created.key})`,
+        targetDisplay: created.name,
+      });
+
+      return created;
     } catch (error) {
       this.handleWriteError(error);
     }
@@ -247,6 +265,19 @@ export class ReportingPeriodsService {
     }
 
     ensureUserHasSchoolAccess(user, existing.schoolId);
+    const before = await this.prisma.reportingPeriod.findUniqueOrThrow({
+      where: { id: existing.id },
+      select: {
+        id: true,
+        name: true,
+        key: true,
+        order: true,
+        startsAt: true,
+        endsAt: true,
+        isActive: true,
+        isLocked: true,
+      },
+    });
 
     const hasNonLockUpdates =
       data.name !== undefined ||
@@ -285,7 +316,7 @@ export class ReportingPeriodsService {
     );
 
     try {
-      return await this.prisma.reportingPeriod.update({
+      const updated = await this.prisma.reportingPeriod.update({
         where: { id: existing.id },
         data: {
           ...(data.name !== undefined ? { name: data.name } : {}),
@@ -297,6 +328,32 @@ export class ReportingPeriodsService {
         },
         include: this.buildInclude(),
       });
+
+      await this.auditService.log({
+        actor: user,
+        schoolId: existing.schoolId,
+        entityType: 'ReportingPeriod',
+        entityId: updated.id,
+        action: 'UPDATE',
+        severity: AuditLogSeverity.INFO,
+        summary: `Updated reporting period ${updated.name} (${updated.key})`,
+        targetDisplay: updated.name,
+        changesJson:
+          buildAuditDiff({
+            before,
+            after: {
+              name: updated.name,
+              key: updated.key,
+              order: updated.order,
+              startsAt: updated.startsAt,
+              endsAt: updated.endsAt,
+              isActive: updated.isActive,
+              isLocked: updated.isLocked,
+            },
+          }) ?? undefined,
+      });
+
+      return updated;
     } catch (error) {
       this.handleWriteError(error);
     }
@@ -319,11 +376,24 @@ export class ReportingPeriodsService {
 
     ensureUserHasSchoolAccess(user, existing.schoolId);
 
-    return this.prisma.reportingPeriod.update({
+    const updated = await this.prisma.reportingPeriod.update({
       where: { id: existing.id },
       data: { isActive },
       include: this.buildInclude(),
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: existing.schoolId,
+      entityType: 'ReportingPeriod',
+      entityId: updated.id,
+      action: isActive ? 'ACTIVATE' : 'ARCHIVE',
+      severity: isActive ? AuditLogSeverity.INFO : AuditLogSeverity.WARNING,
+      summary: `${isActive ? 'Activated' : 'Archived'} reporting period ${updated.name} (${updated.key})`,
+      targetDisplay: updated.name,
+    });
+
+    return updated;
   }
 
   async setLocked(user: AuthUser, id: string, isLocked: boolean) {
@@ -336,10 +406,23 @@ export class ReportingPeriodsService {
       throw new BadRequestException('Reporting period is archived');
     }
 
-    return this.prisma.reportingPeriod.update({
+    const updated = await this.prisma.reportingPeriod.update({
       where: { id: existing.id },
       data: { isLocked },
       include: this.buildInclude(),
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: existing.schoolId,
+      entityType: 'ReportingPeriod',
+      entityId: updated.id,
+      action: isLocked ? 'LOCK' : 'UNLOCK',
+      severity: AuditLogSeverity.WARNING,
+      summary: `${isLocked ? 'Locked' : 'Unlocked'} reporting period ${updated.name} (${updated.key})`,
+      targetDisplay: updated.name,
+    });
+
+    return updated;
   }
 }

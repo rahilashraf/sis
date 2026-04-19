@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AuditLogSeverity, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLinkDto } from './dto/create-link.dto';
 import { AuthenticatedUser } from '../common/auth/auth-user';
@@ -15,10 +15,14 @@ import {
 } from '../common/access/school-access.util';
 import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
 import { safeUserSelect } from '../common/prisma/safe-user-response';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class LinksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   private readonly duplicateLinkMessage =
     'Student is already linked to this parent';
@@ -152,10 +156,22 @@ export class LinksService {
     this.ensureActorCanAccessLinkedSchools(actor, sharedSchoolIds);
 
     try {
-      return await this.prisma.studentParentLink.create({
+      const created = await this.prisma.studentParentLink.create({
         data,
         select: this.buildLinkSelect(),
       });
+
+      await this.auditService.log({
+        actor,
+        schoolId: sharedSchoolIds[0] ?? null,
+        entityType: 'StudentParentLink',
+        entityId: created.id,
+        action: 'CREATE',
+        severity: AuditLogSeverity.INFO,
+        summary: `Linked parent ${created.parentId} to student ${created.studentId}`,
+      });
+
+      return created;
     } catch (error) {
       this.rethrowDuplicateLinkError(error);
     }
@@ -166,6 +182,8 @@ export class LinksService {
       where: { id },
       select: {
         id: true,
+        parentId: true,
+        studentId: true,
         parent: {
           select: {
             schoolId: true,
@@ -214,7 +232,7 @@ export class LinksService {
 
     this.ensureActorCanAccessLinkedSchools(actor, linkedSchoolIds);
 
-    return this.prisma.studentParentLink.delete({
+    const deleted = await this.prisma.studentParentLink.delete({
       where: { id },
       select: {
         id: true,
@@ -223,5 +241,17 @@ export class LinksService {
         createdAt: true,
       },
     });
+
+    await this.auditService.log({
+      actor,
+      schoolId: linkedSchoolIds[0] ?? null,
+      entityType: 'StudentParentLink',
+      entityId: deleted.id,
+      action: 'DELETE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Removed parent-student link parent=${deleted.parentId} student=${deleted.studentId}`,
+    });
+
+    return deleted;
   }
 }

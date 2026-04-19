@@ -5,7 +5,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, TeacherClassAssignmentType, UserRole } from '@prisma/client';
+import {
+  AuditLogSeverity,
+  Prisma,
+  TeacherClassAssignmentType,
+  UserRole,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
@@ -26,10 +31,15 @@ import {
   schoolSummarySelect,
   schoolYearSummarySelect,
 } from '../common/prisma/safe-user-response';
+import { AuditService } from '../audit/audit.service';
+import { buildAuditDiff } from '../audit/audit-diff.util';
 
 @Injectable()
 export class ClassesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   private readonly duplicateClassNameMessage =
     'A class with this name, grade level, and subject already exists for this school year';
@@ -480,7 +490,7 @@ export class ClassesService {
     ]);
 
     try {
-      return await this.prisma.class.create({
+      const created = await this.prisma.class.create({
         data: {
           schoolId: data.schoolId,
           schoolYearId: data.schoolYearId,
@@ -492,6 +502,29 @@ export class ClassesService {
         },
         select: this.buildClassSelect(),
       });
+
+      await this.auditService.log({
+        actor: user,
+        schoolId: created.schoolId,
+        entityType: 'Class',
+        entityId: created.id,
+        action: 'CREATE',
+        severity: AuditLogSeverity.INFO,
+        summary: `Created class ${created.name}`,
+        targetDisplay: created.name,
+        changesJson:
+          buildAuditDiff({
+            after: {
+              schoolYearId: created.schoolYearId,
+              gradeLevelId: created.gradeLevelId,
+              subjectOptionId: created.subjectOptionId,
+              isHomeroom: created.isHomeroom,
+              isActive: created.isActive,
+            },
+          }) ?? undefined,
+      });
+
+      return created;
     } catch (error) {
       this.rethrowDuplicateClassNameError(error);
     }
@@ -640,7 +673,7 @@ export class ClassesService {
       data.endsAt,
     );
 
-    return this.prisma.teacherClassAssignment.upsert({
+    const assignment = await this.prisma.teacherClassAssignment.upsert({
       where: {
         teacherId_classId: {
           teacherId: data.teacherId,
@@ -676,6 +709,24 @@ export class ClassesService {
         },
       },
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: assignment.class.schoolId,
+      entityType: 'TeacherClassAssignment',
+      entityId: assignment.id,
+      action: 'ASSIGN_TEACHER',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Assigned teacher ${assignment.teacher.firstName} ${assignment.teacher.lastName} to class ${assignment.class.name}`,
+      targetDisplay: assignment.class.name,
+      changesJson: {
+        assignmentType: assignment.assignmentType,
+        startsAt: assignment.startsAt,
+        endsAt: assignment.endsAt,
+      },
+    });
+
+    return assignment;
   }
 
   async removeTeacher(
@@ -702,7 +753,7 @@ export class ClassesService {
       throw new NotFoundException('Teacher assignment not found');
     }
 
-    return this.prisma.teacherClassAssignment.delete({
+    const removed = await this.prisma.teacherClassAssignment.delete({
       where: {
         id: assignment.id,
       },
@@ -723,6 +774,19 @@ export class ClassesService {
         },
       },
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: removed.class.schoolId,
+      entityType: 'TeacherClassAssignment',
+      entityId: removed.id,
+      action: 'REMOVE_TEACHER',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Removed teacher ${removed.teacher.firstName} ${removed.teacher.lastName} from class ${removed.class.name}`,
+      targetDisplay: removed.class.name,
+    });
+
+    return removed;
   }
 
   async updateTeacherAssignment(
@@ -793,7 +857,7 @@ export class ClassesService {
       endsAtInput,
     );
 
-    return this.prisma.teacherClassAssignment.update({
+    const updated = await this.prisma.teacherClassAssignment.update({
       where: {
         id: assignment.id,
       },
@@ -819,6 +883,32 @@ export class ClassesService {
         },
       },
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: updated.class.schoolId,
+      entityType: 'TeacherClassAssignment',
+      entityId: updated.id,
+      action: 'UPDATE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Updated teacher assignment for class ${updated.class.name}`,
+      targetDisplay: updated.class.name,
+      changesJson:
+        buildAuditDiff({
+          before: {
+            assignmentType: assignment.assignmentType,
+            startsAt: assignment.startsAt,
+            endsAt: assignment.endsAt,
+          },
+          after: {
+            assignmentType: updated.assignmentType,
+            startsAt: updated.startsAt,
+            endsAt: updated.endsAt,
+          },
+        }) ?? undefined,
+    });
+
+    return updated;
   }
 
   async enrollStudent(
@@ -840,7 +930,7 @@ export class ClassesService {
       );
     }
 
-    return this.prisma.studentClassEnrollment.create({
+    const enrollment = await this.prisma.studentClassEnrollment.create({
       data: {
         classId,
         studentId: data.studentId,
@@ -858,6 +948,19 @@ export class ClassesService {
         },
       },
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: enrollment.class.schoolId,
+      entityType: 'StudentClassEnrollment',
+      entityId: enrollment.id,
+      action: 'ENROLL',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Enrolled student ${enrollment.student.firstName} ${enrollment.student.lastName} in class ${enrollment.class.name}`,
+      targetDisplay: enrollment.class.name,
+    });
+
+    return enrollment;
   }
 
   async unenrollStudent(
@@ -884,7 +987,7 @@ export class ClassesService {
       throw new NotFoundException('Student enrollment not found');
     }
 
-    return this.prisma.studentClassEnrollment.delete({
+    const removed = await this.prisma.studentClassEnrollment.delete({
       where: {
         id: enrollment.id,
       },
@@ -901,6 +1004,19 @@ export class ClassesService {
         },
       },
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: removed.class.schoolId,
+      entityType: 'StudentClassEnrollment',
+      entityId: removed.id,
+      action: 'UNENROLL',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Unenrolled student ${removed.student.firstName} ${removed.student.lastName} from class ${removed.class.name}`,
+      targetDisplay: removed.class.name,
+    });
+
+    return removed;
   }
 
   async setClassActiveState(
@@ -911,16 +1027,40 @@ export class ClassesService {
     const existingClass = await this.getClassOrThrow(classId);
     ensureUserHasSchoolAccess(user, existingClass.schoolId);
 
-    return this.prisma.class.update({
+    const updated = await this.prisma.class.update({
       where: { id: classId },
       data: { isActive },
       select: this.buildClassSelect(),
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: updated.schoolId,
+      entityType: 'Class',
+      entityId: updated.id,
+      action: isActive ? 'ACTIVATE' : 'ARCHIVE',
+      severity: isActive ? AuditLogSeverity.INFO : AuditLogSeverity.WARNING,
+      summary: `${isActive ? 'Activated' : 'Archived'} class ${updated.name}`,
+      targetDisplay: updated.name,
+    });
+
+    return updated;
   }
 
   async update(user: AuthenticatedUser, classId: string, data: UpdateClassDto) {
     const existingClass = await this.getClassOrThrow(classId);
     ensureUserHasSchoolAccess(user, existingClass.schoolId);
+    const before = await this.prisma.class.findUniqueOrThrow({
+      where: { id: classId },
+      select: {
+        id: true,
+        name: true,
+        isActive: true,
+        isHomeroom: true,
+        gradeLevelId: true,
+        subjectOptionId: true,
+      },
+    });
 
     if (Object.keys(data).length === 0) {
       throw new BadRequestException('No valid fields provided for update');
@@ -973,11 +1113,35 @@ export class ClassesService {
     }
 
     try {
-      return await this.prisma.class.update({
+      const updated = await this.prisma.class.update({
         where: { id: classId },
         data: updateData,
         select: this.buildClassSelect(),
       });
+
+      await this.auditService.log({
+        actor: user,
+        schoolId: updated.schoolId,
+        entityType: 'Class',
+        entityId: updated.id,
+        action: 'UPDATE',
+        severity: AuditLogSeverity.INFO,
+        summary: `Updated class ${updated.name}`,
+        targetDisplay: updated.name,
+        changesJson:
+          buildAuditDiff({
+            before,
+            after: {
+              name: updated.name,
+              isActive: updated.isActive,
+              isHomeroom: updated.isHomeroom,
+              gradeLevelId: updated.gradeLevelId,
+              subjectOptionId: updated.subjectOptionId,
+            },
+          }) ?? undefined,
+      });
+
+      return updated;
     } catch (error) {
       this.rethrowDuplicateClassNameError(error);
     }
@@ -988,6 +1152,7 @@ export class ClassesService {
       where: { id: classId },
       select: {
         id: true,
+        name: true,
         schoolId: true,
         _count: {
           select: {
@@ -1020,6 +1185,17 @@ export class ClassesService {
         },
       });
 
+      await this.auditService.log({
+        actor: user,
+        schoolId: existingClass.schoolId,
+        entityType: 'Class',
+        entityId: existingClass.id,
+        action: 'DELETE',
+        severity: AuditLogSeverity.HIGH,
+        summary: `Deleted class ${existingClass.name}`,
+        targetDisplay: existingClass.name,
+      });
+
       return {
         success: true,
         removalMode: 'deleted' as const,
@@ -1030,6 +1206,20 @@ export class ClassesService {
       where: { id: existingClass.id },
       data: {
         isActive: false,
+      },
+    });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: existingClass.schoolId,
+      entityType: 'Class',
+      entityId: existingClass.id,
+      action: 'ARCHIVE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Archived class ${existingClass.name} because dependencies exist`,
+      targetDisplay: existingClass.name,
+      changesJson: {
+        dependencyLabels,
       },
     });
 

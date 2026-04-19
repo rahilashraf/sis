@@ -9,6 +9,7 @@ import {
   AttendanceScopeType,
   AttendanceStatusCountBehavior,
   AttendanceStatus,
+  AuditLogSeverity,
   Prisma,
   TeacherClassAssignmentType,
   UserRole,
@@ -34,6 +35,8 @@ import {
   schoolSummarySelect,
   schoolYearSummarySelect,
 } from '../common/prisma/safe-user-response';
+import { AuditService } from '../audit/audit.service';
+import { buildAuditDiff } from '../audit/audit-diff.util';
 
 type AuthUser = AuthenticatedUser;
 
@@ -228,7 +231,10 @@ const attendanceRecordSelect =
 
 @Injectable()
 export class AttendanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   private normalizeDateOnly(input: string): Date {
     return parseDateOnlyOrThrow(input, 'date');
@@ -1278,7 +1284,7 @@ export class AttendanceService {
       });
     }
 
-    return this.prisma.attendanceSession.create({
+    const created = await this.prisma.attendanceSession.create({
       data: {
         schoolId: dto.schoolId,
         schoolYearId: dto.schoolYearId ?? null,
@@ -1308,6 +1314,24 @@ export class AttendanceService {
       },
       select: attendanceSessionSelect,
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: created.schoolId,
+      entityType: 'AttendanceSession',
+      entityId: created.id,
+      action: 'CREATE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Created attendance session for ${created.date.toISOString().slice(0, 10)} with ${created.records.length} records`,
+      targetDisplay: created.scopeLabel ?? created.date.toISOString().slice(0, 10),
+      changesJson: {
+        classIds: created.classes.map((sessionClass) => sessionClass.classId),
+        recordCount: created.records.length,
+        scopeType: created.scopeType,
+      },
+    });
+
+    return created;
   }
 
   private async updateSessionWithScope(
@@ -1377,7 +1401,32 @@ export class AttendanceService {
       ],
     );
 
-    return this.getSessionById(user, sessionId);
+    const updatedSession = await this.getSessionById(user, sessionId);
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: existingSession.schoolId,
+      entityType: 'AttendanceSession',
+      entityId: sessionId,
+      action: 'UPDATE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Updated attendance session for ${existingSession.date.toISOString().slice(0, 10)} with ${normalizedRecords.length} records`,
+      targetDisplay:
+        updatedSession.scopeLabel ?? updatedSession.date.toISOString().slice(0, 10),
+      changesJson:
+        buildAuditDiff({
+          before: {
+            classIds: existingClassIds,
+            recordCount: existingSession.records.length,
+          },
+          after: {
+            classIds: updatedSession.classes.map((sessionClass) => sessionClass.classId),
+            recordCount: updatedSession.records.length,
+          },
+        }) ?? undefined,
+    });
+
+    return updatedSession;
   }
 
   async updateSession(
@@ -1628,6 +1677,20 @@ export class AttendanceService {
         },
       });
 
+      await this.auditService.log({
+        actor: user,
+        schoolId,
+        entityType: 'AttendanceStatusRule',
+        entityId: `${schoolId}:${updated.status}`,
+        action: 'UPDATE',
+        severity: AuditLogSeverity.WARNING,
+        summary: `Updated attendance status rule ${updated.status} -> ${updated.behavior}`,
+        changesJson: {
+          status: updated.status,
+          behavior: updated.behavior,
+        },
+      });
+
       return updated;
     } catch (error) {
       if (isSchemaMissingError(error)) {
@@ -1706,7 +1769,7 @@ export class AttendanceService {
     }
 
     try {
-      return await this.prisma.attendanceCustomStatus.create({
+      const created = await this.prisma.attendanceCustomStatus.create({
         data: {
           schoolId,
           label,
@@ -1723,6 +1786,19 @@ export class AttendanceService {
           updatedAt: true,
         },
       });
+
+      await this.auditService.log({
+        actor: user,
+        schoolId,
+        entityType: 'AttendanceCustomStatus',
+        entityId: created.id,
+        action: 'CREATE',
+        severity: AuditLogSeverity.WARNING,
+        summary: `Created attendance custom status ${created.label}`,
+        targetDisplay: created.label,
+      });
+
+      return created;
     } catch (error) {
       if (isSchemaMissingError(error)) {
         throw new ConflictException(
@@ -1744,6 +1820,9 @@ export class AttendanceService {
       select: {
         id: true,
         schoolId: true,
+        label: true,
+        behavior: true,
+        isActive: true,
       },
     });
 
@@ -1776,7 +1855,7 @@ export class AttendanceService {
     }
 
     try {
-      return await this.prisma.attendanceCustomStatus.update({
+      const updated = await this.prisma.attendanceCustomStatus.update({
         where: { id: customStatusId },
         data: {
           ...(nextLabel !== undefined ? { label: nextLabel } : {}),
@@ -1793,6 +1872,28 @@ export class AttendanceService {
           updatedAt: true,
         },
       });
+
+      await this.auditService.log({
+        actor: user,
+        schoolId: updated.schoolId,
+        entityType: 'AttendanceCustomStatus',
+        entityId: updated.id,
+        action: 'UPDATE',
+        severity: AuditLogSeverity.WARNING,
+        summary: `Updated attendance custom status ${updated.label}`,
+        targetDisplay: updated.label,
+        changesJson:
+          buildAuditDiff({
+            before: existing,
+            after: {
+              label: updated.label,
+              behavior: updated.behavior,
+              isActive: updated.isActive,
+            },
+          }) ?? undefined,
+      });
+
+      return updated;
     } catch (error) {
       if (isSchemaMissingError(error)) {
         throw new ConflictException(
@@ -2157,7 +2258,7 @@ export class AttendanceService {
       customStatusesById,
     );
 
-    return this.prisma.attendanceRecord.update({
+    const updated = await this.prisma.attendanceRecord.update({
       where: { id: recordId },
       data: {
         status: resolved.status,
@@ -2166,6 +2267,32 @@ export class AttendanceService {
       },
       select: attendanceRecordSelect,
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: existing.attendanceSession.schoolId,
+      entityType: 'AttendanceRecord',
+      entityId: updated.id,
+      action: 'UPDATE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Updated attendance record for student ${updated.student.firstName} ${updated.student.lastName}`,
+      targetDisplay: `${updated.student.firstName} ${updated.student.lastName}`.trim(),
+      changesJson:
+        buildAuditDiff({
+          before: {
+            status: existing.status,
+            customStatusId: existing.customStatusId,
+            remark: existing.remark,
+          },
+          after: {
+            status: updated.status,
+            customStatusId: updated.customStatusId,
+            remark: updated.remark,
+          },
+        }) ?? undefined,
+    });
+
+    return updated;
   }
 
   async deleteSession(user: AuthUser, sessionId: string) {
@@ -2185,9 +2312,26 @@ export class AttendanceService {
     );
     await this.ensureUserCanAccessClasses(user, classIds);
 
-    return this.prisma.attendanceSession.delete({
+    const deleted = await this.prisma.attendanceSession.delete({
       where: { id: sessionId },
       select: attendanceSessionSelect,
     });
+
+    await this.auditService.log({
+      actor: user,
+      schoolId: deleted.schoolId,
+      entityType: 'AttendanceSession',
+      entityId: deleted.id,
+      action: 'DELETE',
+      severity: AuditLogSeverity.HIGH,
+      summary: `Deleted attendance session for ${deleted.date.toISOString().slice(0, 10)}`,
+      targetDisplay: deleted.scopeLabel ?? deleted.date.toISOString().slice(0, 10),
+      changesJson: {
+        classIds: deleted.classes.map((sessionClass) => sessionClass.classId),
+        recordCount: deleted.records.length,
+      },
+    });
+
+    return deleted;
   }
 }
