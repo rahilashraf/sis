@@ -1,5 +1,7 @@
 import type { UserRole } from "../auth/types";
 import { apiFetch } from "./client";
+import { apiConfig } from "./config";
+import { getStoredSessionSnapshot } from "../auth/storage";
 
 export type AuditLogSeverity = "INFO" | "WARNING" | "HIGH" | "CRITICAL";
 
@@ -35,10 +37,61 @@ export type AuditSummary = {
   bySeverity: Record<string, number>;
 };
 
+// Shape the backend /audit/summary endpoint actually returns
+type RawAuditSummary = {
+  total: number;
+  severityCounts: Array<{ severity: string; _count: { _all: number } }>;
+  actionCounts: Array<{ action: string; _count: { _all: number } }>;
+  entityCounts: Array<{ entityType: string; _count: { _all: number } }>;
+};
+
+function toCountMap<T extends Record<string, unknown>>(
+  arr: T[],
+  key: keyof T,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const item of arr) {
+    const k = String(item[key]);
+    out[k] = (item._count as { _all: number })._all ?? 0;
+  }
+  return out;
+}
+
 export type AuditPurgeResult = {
   success: boolean;
   purgedCount: number;
 };
+
+/** Authenticated fetch that returns a Blob — used for file download endpoints. */
+async function apiFetchBlob(path: string): Promise<Blob> {
+  const session = getStoredSessionSnapshot();
+  const headers: Record<string, string> = {};
+
+  if (session?.accessToken) {
+    headers["Authorization"] = `Bearer ${session.accessToken}`;
+  }
+
+  const url = `${apiConfig.baseUrl}${path}`;
+  const res = await fetch(url, { headers });
+
+  if (res.status === 401) {
+    throw new Error("Unauthorized");
+  }
+
+  if (!res.ok) {
+    let message = res.statusText || "Export failed";
+    try {
+      const body = await res.json();
+      if (typeof body?.message === "string") message = body.message;
+      else if (Array.isArray(body?.message)) message = body.message.join(", ");
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message);
+  }
+
+  return res.blob();
+}
 
 export function listAuditLogs(options: {
   page?: number;
@@ -78,9 +131,15 @@ export function listAuditLogs(options: {
   }
 
   const queryStr = query.toString();
-  return apiFetch<AuditLogListResult>(
+  return apiFetch<{ rows: AuditLog[]; total: number; page: number; pageSize: number }>(
     `/audit/logs${queryStr ? `?${queryStr}` : ""}`,
-  );
+  ).then((raw) => ({
+    logs: raw.rows ?? [],
+    total: raw.total ?? 0,
+    page: raw.page ?? 1,
+    pageSize: raw.pageSize ?? 50,
+    pageCount: raw.pageSize > 0 ? Math.max(1, Math.ceil((raw.total ?? 0) / raw.pageSize)) : 1,
+  }));
 }
 
 export function getAuditSummary(options?: {
@@ -113,9 +172,14 @@ export function getAuditSummary(options?: {
   }
 
   const queryStr = query.toString();
-  return apiFetch<AuditSummary>(
+  return apiFetch<RawAuditSummary>(
     `/audit/summary${queryStr ? `?${queryStr}` : ""}`,
-  );
+  ).then((raw): AuditSummary => ({
+    total: raw.total ?? 0,
+    bySeverity: toCountMap(raw.severityCounts ?? [], "severity"),
+    byAction: toCountMap(raw.actionCounts ?? [], "action"),
+    byEntity: toCountMap(raw.entityCounts ?? [], "entityType"),
+  }));
 }
 
 export function exportAuditLogsAsPdf(options: {
@@ -148,14 +212,7 @@ export function exportAuditLogsAsPdf(options: {
   }
 
   const queryStr = query.toString();
-  return fetch(
-    `/api/audit/export/pdf${queryStr ? `?${queryStr}` : ""}`,
-  ).then((res) => {
-    if (!res.ok) {
-      throw new Error("Failed to export audit logs as PDF");
-    }
-    return res.blob();
-  });
+  return apiFetchBlob(`/audit/export/pdf${queryStr ? `?${queryStr}` : ""}`);
 }
 
 export function exportAuditLogsAsCsv(options: {
@@ -188,14 +245,7 @@ export function exportAuditLogsAsCsv(options: {
   }
 
   const queryStr = query.toString();
-  return fetch(
-    `/api/audit/export/csv${queryStr ? `?${queryStr}` : ""}`,
-  ).then((res) => {
-    if (!res.ok) {
-      throw new Error("Failed to export audit logs as CSV");
-    }
-    return res.blob();
-  });
+  return apiFetchBlob(`/audit/export/csv${queryStr ? `?${queryStr}` : ""}`);
 }
 
 export function purgeAuditLogs(options: {

@@ -102,8 +102,9 @@ export function AuditManagement() {
     pageSize: 50,
   });
 
+  const emptySummary: AuditSummary = { total: 0, bySeverity: {}, byAction: {}, byEntity: {} };
   const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [summary, setSummary] = useState<AuditSummary | null>(null);
+  const [summary, setSummary] = useState<AuditSummary>(emptySummary);
   const [total, setTotal] = useState(0);
   const [pageCount, setPageCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -153,9 +154,9 @@ export function AuditManagement() {
         }),
       ]);
 
-      setLogs(logsResult.logs);
-      setTotal(logsResult.total);
-      setPageCount(logsResult.pageCount);
+      setLogs(logsResult.logs ?? []);
+      setTotal(logsResult.total ?? 0);
+      setPageCount(logsResult.pageCount ?? 1);
       setSummary(summaryResult);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load audit logs");
@@ -261,51 +262,49 @@ export function AuditManagement() {
       )}
 
       {/* Summary Cards */}
-      {summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Total Logs</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{summary.total}</div>
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Total Logs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{summary.total ?? 0}</div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Critical</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {summary.bySeverity["CRITICAL"] ?? 0}
-              </div>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Critical</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {summary.bySeverity?.["CRITICAL"] ?? 0}
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">High</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {summary.bySeverity["HIGH"] ?? 0}
-              </div>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">High</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {summary.bySeverity?.["HIGH"] ?? 0}
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Warning</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {summary.bySeverity["WARNING"] ?? 0}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Warning</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {summary.bySeverity?.["WARNING"] ?? 0}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Filters */}
       <Card>

@@ -50,6 +50,10 @@ export function getNavigationItems(role: UserRole) {
       },
     );
 
+    if (role === "OWNER") {
+      items.push({ href: "/admin/audit", label: "Audit Logs" });
+    }
+
     return items;
   }
 
