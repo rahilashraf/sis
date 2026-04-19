@@ -32,6 +32,7 @@ export function getNavigationItems(role: UserRole) {
       { href: "/admin/users", label: "Users" },
       { href: "/admin/classes", label: "Classes" },
       { href: "/admin/gradebook", label: "Gradebook" },
+      { href: "/admin/behavior", label: "Incident Reports" },
       { href: "/admin/forms", label: "Forms" },
       { href: "/admin/re-registration", label: "Re-registration" },
       { href: "/admin/schools", label: "Schools" },
@@ -42,6 +43,7 @@ export function getNavigationItems(role: UserRole) {
         href: "/admin/enrollment-subject-options",
         label: "Enrollment Subjects",
       },
+      { href: "/admin/behavior-categories", label: "Incident Categories" },
       {
         href: "/admin/assessment-result-status-labels",
         label: "Assessment Statuses",
@@ -57,6 +59,7 @@ export function getNavigationItems(role: UserRole) {
       { href: "/admin/users", label: "Users" },
       { href: "/admin/classes", label: "Classes" },
       { href: "/admin/gradebook", label: "Gradebook" },
+      { href: "/admin/behavior", label: "Incident Reports" },
       { href: "/admin/forms", label: "Forms" },
       { href: "/admin/re-registration", label: "Re-registration" },
       { href: "/admin/schools", label: "Schools" },
@@ -70,6 +73,7 @@ export function getNavigationItems(role: UserRole) {
       { href: "/admin/attendance", label: "Attendance" },
       { href: "/admin/classes", label: "Classes" },
       { href: "/admin/gradebook", label: "Gradebook" },
+      { href: "/admin/behavior", label: "Incident Reports" },
       { href: "/admin/forms", label: "Forms" },
     );
 
@@ -81,6 +85,7 @@ export function getNavigationItems(role: UserRole) {
       { href: "/teacher/attendance", label: "Attendance" },
       { href: "/teacher/classes", label: "Classes" },
       { href: "/teacher/gradebook", label: "Gradebook" },
+      { href: "/teacher/behavior", label: "Incident Reports" },
     );
 
     return items;

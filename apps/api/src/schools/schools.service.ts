@@ -5,12 +5,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../common/auth/auth-user';
 import {
   ensureUserHasSchoolAccess,
   getAccessibleSchoolIds,
+  isHighPrivilegeRole,
   isBypassRole,
 } from '../common/access/school-access.util';
 import { UpdateSchoolDto } from './dto/update-school.dto';
@@ -57,29 +57,16 @@ export class SchoolsService {
   }
 
   async create(user: AuthenticatedUser, data: CreateSchoolDto) {
-    if (!isBypassRole(user.role)) {
+    if (!isHighPrivilegeRole(user.role)) {
       throw new ForbiddenException(
-        'Only owner, super admin, and admin roles can create schools',
+        'Only owner and super admin roles can create schools',
       );
     }
-
-    const membershipData =
-      user.role === UserRole.ADMIN
-        ? {
-            memberships: {
-              create: {
-                userId: user.id,
-                isActive: true,
-              },
-            },
-          }
-        : {};
 
     return this.prisma.school.create({
       data: {
         name: data.name,
         shortName: data.shortName,
-        ...membershipData,
       },
     });
   }

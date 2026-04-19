@@ -13,6 +13,7 @@ import {
   isBypassRole,
   isSchoolAdminRole,
 } from '../common/access/school-access.util';
+import { parseDateOnlyOrThrow } from '../common/dates/date-only.util';
 import {
   safeUserSchoolMembershipSelect,
   safeUserSelect,
@@ -161,15 +162,7 @@ export class StudentsService {
   }
 
   private normalizeDateOnly(input: string): Date {
-    const raw = new Date(input);
-
-    if (Number.isNaN(raw.getTime())) {
-      throw new BadRequestException('Invalid dateOfBirth');
-    }
-
-    return new Date(
-      Date.UTC(raw.getUTCFullYear(), raw.getUTCMonth(), raw.getUTCDate()),
-    );
+    return parseDateOnlyOrThrow(input, 'dateOfBirth');
   }
 
   private async getStudentOrThrow(studentId: string) {

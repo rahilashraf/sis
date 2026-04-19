@@ -15,6 +15,12 @@ describe('ClassesService', () => {
     schoolYear: {
       findUnique: jest.Mock;
     };
+    gradeLevel: {
+      findUnique: jest.Mock;
+    };
+    enrollmentSubjectOption: {
+      findUnique: jest.Mock;
+    };
     user: {
       findUnique: jest.Mock;
     };
@@ -33,6 +39,12 @@ describe('ClassesService', () => {
         delete: jest.fn(),
       },
       schoolYear: {
+        findUnique: jest.fn(),
+      },
+      gradeLevel: {
+        findUnique: jest.fn(),
+      },
+      enrollmentSubjectOption: {
         findUnique: jest.fn(),
       },
       user: {
@@ -102,12 +114,29 @@ describe('ClassesService', () => {
       id: 'year-1',
       schoolId: 'school-1',
     });
+    prisma.gradeLevel.findUnique.mockResolvedValue({
+      id: 'grade-1',
+      schoolId: 'school-1',
+      name: 'Grade 2',
+      isActive: true,
+    });
+    prisma.enrollmentSubjectOption.findUnique.mockResolvedValue({
+      id: 'subject-1',
+      name: 'Math',
+      isActive: true,
+    });
     prisma.class.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('duplicate', {
         code: 'P2002',
         clientVersion: 'test',
         meta: {
-          target: ['schoolId', 'schoolYearId', 'name'],
+          target: [
+            'schoolId',
+            'schoolYearId',
+            'name',
+            'gradeLevelId',
+            'subjectOptionId',
+          ],
         },
       }),
     );
@@ -122,12 +151,14 @@ describe('ClassesService', () => {
         {
           schoolId: 'school-1',
           schoolYearId: 'year-1',
+          gradeLevelId: 'grade-1',
+          subjectOptionId: 'subject-1',
           name: 'Math 101',
         },
       ),
     ).rejects.toEqual(
       new ConflictException(
-        'A class with this name already exists for this school year',
+        'A class with this name, grade level, and subject already exists for this school year',
       ),
     );
   });
@@ -137,13 +168,21 @@ describe('ClassesService', () => {
       id: 'class-1',
       schoolId: 'school-1',
       schoolYearId: 'year-1',
+      gradeLevelId: 'grade-1',
+      subjectOptionId: 'subject-1',
     });
     prisma.class.update.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('duplicate', {
         code: 'P2002',
         clientVersion: 'test',
         meta: {
-          target: ['schoolId', 'schoolYearId', 'name'],
+          target: [
+            'schoolId',
+            'schoolYearId',
+            'name',
+            'gradeLevelId',
+            'subjectOptionId',
+          ],
         },
       }),
     );
@@ -162,7 +201,7 @@ describe('ClassesService', () => {
       ),
     ).rejects.toEqual(
       new ConflictException(
-        'A class with this name already exists for this school year',
+        'A class with this name, grade level, and subject already exists for this school year',
       ),
     );
   });

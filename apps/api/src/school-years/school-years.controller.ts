@@ -25,7 +25,7 @@ export class SchoolYearsController {
   constructor(private readonly schoolYearsService: SchoolYearsService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Post()
   create(@Req() req: AuthenticatedRequest, @Body() body: CreateSchoolYearDto) {
     return this.schoolYearsService.create(req.user, body);
@@ -45,7 +45,7 @@ export class SchoolYearsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Patch(':id')
   update(
     @Req() req: AuthenticatedRequest,
@@ -56,7 +56,7 @@ export class SchoolYearsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Patch(':id/activate')
   activate(
     @Req() req: AuthenticatedRequest,
@@ -66,7 +66,7 @@ export class SchoolYearsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Patch(':id/archive')
   archive(
     @Req() req: AuthenticatedRequest,
@@ -76,7 +76,7 @@ export class SchoolYearsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Patch(':id/deactivate')
   deactivate(
     @Req() req: AuthenticatedRequest,
@@ -86,7 +86,7 @@ export class SchoolYearsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Delete(':id')
   async remove(
     @Req() req: AuthenticatedRequest,

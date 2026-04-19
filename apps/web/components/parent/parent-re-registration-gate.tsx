@@ -14,11 +14,19 @@ import { getStudentById, type StudentProfile } from "@/lib/api/students";
 import { listSchoolYears, type SchoolYear } from "@/lib/api/schools";
 import { getReRegistrationWindowStatus, type ReRegistrationWindowStatus } from "@/lib/api/re-registration";
 import { ParentReRegistrationForm } from "@/components/parent/re-registration-form";
+import { parseDateOnly } from "@/lib/date";
 
 function pickDefaultSchoolYear(years: SchoolYear[], now = new Date()) {
   const upcoming = years
-    .filter((year) => new Date(year.startDate) > now)
-    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0];
+    .filter((year) => {
+      const startDate = parseDateOnly(year.startDate);
+      return startDate ? startDate > now : false;
+    })
+    .sort((a, b) => {
+      const startA = parseDateOnly(a.startDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const startB = parseDateOnly(b.startDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      return startA - startB;
+    })[0];
 
   return upcoming ?? years.find((year) => year.isActive) ?? years[0] ?? null;
 }
@@ -180,4 +188,3 @@ export function ParentReRegistrationGate({ studentId }: { studentId: string }) {
     </div>
   );
 }
-

@@ -35,10 +35,11 @@ import {
   type School,
   type SchoolYear,
 } from "@/lib/api/schools";
-import { formatDateLabel, getLocalDateInputValue } from "@/lib/utils";
+import { normalizeDateOnlyPayload, parseDateOnly } from "@/lib/date";
+import { formatDateLabel } from "@/lib/utils";
 
-const adminManageRoles = new Set(["OWNER", "SUPER_ADMIN", "ADMIN"]);
-const schoolCreateRoles = new Set(["OWNER", "SUPER_ADMIN", "ADMIN"]);
+const schoolViewRoles = new Set(["OWNER", "SUPER_ADMIN", "ADMIN"]);
+const schoolManageRoles = new Set(["OWNER", "SUPER_ADMIN"]);
 
 type CreateSchoolFormState = {
   name: string;
@@ -87,17 +88,7 @@ function buildCreateSchoolForm(): CreateSchoolFormState {
 }
 
 function toDateInputValue(value: string) {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value;
-  }
-
-  const parsed = new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return "";
-  }
-
-  return getLocalDateInputValue(parsed);
+  return normalizeDateOnlyPayload(value);
 }
 
 function buildSchoolYearForm(schoolYear: SchoolYear): EditSchoolYearFormState {
@@ -118,22 +109,7 @@ function buildCreateSchoolYearForm(schoolId: string): CreateSchoolYearFormState 
 }
 
 function parseDateInputValue(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return null;
-  }
-
-  const [year, month, day] = value.split("-").map(Number);
-  const parsed = new Date(year, month - 1, day, 12);
-
-  if (
-    parsed.getFullYear() !== year ||
-    parsed.getMonth() !== month - 1 ||
-    parsed.getDate() !== day
-  ) {
-    return null;
-  }
-
-  return parsed;
+  return parseDateOnly(value);
 }
 
 function validateSchoolName(name: string) {
@@ -293,12 +269,13 @@ export function SchoolsManagement() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const canViewSchools = session?.user.role
+    ? schoolViewRoles.has(session.user.role)
+    : false;
   const canManageSchools = session?.user.role
-    ? adminManageRoles.has(session.user.role)
+    ? schoolManageRoles.has(session.user.role)
     : false;
-  const canCreateSchools = session?.user.role
-    ? schoolCreateRoles.has(session.user.role)
-    : false;
+  const canCreateSchools = canManageSchools;
   const selectedSchool = schools.find((school) => school.id === selectedSchoolId) ?? null;
 
   const activeSchoolsCount = useMemo(
@@ -668,15 +645,15 @@ export function SchoolsManagement() {
     }
   }
 
-  if (!canManageSchools) {
+  if (!canViewSchools) {
     return (
       <div className="space-y-6">
         <PageHeader
           title="Schools"
-          description="School management is reserved for owner, super admin, and admin roles."
+          description="School access is limited to owner, super admin, and admin roles."
         />
         <EmptyState
-          description="Your current role can work within assigned schools, but it cannot manage school records or school years."
+          description="Your current role can work within assigned schools, but it cannot access school records in this area."
           title="School management is not available"
         />
       </div>
@@ -700,9 +677,15 @@ export function SchoolsManagement() {
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {successMessage ? <Notice tone="success">{successMessage}</Notice> : null}
+      {!canManageSchools ? (
+        <Notice tone="info">
+          Your role is read-only on this page. Contact an owner or super admin to make
+          school, school year, or grade-level changes.
+        </Notice>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-2">
-        {editingSchool && schoolForm ? (
+        {canManageSchools && editingSchool && schoolForm ? (
           <Card>
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -784,7 +767,7 @@ export function SchoolsManagement() {
           </Card>
         )}
 
-        {editingSchoolYear && schoolYearForm ? (
+        {canManageSchools && editingSchoolYear && schoolYearForm ? (
           <Card>
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -1003,52 +986,56 @@ export function SchoolsManagement() {
                         </Badge>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            disabled={isSavingSchool || isRunningAction}
-                            onClick={() => handleStartEditSchool(school)}
-                            type="button"
-                            variant="secondary"
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            disabled={isSavingSchool || isRunningAction}
-                            onClick={() => {
-                              setActionTarget({
-                                id: school.id,
-                                kind: "school",
-                                action: school.isActive ? "archive" : "activate",
-                                label: school.name,
-                              });
-                              setActionError(null);
-                              setError(null);
-                              setSuccessMessage(null);
-                            }}
-                            type="button"
-                            variant={school.isActive ? "danger" : "primary"}
-                          >
-                            {school.isActive ? "Archive" : "Unarchive"}
-                          </Button>
-                          <Button
-                            disabled={isSavingSchool || isRunningAction}
-                            onClick={() => {
-                              setActionTarget({
-                                id: school.id,
-                                kind: "school",
-                                action: "delete",
-                                label: school.name,
-                              });
-                              setActionError(null);
-                              setError(null);
-                              setSuccessMessage(null);
-                            }}
-                            type="button"
-                            variant="danger"
-                          >
-                            Remove
-                          </Button>
-                        </div>
+                        {canManageSchools ? (
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              disabled={isSavingSchool || isRunningAction}
+                              onClick={() => handleStartEditSchool(school)}
+                              type="button"
+                              variant="secondary"
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              disabled={isSavingSchool || isRunningAction}
+                              onClick={() => {
+                                setActionTarget({
+                                  id: school.id,
+                                  kind: "school",
+                                  action: school.isActive ? "archive" : "activate",
+                                  label: school.name,
+                                });
+                                setActionError(null);
+                                setError(null);
+                                setSuccessMessage(null);
+                              }}
+                              type="button"
+                              variant={school.isActive ? "danger" : "primary"}
+                            >
+                              {school.isActive ? "Archive" : "Unarchive"}
+                            </Button>
+                            <Button
+                              disabled={isSavingSchool || isRunningAction}
+                              onClick={() => {
+                                setActionTarget({
+                                  id: school.id,
+                                  kind: "school",
+                                  action: "delete",
+                                  label: school.name,
+                                });
+                                setActionError(null);
+                                setError(null);
+                                setSuccessMessage(null);
+                              }}
+                              type="button"
+                              variant="danger"
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-500">Read-only</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1083,19 +1070,21 @@ export function SchoolsManagement() {
             <Badge variant="neutral">
               {isLoadingYears ? "Loading school years..." : `${schoolYears.length} records`}
             </Badge>
-            <Button
-              disabled={!selectedSchoolId}
-              onClick={() => {
-                setIsCreateSchoolYearOpen((current) => !current);
-                setCreateSchoolYearForm(buildCreateSchoolYearForm(selectedSchoolId));
-                setError(null);
-                setSuccessMessage(null);
-              }}
-              type="button"
-              variant={isCreateSchoolYearOpen ? "secondary" : "primary"}
-            >
-              {isCreateSchoolYearOpen ? "Close" : "Create School Year"}
-            </Button>
+            {canManageSchools ? (
+              <Button
+                disabled={!selectedSchoolId}
+                onClick={() => {
+                  setIsCreateSchoolYearOpen((current) => !current);
+                  setCreateSchoolYearForm(buildCreateSchoolYearForm(selectedSchoolId));
+                  setError(null);
+                  setSuccessMessage(null);
+                }}
+                type="button"
+                variant={isCreateSchoolYearOpen ? "secondary" : "primary"}
+              >
+                {isCreateSchoolYearOpen ? "Close" : "Create School Year"}
+              </Button>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent>
@@ -1195,52 +1184,56 @@ export function SchoolsManagement() {
                           </Badge>
                         </td>
                         <td className="px-4 py-4">
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              disabled={isSavingSchoolYear || isRunningAction}
-                              onClick={() => handleStartEditSchoolYear(schoolYear)}
-                              type="button"
-                              variant="secondary"
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              disabled={isSavingSchoolYear || isRunningAction}
-                              onClick={() => {
-                                setActionTarget({
-                                  id: schoolYear.id,
-                                  kind: "schoolYear",
-                                  action: schoolYear.isActive ? "archive" : "activate",
-                                  label: schoolYear.name,
-                                });
-                                setActionError(null);
-                                setError(null);
-                                setSuccessMessage(null);
-                              }}
-                              type="button"
-                              variant={schoolYear.isActive ? "danger" : "primary"}
-                            >
-                              {schoolYear.isActive ? "Archive" : "Unarchive"}
-                            </Button>
-                            <Button
-                              disabled={isSavingSchoolYear || isRunningAction}
-                              onClick={() => {
-                                setActionTarget({
-                                  id: schoolYear.id,
-                                  kind: "schoolYear",
-                                  action: "delete",
-                                  label: schoolYear.name,
-                                });
-                                setActionError(null);
-                                setError(null);
-                                setSuccessMessage(null);
-                              }}
-                              type="button"
-                              variant="danger"
-                            >
-                              Remove
-                            </Button>
-                          </div>
+                          {canManageSchools ? (
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                disabled={isSavingSchoolYear || isRunningAction}
+                                onClick={() => handleStartEditSchoolYear(schoolYear)}
+                                type="button"
+                                variant="secondary"
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                disabled={isSavingSchoolYear || isRunningAction}
+                                onClick={() => {
+                                  setActionTarget({
+                                    id: schoolYear.id,
+                                    kind: "schoolYear",
+                                    action: schoolYear.isActive ? "archive" : "activate",
+                                    label: schoolYear.name,
+                                  });
+                                  setActionError(null);
+                                  setError(null);
+                                  setSuccessMessage(null);
+                                }}
+                                type="button"
+                                variant={schoolYear.isActive ? "danger" : "primary"}
+                              >
+                                {schoolYear.isActive ? "Archive" : "Unarchive"}
+                              </Button>
+                              <Button
+                                disabled={isSavingSchoolYear || isRunningAction}
+                                onClick={() => {
+                                  setActionTarget({
+                                    id: schoolYear.id,
+                                    kind: "schoolYear",
+                                    action: "delete",
+                                    label: schoolYear.name,
+                                  });
+                                  setActionError(null);
+                                  setError(null);
+                                  setSuccessMessage(null);
+                                }}
+                                type="button"
+                                variant="danger"
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-500">Read-only</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -1270,6 +1263,7 @@ export function SchoolsManagement() {
       </Card>
 
       <GradeLevelsManagement
+        canManage={canManageSchools}
         selectedSchoolId={selectedSchoolId}
         selectedSchoolName={selectedSchool?.name ?? null}
       />

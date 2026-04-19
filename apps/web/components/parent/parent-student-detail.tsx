@@ -12,10 +12,11 @@ import { StudentProfileOverview } from "@/components/students/student-profile-ov
 import { getStudentById, type StudentProfile } from "@/lib/api/students";
 import { getAttendanceStudentSummary, type AttendanceStudentSummary } from "@/lib/api/attendance";
 import { listStudentDocuments, type StudentDocument } from "@/lib/api/student-documents";
+import { dateOnlyFromDate } from "@/lib/date";
 import { formatDateLabel } from "@/lib/utils";
 
 function toISODate(value: Date) {
-  return value.toISOString().slice(0, 10);
+  return dateOnlyFromDate(value);
 }
 
 export function ParentStudentDetail({ studentId }: { studentId: string }) {

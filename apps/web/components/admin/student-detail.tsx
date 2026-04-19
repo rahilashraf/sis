@@ -38,6 +38,8 @@ import { listUsers, type ManagedUser } from "@/lib/api/users";
 import { StudentProfileOverview } from "@/components/students/student-profile-overview";
 import { StudentDocumentsPanel } from "@/components/admin/student-documents-panel";
 import { EnrollmentHistoryPanel } from "@/components/admin/enrollment-history-panel";
+import { BehaviorRecordsPanel } from "@/components/admin/behavior-records-panel";
+import { normalizeDateOnlyPayload } from "@/lib/date";
 import { formatDateTimeLabel, getDisplayText } from "@/lib/utils";
 
 type StudentProfileFormState = {
@@ -73,7 +75,7 @@ type StudentProfileFormState = {
 };
 
 function toDateInputValue(value: string | null) {
-  return value ? value.slice(0, 10) : "";
+  return normalizeDateOnlyPayload(value);
 }
 
 function buildEditForm(student: StudentProfile): StudentProfileFormState {
@@ -310,6 +312,13 @@ export function StudentDetail({ studentId }: { studentId: string }) {
     session?.user.role === "OWNER" ||
     session?.user.role === "SUPER_ADMIN" ||
     session?.user.role === "ADMIN";
+  const canViewBehavior =
+    session?.user.role === "OWNER" ||
+    session?.user.role === "SUPER_ADMIN" ||
+    session?.user.role === "ADMIN" ||
+    session?.user.role === "STAFF" ||
+    session?.user.role === "TEACHER" ||
+    session?.user.role === "SUPPLY_TEACHER";
   const canManageDocuments =
     session?.user.role === "OWNER" ||
     session?.user.role === "SUPER_ADMIN" ||
@@ -690,6 +699,11 @@ export function StudentDetail({ studentId }: { studentId: string }) {
 
           <EnrollmentHistoryPanel
             canManage={canManageStudent}
+            studentId={student.id}
+          />
+
+          <BehaviorRecordsPanel
+            canView={canViewBehavior}
             studentId={student.id}
           />
 

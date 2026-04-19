@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { normalizeDateOnlyPayload } from "@/lib/date";
 import {
   createEnrollmentHistory,
   getEnrollmentHistory,
@@ -48,7 +49,7 @@ const statusOptions: Array<{ value: EnrollmentHistoryStatus; label: string }> = 
 ];
 
 function toDateInputValue(value: string | null) {
-  return value ? value.slice(0, 10) : "";
+  return normalizeDateOnlyPayload(value);
 }
 
 function buildFormState(history: EnrollmentHistoryRecord | null): EnrollmentHistoryFormState {

@@ -12,6 +12,7 @@ import {
   isBypassRole,
   isHighPrivilegeRole,
 } from '../common/access/school-access.util';
+import { parseDateOnlyOrThrow } from '../common/dates/date-only.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportingPeriodDto } from './dto/create-reporting-period.dto';
 import { QueryReportingPeriodsDto } from './dto/query-reporting-periods.dto';
@@ -58,13 +59,7 @@ export class ReportingPeriodsService {
   }
 
   private parseDate(value: string, fieldName: 'startsAt' | 'endsAt') {
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-      throw new BadRequestException(`${fieldName} must be a valid date`);
-    }
-
-    return date;
+    return parseDateOnlyOrThrow(value, fieldName);
   }
 
   private async ensureSchoolAndYearAreValid(

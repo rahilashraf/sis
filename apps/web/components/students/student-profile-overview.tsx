@@ -10,8 +10,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { StudentProfile } from "@/lib/api/students";
+import { formatDateOnly } from "@/lib/date";
 import {
-  formatDateLabel,
   formatDateTimeLabel,
   formatRoleLabel,
   getDisplayText,
@@ -84,7 +84,7 @@ export function StudentProfileOverview({
               Date of birth
             </p>
             <p className="mt-2 text-sm font-medium text-slate-900">
-              {formatDateLabel(student.dateOfBirth)}
+              {formatDateOnly(student.dateOfBirth)}
             </p>
           </CardContent>
         </Card>

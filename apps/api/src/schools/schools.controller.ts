@@ -36,14 +36,14 @@ export class SchoolsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Post()
   create(@Req() req: AuthenticatedRequest, @Body() body: CreateSchoolDto) {
     return this.schoolsService.create(req.user, body);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Patch(':id')
   update(
     @Req() req: AuthenticatedRequest,
@@ -54,7 +54,7 @@ export class SchoolsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Patch(':id/archive')
   archive(
     @Req() req: AuthenticatedRequest,
@@ -64,7 +64,7 @@ export class SchoolsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Patch(':id/activate')
   activate(
     @Req() req: AuthenticatedRequest,
@@ -74,7 +74,7 @@ export class SchoolsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Delete(':id')
   async remove(
     @Req() req: AuthenticatedRequest,

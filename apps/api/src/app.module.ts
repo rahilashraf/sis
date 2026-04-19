@@ -21,6 +21,7 @@ import { ReRegistrationModule } from './re-registration/re-registration.module';
 import { StudentDocumentsModule } from './student-documents/student-documents.module';
 import { FormsModule } from './forms/forms.module';
 import { EnrollmentHistoryModule } from './enrollment-history/enrollment-history.module';
+import { BehaviorModule } from './behavior/behavior.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { EnrollmentHistoryModule } from './enrollment-history/enrollment-history
     StudentDocumentsModule,
     FormsModule,
     EnrollmentHistoryModule,
+    BehaviorModule,
   ],
   controllers: [AppController],
   providers: [AppService],

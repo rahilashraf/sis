@@ -12,6 +12,7 @@ import { CreateSchoolYearDto } from './dto/create-school-year.dto';
 import { AuthenticatedUser } from '../common/auth/auth-user';
 import { ensureUserHasSchoolAccess } from '../common/access/school-access.util';
 import { UpdateSchoolYearDto } from './dto/update-school-year.dto';
+import { parseDateOnlyOrThrow } from '../common/dates/date-only.util';
 
 @Injectable()
 export class SchoolYearsService {
@@ -63,8 +64,8 @@ export class SchoolYearsService {
       throw new NotFoundException('School not found');
     }
 
-    const startDate = new Date(data.startDate);
-    const endDate = new Date(data.endDate);
+    const startDate = parseDateOnlyOrThrow(data.startDate, 'startDate');
+    const endDate = parseDateOnlyOrThrow(data.endDate, 'endDate');
 
     this.ensureValidDateRange(startDate, endDate);
 
@@ -115,9 +116,11 @@ export class SchoolYearsService {
     ensureUserHasSchoolAccess(user, existing.schoolId);
 
     const nextStartDate = data.startDate
-      ? new Date(data.startDate)
+      ? parseDateOnlyOrThrow(data.startDate, 'startDate')
       : existing.startDate;
-    const nextEndDate = data.endDate ? new Date(data.endDate) : existing.endDate;
+    const nextEndDate = data.endDate
+      ? parseDateOnlyOrThrow(data.endDate, 'endDate')
+      : existing.endDate;
 
     this.ensureValidDateRange(nextStartDate, nextEndDate);
 

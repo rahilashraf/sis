@@ -113,7 +113,7 @@ describe('SchoolYearsController (HTTP)', () => {
     await app.close();
   });
 
-  it('creates a school year for admin-like roles', async () => {
+  it('creates a school year for owner/super admin roles', async () => {
     prisma.school.findUnique.mockResolvedValue({ id: 'school-1' });
     prisma.schoolYear.create.mockResolvedValue({
       id: 'year-1',
@@ -125,8 +125,8 @@ describe('SchoolYearsController (HTTP)', () => {
 
     await request(app.getHttpServer())
       .post('/school-years')
-      .set('x-test-user-id', 'staff-1')
-      .set('x-test-role', UserRole.STAFF)
+      .set('x-test-user-id', 'owner-1')
+      .set('x-test-role', UserRole.OWNER)
       .send({
         schoolId: 'school-1',
         name: '2025-2026',
@@ -154,11 +154,11 @@ describe('SchoolYearsController (HTTP)', () => {
     );
   });
 
-  it('returns 403 when a non-admin role creates a school year', async () => {
+  it('returns 403 when admin creates a school year', async () => {
     await request(app.getHttpServer())
       .post('/school-years')
-      .set('x-test-user-id', 'teacher-1')
-      .set('x-test-role', UserRole.TEACHER)
+      .set('x-test-user-id', 'admin-1')
+      .set('x-test-role', UserRole.ADMIN)
       .send({
         schoolId: 'school-1',
         name: '2025-2026',
@@ -259,8 +259,8 @@ describe('SchoolYearsController (HTTP)', () => {
 
     await request(app.getHttpServer())
       .patch('/school-years/year-2/activate')
-      .set('x-test-user-id', 'admin-1')
-      .set('x-test-role', UserRole.ADMIN)
+      .set('x-test-user-id', 'owner-1')
+      .set('x-test-role', UserRole.OWNER)
       .expect(200)
       .expect({
         id: 'year-2',
@@ -291,17 +291,17 @@ describe('SchoolYearsController (HTTP)', () => {
     });
   });
 
-  it('returns 403 when a non-admin role activates a school year', async () => {
+  it('returns 403 when admin activates a school year', async () => {
     await request(app.getHttpServer())
       .patch('/school-years/year-1/activate')
-      .set('x-test-user-id', 'teacher-1')
-      .set('x-test-role', UserRole.TEACHER)
+      .set('x-test-user-id', 'admin-1')
+      .set('x-test-role', UserRole.ADMIN)
       .expect(403);
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('archives a school year for admin-like roles', async () => {
+  it('archives a school year for owner/super admin roles', async () => {
     prisma.schoolYear.findUnique.mockResolvedValue({
       id: 'year-1',
       schoolId: 'school-1',
@@ -316,8 +316,8 @@ describe('SchoolYearsController (HTTP)', () => {
 
     await request(app.getHttpServer())
       .patch('/school-years/year-1/archive')
-      .set('x-test-user-id', 'staff-1')
-      .set('x-test-role', UserRole.STAFF)
+      .set('x-test-user-id', 'owner-1')
+      .set('x-test-role', UserRole.OWNER)
       .expect(200)
       .expect({
         id: 'year-1',
@@ -343,8 +343,8 @@ describe('SchoolYearsController (HTTP)', () => {
 
     await request(app.getHttpServer())
       .patch('/school-years/year-1/deactivate')
-      .set('x-test-user-id', 'admin-1')
-      .set('x-test-role', UserRole.ADMIN)
+      .set('x-test-user-id', 'super-admin-1')
+      .set('x-test-role', UserRole.SUPER_ADMIN)
       .expect(200)
       .expect({
         id: 'year-1',
@@ -360,8 +360,8 @@ describe('SchoolYearsController (HTTP)', () => {
 
     await request(app.getHttpServer())
       .post('/school-years')
-      .set('x-test-user-id', 'admin-1')
-      .set('x-test-role', UserRole.ADMIN)
+      .set('x-test-user-id', 'owner-1')
+      .set('x-test-role', UserRole.OWNER)
       .send({
         schoolId: 'school-1',
         name: '2025-2026',
@@ -373,7 +373,7 @@ describe('SchoolYearsController (HTTP)', () => {
     expect(prisma.schoolYear.create).not.toHaveBeenCalled();
   });
 
-  it('deletes an empty school year for admin-level access', async () => {
+  it('deletes an empty school year for owner/super admin access', async () => {
     prisma.schoolYear.findUnique.mockResolvedValue({
       id: 'year-1',
       schoolId: 'school-1',

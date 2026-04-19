@@ -31,7 +31,7 @@ export class ClassesService {
   constructor(private readonly prisma: PrismaService) {}
 
   private readonly duplicateClassNameMessage =
-    'A class with this name already exists for this school year';
+    'A class with this name, grade level, and subject already exists for this school year';
 
   private isAdminLike(role: UserRole) {
     return isBypassRole(role) || isSchoolAdminRole(role);
@@ -83,7 +83,9 @@ export class ClassesService {
     return (
       target.includes('schoolId') &&
       target.includes('schoolYearId') &&
-      target.includes('name')
+      target.includes('name') &&
+      target.includes('gradeLevelId') &&
+      target.includes('subjectOptionId')
     );
   }
 
@@ -100,6 +102,8 @@ export class ClassesService {
       id: true,
       schoolId: true,
       schoolYearId: true,
+      gradeLevelId: true,
+      subjectOptionId: true,
       name: true,
       subject: true,
       isHomeroom: true,
@@ -111,6 +115,19 @@ export class ClassesService {
       },
       schoolYear: {
         select: schoolYearSummarySelect,
+      },
+      gradeLevel: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      subjectOption: {
+        select: {
+          id: true,
+          name: true,
+          isActive: true,
+        },
       },
       teachers: {
         select: this.buildTeacherAssignmentSelect(),
@@ -137,6 +154,8 @@ export class ClassesService {
         id: true,
         schoolId: true,
         schoolYearId: true,
+        gradeLevelId: true,
+        subjectOptionId: true,
       },
     });
 
@@ -145,6 +164,56 @@ export class ClassesService {
     }
 
     return existingClass;
+  }
+
+  private async getGradeLevelOrThrow(
+    gradeLevelId: string,
+    schoolId: string,
+    includeInactive = false,
+  ) {
+    const gradeLevel = await this.prisma.gradeLevel.findUnique({
+      where: { id: gradeLevelId },
+      select: {
+        id: true,
+        schoolId: true,
+        name: true,
+        isActive: true,
+      },
+    });
+
+    if (!gradeLevel || gradeLevel.schoolId !== schoolId) {
+      throw new BadRequestException('gradeLevelId does not belong to schoolId');
+    }
+
+    if (!includeInactive && !gradeLevel.isActive) {
+      throw new BadRequestException('gradeLevelId must reference an active grade level');
+    }
+
+    return gradeLevel;
+  }
+
+  private async getSubjectOptionOrThrow(
+    subjectOptionId: string,
+    includeInactive = false,
+  ) {
+    const subjectOption = await this.prisma.enrollmentSubjectOption.findUnique({
+      where: { id: subjectOptionId },
+      select: {
+        id: true,
+        name: true,
+        isActive: true,
+      },
+    });
+
+    if (!subjectOption) {
+      throw new BadRequestException('subjectOptionId is invalid');
+    }
+
+    if (!includeInactive && !subjectOption.isActive) {
+      throw new BadRequestException('subjectOptionId must reference an active subject option');
+    }
+
+    return subjectOption;
   }
 
   private async getUserSchoolIdsOrThrow(
@@ -395,13 +464,25 @@ export class ClassesService {
       throw new BadRequestException('schoolYearId does not belong to schoolId');
     }
 
+    const className = data.name.trim();
+    if (!className) {
+      throw new BadRequestException('name is required');
+    }
+
+    const [gradeLevel, subjectOption] = await Promise.all([
+      this.getGradeLevelOrThrow(data.gradeLevelId, data.schoolId),
+      this.getSubjectOptionOrThrow(data.subjectOptionId),
+    ]);
+
     try {
       return await this.prisma.class.create({
         data: {
           schoolId: data.schoolId,
           schoolYearId: data.schoolYearId,
-          name: data.name,
-          subject: data.subject,
+          gradeLevelId: gradeLevel.id,
+          subjectOptionId: subjectOption.id,
+          name: className,
+          subject: subjectOption.name,
           isHomeroom: data.isHomeroom ?? false,
         },
         select: this.buildClassSelect(),
@@ -840,15 +921,56 @@ export class ClassesService {
       throw new BadRequestException('No valid fields provided for update');
     }
 
+    const updateData: Prisma.ClassUpdateInput = {
+      isHomeroom: data.isHomeroom,
+      isActive: data.isActive,
+    };
+
+    if (data.name !== undefined) {
+      const className = data.name.trim();
+      if (!className) {
+        throw new BadRequestException('name is required');
+      }
+      updateData.name = className;
+    }
+
+    if (data.gradeLevelId !== undefined) {
+      const gradeLevel = await this.getGradeLevelOrThrow(
+        data.gradeLevelId,
+        existingClass.schoolId,
+      );
+      updateData.gradeLevel = {
+        connect: {
+          id: gradeLevel.id,
+        },
+      };
+    }
+
+    if (data.subjectOptionId !== undefined) {
+      const subjectOption = await this.getSubjectOptionOrThrow(data.subjectOptionId);
+      updateData.subjectOption = {
+        connect: {
+          id: subjectOption.id,
+        },
+      };
+      updateData.subject = subjectOption.name;
+    }
+
+    if (
+      updateData.name === undefined &&
+      updateData.isHomeroom === undefined &&
+      updateData.isActive === undefined &&
+      updateData.gradeLevel === undefined &&
+      updateData.subjectOption === undefined &&
+      updateData.subject === undefined
+    ) {
+      throw new BadRequestException('No valid fields provided for update');
+    }
+
     try {
       return await this.prisma.class.update({
         where: { id: classId },
-        data: {
-          name: data.name,
-          subject: data.subject,
-          isHomeroom: data.isHomeroom,
-          isActive: data.isActive,
-        },
+        data: updateData,
         select: this.buildClassSelect(),
       });
     } catch (error) {

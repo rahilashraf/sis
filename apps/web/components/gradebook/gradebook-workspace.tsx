@@ -48,11 +48,10 @@ import {
   type StudentInClassSummary,
 } from "@/lib/api/gradebook";
 import {
-  formatDateLabel,
   getDisplayText,
-  getLocalDateInputValue,
 } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
+import { formatDateOnly, normalizeDateOnlyPayload } from "@/lib/date";
 
 type Mode = "teacher" | "admin";
 
@@ -83,9 +82,7 @@ function buildDefaultForm(types: AssessmentType[]): AssessmentFormState {
 }
 
 function buildEditForm(assessment: Assessment): AssessmentFormState {
-  const dueDate = assessment.dueAt
-    ? getLocalDateInputValue(new Date(assessment.dueAt))
-    : "";
+  const dueDate = normalizeDateOnlyPayload(assessment.dueAt);
 
   return {
     mode: "edit",
@@ -102,9 +99,10 @@ function buildEditForm(assessment: Assessment): AssessmentFormState {
 
 function getClassOptionLabel(schoolClass: SchoolClass) {
   const className = getDisplayText(schoolClass.name);
-  const subject = getDisplayText(schoolClass.subject, "");
+  const subject = getDisplayText(schoolClass.subjectOption?.name ?? schoolClass.subject, "");
+  const gradeLevel = getDisplayText(schoolClass.gradeLevel?.name, "");
 
-  return `${className}${subject ? ` • ${subject}` : ""}${schoolClass.isActive ? "" : " • Inactive"}`;
+  return `${className}${gradeLevel ? ` • ${gradeLevel}` : ""}${subject ? ` • ${subject}` : ""}${schoolClass.isActive ? "" : " • Inactive"}`;
 }
 
 function formatPercent(value: number | null) {
@@ -139,6 +137,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
   const [reportingPeriodError, setReportingPeriodError] = useState<string | null>(null);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState("");
+  const [selectedGradeLevelId, setSelectedGradeLevelId] = useState("");
+  const [selectedSubjectOptionId, setSelectedSubjectOptionId] = useState("");
   const [selectedClassId, setSelectedClassId] = useState("");
   const [includeInactiveClasses, setIncludeInactiveClasses] = useState(false);
   const [formState, setFormState] = useState<AssessmentFormState>(() =>
@@ -194,13 +194,68 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
   }, [classes]);
 
   const visibleClasses = useMemo(() => {
-    if (mode === "teacher") {
-      return classes;
+    const schoolFiltered =
+      mode === "teacher"
+        ? classes
+        : selectedSchoolId
+          ? classes.filter((schoolClass) => schoolClass.schoolId === selectedSchoolId)
+          : classes;
+
+    return schoolFiltered.filter((schoolClass) => {
+      if (selectedGradeLevelId && schoolClass.gradeLevelId !== selectedGradeLevelId) {
+        return false;
+      }
+
+      if (selectedSubjectOptionId && schoolClass.subjectOptionId !== selectedSubjectOptionId) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [classes, mode, selectedGradeLevelId, selectedSchoolId, selectedSubjectOptionId]);
+
+  const availableGradeLevelOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const schoolClass of classes) {
+      if (mode === "admin" && selectedSchoolId && schoolClass.schoolId !== selectedSchoolId) {
+        continue;
+      }
+
+      if (!schoolClass.gradeLevelId) {
+        continue;
+      }
+
+      map.set(
+        schoolClass.gradeLevelId,
+        schoolClass.gradeLevel?.name ?? `Grade level ${schoolClass.gradeLevelId}`,
+      );
     }
 
-    return selectedSchoolId
-      ? classes.filter((schoolClass) => schoolClass.schoolId === selectedSchoolId)
-      : classes;
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }, [classes, mode, selectedSchoolId]);
+
+  const availableSubjectOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const schoolClass of classes) {
+      if (mode === "admin" && selectedSchoolId && schoolClass.schoolId !== selectedSchoolId) {
+        continue;
+      }
+
+      if (!schoolClass.subjectOptionId) {
+        continue;
+      }
+
+      map.set(
+        schoolClass.subjectOptionId,
+        schoolClass.subjectOption?.name ?? schoolClass.subject ?? "Subject",
+      );
+    }
+
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((left, right) => left.name.localeCompare(right.name));
   }, [classes, mode, selectedSchoolId]);
 
   const selectedClass = useMemo(
@@ -1111,12 +1166,16 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
             Select a class to load assessments, grade entry, and summary calculations.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
+        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {mode === "admin" ? (
             <Field htmlFor="gradebook-school" label="School">
               <Select
                 id="gradebook-school"
-                onChange={(event) => setSelectedSchoolId(event.target.value)}
+                onChange={(event) => {
+                  setSelectedSchoolId(event.target.value);
+                  setSelectedGradeLevelId("");
+                  setSelectedSubjectOptionId("");
+                }}
                 value={selectedSchoolId}
               >
                 <option value="">All schools</option>
@@ -1128,6 +1187,36 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
               </Select>
             </Field>
           ) : null}
+
+          <Field htmlFor="gradebook-grade-level-filter" label="Grade level">
+            <Select
+              id="gradebook-grade-level-filter"
+              onChange={(event) => setSelectedGradeLevelId(event.target.value)}
+              value={selectedGradeLevelId}
+            >
+              <option value="">All grade levels</option>
+              {availableGradeLevelOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field htmlFor="gradebook-subject-filter" label="Subject">
+            <Select
+              id="gradebook-subject-filter"
+              onChange={(event) => setSelectedSubjectOptionId(event.target.value)}
+              value={selectedSubjectOptionId}
+            >
+              <option value="">All subjects</option>
+              {availableSubjectOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
 
           <Field htmlFor="gradebook-class" label="Class">
             <Select
@@ -1150,7 +1239,7 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
           {mode === "admin" ? (
             <CheckboxField
               checked={includeInactiveClasses}
-              className="md:col-span-2"
+              className="md:col-span-2 lg:col-span-4"
               description="Include inactive classes that were removed from normal workflows."
               label="Show inactive classes"
               onChange={(event) => setIncludeInactiveClasses(event.target.checked)}
@@ -1165,7 +1254,7 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
           description={
             mode === "teacher"
               ? "No classes are currently assigned to you."
-              : "No classes are available for the selected school filter."
+              : "No classes are available for the selected filters."
           }
         />
       ) : null}
@@ -1424,7 +1513,7 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                           {assessment.weight}
                         </td>
                         <td className="px-4 py-4 text-slate-600">
-                          {assessment.dueAt ? formatDateLabel(assessment.dueAt) : "—"}
+                          {assessment.dueAt ? formatDateOnly(assessment.dueAt) : "—"}
                         </td>
                         <td className="px-4 py-4">
                           <Badge
@@ -1918,7 +2007,7 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                                         {assessment.assessmentType.name}
                                       </td>
                                       <td className="px-4 py-4 text-slate-600">
-                                        {assessment.dueAt ? formatDateLabel(assessment.dueAt) : "—"}
+                                        {assessment.dueAt ? formatDateOnly(assessment.dueAt) : "—"}
                                       </td>
                                       <td className="px-4 py-4 text-slate-600">
                                         {assessment.weight}

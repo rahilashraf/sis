@@ -31,22 +31,29 @@ import {
   type School,
   type SchoolYear,
 } from "@/lib/api/schools";
+import { listGradeLevels, type GradeLevel } from "@/lib/api/grade-levels";
+import {
+  listEnrollmentSubjectOptions,
+  type EnrollmentSubjectOption,
+} from "@/lib/api/enrollment-history";
 
 const adminManageRoles = new Set(["OWNER", "SUPER_ADMIN", "ADMIN"]);
 
 type CreateClassFormState = {
   schoolId: string;
   schoolYearId: string;
+  gradeLevelId: string;
+  subjectOptionId: string;
   name: string;
-  subject: string;
   isHomeroom: boolean;
 };
 
 const emptyCreateForm: CreateClassFormState = {
   schoolId: "",
   schoolYearId: "",
+  gradeLevelId: "",
+  subjectOptionId: "",
   name: "",
-  subject: "",
   isHomeroom: false,
 };
 
@@ -55,7 +62,11 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([]);
+  const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
+  const [subjectOptions, setSubjectOptions] = useState<EnrollmentSubjectOption[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState("");
+  const [selectedGradeLevelFilterId, setSelectedGradeLevelFilterId] = useState("");
+  const [selectedSubjectFilterId, setSelectedSubjectFilterId] = useState("");
   const [showRemoved, setShowRemoved] = useState(false);
   const [createForm, setCreateForm] = useState<CreateClassFormState>(emptyCreateForm);
   const [deleteTarget, setDeleteTarget] = useState<SchoolClass | null>(null);
@@ -76,13 +87,15 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
       setError(null);
 
       try {
-        const [classResponse, schoolResponse] = await Promise.all([
+        const [classResponse, schoolResponse, subjectOptionResponse] = await Promise.all([
           listClasses({ includeInactive: showRemoved }),
           listSchools(),
+          listEnrollmentSubjectOptions({ includeInactive: false }),
         ]);
 
         setClasses(classResponse);
         setSchools(schoolResponse);
+        setSubjectOptions(subjectOptionResponse.filter((entry) => entry.isActive));
 
         const initialSchoolId = schoolResponse[0]?.id ?? "";
         setSelectedSchoolId(initialSchoolId);
@@ -101,15 +114,20 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
   }, [showRemoved]);
 
   useEffect(() => {
-    async function loadSchoolYears() {
+    async function loadSchoolYearsAndGradeLevels() {
       if (!createForm.schoolId) {
         setSchoolYears([]);
+        setGradeLevels([]);
         return;
       }
 
       try {
-        const years = await listSchoolYears(createForm.schoolId);
+        const [years, levels] = await Promise.all([
+          listSchoolYears(createForm.schoolId),
+          listGradeLevels(createForm.schoolId, { includeInactive: false }),
+        ]);
         setSchoolYears(years);
+        setGradeLevels(levels.filter((gradeLevel) => gradeLevel.isActive));
         setCreateForm((current) => ({
           ...current,
           schoolYearId:
@@ -117,18 +135,26 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
             years.find((year) => year.isActive)?.id ??
             years[0]?.id ??
             "",
+          gradeLevelId:
+            levels.find((gradeLevel) => gradeLevel.id === current.gradeLevelId)?.id ??
+            levels[0]?.id ??
+            "",
+          subjectOptionId:
+            subjectOptions.find((option) => option.id === current.subjectOptionId)?.id ??
+            subjectOptions[0]?.id ??
+            "",
         }));
       } catch (loadError) {
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "Unable to load school years.",
+            : "Unable to load school setup options.",
         );
       }
     }
 
-    void loadSchoolYears();
-  }, [createForm.schoolId]);
+    void loadSchoolYearsAndGradeLevels();
+  }, [createForm.schoolId, subjectOptions]);
 
   async function refreshClasses() {
     const classResponse = await listClasses({ includeInactive: showRemoved });
@@ -180,8 +206,9 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
       await createClass({
         schoolId: createForm.schoolId,
         schoolYearId: createForm.schoolYearId,
+        gradeLevelId: createForm.gradeLevelId,
+        subjectOptionId: createForm.subjectOptionId,
         name: createForm.name.trim(),
-        subject: createForm.subject.trim() || undefined,
         isHomeroom: createForm.isHomeroom,
       });
 
@@ -190,6 +217,8 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
         ...emptyCreateForm,
         schoolId: current.schoolId,
         schoolYearId: current.schoolYearId,
+        gradeLevelId: current.gradeLevelId,
+        subjectOptionId: current.subjectOptionId,
       }));
       setSuccessMessage("Class created successfully.");
     } catch (submissionError) {
@@ -203,14 +232,68 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
     }
   }
 
-  const filteredClasses = selectedSchoolId
-    ? classes.filter((schoolClass) => schoolClass.schoolId === selectedSchoolId)
-    : classes;
+  const filteredClasses = classes.filter((schoolClass) => {
+    if (selectedSchoolId && schoolClass.schoolId !== selectedSchoolId) {
+      return false;
+    }
+
+    if (selectedGradeLevelFilterId && schoolClass.gradeLevelId !== selectedGradeLevelFilterId) {
+      return false;
+    }
+
+    if (selectedSubjectFilterId && schoolClass.subjectOptionId !== selectedSubjectFilterId) {
+      return false;
+    }
+
+    return true;
+  });
 
   const activeClassesCount = useMemo(
     () => classes.filter((schoolClass) => schoolClass.isActive).length,
     [classes],
   );
+
+  const availableGradeLevelOptions = useMemo(() => {
+    const map = new Map<string, string>();
+
+    for (const schoolClass of classes) {
+      if (selectedSchoolId && schoolClass.schoolId !== selectedSchoolId) {
+        continue;
+      }
+
+      if (!schoolClass.gradeLevelId) {
+        continue;
+      }
+
+      const label = schoolClass.gradeLevel?.name ?? `Grade level ${schoolClass.gradeLevelId}`;
+      map.set(schoolClass.gradeLevelId, label);
+    }
+
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }, [classes, selectedSchoolId]);
+
+  const availableSubjectOptions = useMemo(() => {
+    const map = new Map<string, string>();
+
+    for (const schoolClass of classes) {
+      if (selectedSchoolId && schoolClass.schoolId !== selectedSchoolId) {
+        continue;
+      }
+
+      if (!schoolClass.subjectOptionId) {
+        continue;
+      }
+
+      const label = schoolClass.subjectOption?.name ?? schoolClass.subject ?? "Unknown subject";
+      map.set(schoolClass.subjectOptionId, label);
+    }
+
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }, [classes, selectedSchoolId]);
 
   return (
     <div className="space-y-6">
@@ -298,18 +381,44 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
                 />
               </Field>
 
-              <Field htmlFor="create-class-subject" label="Subject">
-                <Input
-                  id="create-class-subject"
+              <Field htmlFor="create-class-grade-level" label="Grade level">
+                <Select
+                  id="create-class-grade-level"
                   onChange={(event) =>
                     setCreateForm((current) => ({
                       ...current,
-                      subject: event.target.value,
+                      gradeLevelId: event.target.value,
                     }))
                   }
-                  placeholder="Optional subject"
-                  value={createForm.subject}
-                />
+                  value={createForm.gradeLevelId}
+                >
+                  <option value="">Select grade level</option>
+                  {gradeLevels.map((gradeLevel) => (
+                    <option key={gradeLevel.id} value={gradeLevel.id}>
+                      {gradeLevel.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
+              <Field htmlFor="create-class-subject-option" label="Subject">
+                <Select
+                  id="create-class-subject-option"
+                  onChange={(event) =>
+                    setCreateForm((current) => ({
+                      ...current,
+                      subjectOptionId: event.target.value,
+                    }))
+                  }
+                  value={createForm.subjectOptionId}
+                >
+                  <option value="">Select subject</option>
+                  {subjectOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name}
+                    </option>
+                  ))}
+                </Select>
               </Field>
 
               <CheckboxField
@@ -326,7 +435,16 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
               />
 
               <div className="md:col-span-2 flex justify-end">
-                <Button disabled={isSubmitting} type="submit">
+                <Button
+                  disabled={
+                    isSubmitting ||
+                    !createForm.schoolId ||
+                    !createForm.schoolYearId ||
+                    !createForm.gradeLevelId ||
+                    !createForm.subjectOptionId
+                  }
+                  type="submit"
+                >
                   {isSubmitting ? "Saving..." : "Create class"}
                 </Button>
               </div>
@@ -350,7 +468,7 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
             </CardDescription>
           </div>
 
-          <div className="flex w-full max-w-2xl flex-col gap-3 sm:flex-row sm:items-end sm:justify-end">
+          <div className="flex w-full max-w-5xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end">
             <CheckboxField
               checked={showRemoved}
               className="rounded-xl border border-slate-200 px-3 py-2 sm:max-w-xs"
@@ -362,13 +480,49 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
               <Field htmlFor="classes-filter-school" label="Filter by school">
                 <Select
                   id="classes-filter-school"
-                  onChange={(event) => setSelectedSchoolId(event.target.value)}
+                  onChange={(event) => {
+                    setSelectedSchoolId(event.target.value);
+                    setSelectedGradeLevelFilterId("");
+                    setSelectedSubjectFilterId("");
+                  }}
                   value={selectedSchoolId}
                 >
                   <option value="">All schools</option>
                   {schools.map((school) => (
                     <option key={school.id} value={school.id}>
                       {school.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            <div className="w-full max-w-sm">
+              <Field htmlFor="classes-filter-grade-level" label="Filter by grade level">
+                <Select
+                  id="classes-filter-grade-level"
+                  onChange={(event) => setSelectedGradeLevelFilterId(event.target.value)}
+                  value={selectedGradeLevelFilterId}
+                >
+                  <option value="">All grade levels</option>
+                  {availableGradeLevelOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            <div className="w-full max-w-sm">
+              <Field htmlFor="classes-filter-subject" label="Filter by subject">
+                <Select
+                  id="classes-filter-subject"
+                  onChange={(event) => setSelectedSubjectFilterId(event.target.value)}
+                  value={selectedSubjectFilterId}
+                >
+                  <option value="">All subjects</option>
+                  {availableSubjectOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name}
                     </option>
                   ))}
                 </Select>
@@ -383,6 +537,7 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
                 <thead className="bg-slate-50/80">
                   <tr>
                     <th className="px-4 py-3 font-semibold text-slate-700">Class</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">Grade level</th>
                     <th className="px-4 py-3 font-semibold text-slate-700">School</th>
                     <th className="px-4 py-3 font-semibold text-slate-700">School year</th>
                     <th className="px-4 py-3 font-semibold text-slate-700">Teachers</th>
@@ -397,12 +552,15 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
                         <p className="font-medium text-slate-900">{schoolClass.name}</p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <Badge variant="neutral">
-                            {schoolClass.subject || "No subject"}
+                            {schoolClass.subjectOption?.name ?? schoolClass.subject ?? "No subject"}
                           </Badge>
                           {schoolClass.isHomeroom ? (
                             <Badge variant="warning">Homeroom</Badge>
                           ) : null}
                         </div>
+                      </td>
+                      <td className="px-4 py-4 text-slate-600">
+                        {schoolClass.gradeLevel?.name ?? "Not set"}
                       </td>
                       <td className="px-4 py-4 text-slate-600">{schoolClass.school.name}</td>
                       <td className="px-4 py-4 text-slate-600">
@@ -455,7 +613,7 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
                   ))}
                   {!isLoading && filteredClasses.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8" colSpan={6}>
+                      <td className="px-4 py-8" colSpan={7}>
                         <EmptyState
                           compact
                           description={

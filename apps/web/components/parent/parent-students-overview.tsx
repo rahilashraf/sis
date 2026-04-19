@@ -24,10 +24,11 @@ import { getAttendanceStudentSummary, type AttendanceStudentSummary } from "@/li
 import { listSchoolYears } from "@/lib/api/schools";
 import { getReRegistrationWindowStatus, type ReRegistrationWindowStatus } from "@/lib/api/re-registration";
 import { listParentForms, type ParentFormSummary } from "@/lib/api/forms";
+import { dateOnlyFromDate, parseDateOnly } from "@/lib/date";
 import { formatDisplayedPercent } from "@/lib/utils";
 
 function toISODate(value: Date) {
-  return value.toISOString().slice(0, 10);
+  return dateOnlyFromDate(value);
 }
 
 export function ParentStudentsOverview() {
@@ -122,8 +123,15 @@ export function ParentStudentsOverview() {
         const now = new Date();
         const upcoming =
           schoolYears
-            .filter((year) => new Date(year.startDate) > now)
-            .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0] ??
+            .filter((year) => {
+              const startDate = parseDateOnly(year.startDate);
+              return startDate ? startDate > now : false;
+            })
+            .sort((a, b) => {
+              const startA = parseDateOnly(a.startDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+              const startB = parseDateOnly(b.startDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+              return startA - startB;
+            })[0] ??
           schoolYears.find((year) => year.isActive) ??
           schoolYears[0];
 

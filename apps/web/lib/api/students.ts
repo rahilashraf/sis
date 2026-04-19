@@ -1,5 +1,6 @@
 import type { AuthenticatedUser } from "../auth/types";
 import { apiFetch } from "./client";
+import { normalizeDateOnlyPayload } from "../date";
 
 export type StudentGender = "MALE" | "FEMALE";
 
@@ -98,6 +99,8 @@ export type ReRegistrationInput = Omit<
 >;
 
 function normalizeStudentProfile(student: Partial<StudentProfile>): StudentProfile {
+  const dateOfBirth = normalizeDateOnlyPayload(student.dateOfBirth);
+
   return {
     id: student.id ?? "",
     username: student.username ?? "",
@@ -113,7 +116,7 @@ function normalizeStudentProfile(student: Partial<StudentProfile>): StudentProfi
     gradeLevel: student.gradeLevel ?? null,
     studentNumber: student.studentNumber ?? null,
     oen: student.oen ?? null,
-    dateOfBirth: student.dateOfBirth ?? null,
+    dateOfBirth: dateOfBirth || null,
     gender: student.gender ?? null,
     studentEmail: student.studentEmail ?? null,
     allergies: student.allergies ?? null,

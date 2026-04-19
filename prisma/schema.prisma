@@ -94,6 +94,58 @@ enum EnrollmentHistoryStatus {
   GRADUATED
 }
 
+enum BehaviorRecordType {
+  POSITIVE
+  INCIDENT
+}
+
+enum BehaviorRecordStatus {
+  OPEN
+  RESOLVED
+}
+
+enum BehaviorSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum IncidentLevel {
+  MINOR
+  MAJOR
+}
+
+enum IncidentAffectedPersonType {
+  STUDENT
+  STAFF
+  OTHER
+}
+
+enum IncidentWitnessRole {
+  STAFF
+  STUDENT
+  OTHER
+}
+
+enum IncidentFirstAidStatus {
+  YES
+  NO
+  NOT_APPLICABLE
+}
+
+enum IncidentPostDestination {
+  RETURNED_TO_CLASS_OR_WORK
+  HOME
+  HOSPITAL
+  OTHER
+}
+
+enum IncidentJhscNotificationStatus {
+  YES
+  NO
+  NOT_APPLICABLE
+}
+
 model User {
   id           String   @id @default(cuid())
   schoolId     String?
@@ -157,6 +209,9 @@ model User {
   studentDocuments        StudentDocument[]   @relation("StudentDocumentsStudent")
   uploadedStudentDocuments StudentDocument[]  @relation("StudentDocumentsUploadedBy")
   enrollmentHistory      EnrollmentHistory?
+  behaviorRecordsAsStudent BehaviorRecord[] @relation("BehaviorRecordStudent")
+  behaviorRecordsRecorded BehaviorRecord[] @relation("BehaviorRecordRecordedBy")
+  behaviorRecordAttachmentsUploaded BehaviorRecordAttachment[] @relation("BehaviorRecordAttachmentUploadedBy")
   createdForms           Form[]             @relation("FormCreatedBy")
   formResponsesAsParent  FormResponse[]     @relation("FormResponseParent")
   formResponsesAsStudent FormResponse[]     @relation("FormResponseStudent")
@@ -189,6 +244,8 @@ model School {
   reRegistrationWindows ReRegistrationWindow[]
   forms                  Form[]
   formResponses          FormResponse[]
+  behaviorRecords        BehaviorRecord[]
+  behaviorCategoryOptions BehaviorCategoryOption[]
 }
 
 model GradeScale {
@@ -233,6 +290,7 @@ model GradeLevel {
 
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   students User[] @relation("StudentGradeLevel")
+  classes  Class[]
 
   @@unique([schoolId, name])
   @@index([schoolId, isActive, sortOrder])
@@ -371,14 +429,134 @@ model EnrollmentSubjectOption {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  classes Class[]
+
   @@unique([name])
   @@index([isActive, sortOrder, name])
+}
+
+model BehaviorCategoryOption {
+  id        String   @id @default(cuid())
+  schoolId  String?
+  name      String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school  School?          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  records BehaviorRecord[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId, isActive, sortOrder, name])
+}
+
+model BehaviorRecord {
+  id               String               @id @default(cuid())
+  studentId        String
+  schoolId         String
+  recordedById     String
+  incidentAt       DateTime
+  categoryOptionId String?
+  categoryName     String
+  severity         BehaviorSeverity
+  incidentLevel    IncidentLevel        @default(MINOR)
+  type             BehaviorRecordType
+  title            String
+  description      String
+  actionTaken      String?
+  followUpRequired Boolean              @default(false)
+  parentContacted  Boolean              @default(false)
+  status           BehaviorRecordStatus @default(OPEN)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  student        User                  @relation("BehaviorRecordStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  school         School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  recordedBy     User                  @relation("BehaviorRecordRecordedBy", fields: [recordedById], references: [id], onDelete: Restrict)
+  categoryOption BehaviorCategoryOption? @relation(fields: [categoryOptionId], references: [id], onDelete: SetNull)
+  attachments    BehaviorRecordAttachment[]
+  incidentReport BehaviorIncidentReport?
+
+  @@index([studentId, incidentAt])
+  @@index([schoolId, incidentAt])
+  @@index([status, incidentAt])
+  @@index([severity, incidentAt])
+  @@index([incidentLevel, incidentAt])
+  @@index([type, incidentAt])
+  @@index([categoryName])
+}
+
+model BehaviorIncidentReport {
+  id                           String                         @id @default(cuid())
+  behaviorRecordId             String                         @unique
+  program                      String?
+  reporterName                 String?
+  reporterEmail                String?
+  reporterRole                 String?
+  affectedPersonType           IncidentAffectedPersonType?
+  affectedPersonName           String?
+  affectedPersonAddress        String?
+  affectedPersonDateOfBirth    DateTime?
+  affectedPersonPhone          String?
+  firstAidStatus               IncidentFirstAidStatus?
+  firstAidAdministeredBy       String?
+  firstAidAdministeredByPhone  String?
+  firstAidDetails              String?
+  isIncidentTimeApproximate    Boolean                        @default(false)
+  postIncidentDestination      IncidentPostDestination?
+  postIncidentDestinationOther String?
+  jhscNotificationStatus       IncidentJhscNotificationStatus?
+  additionalNotes              String?
+  createdAt                    DateTime                       @default(now())
+  updatedAt                    DateTime                       @updatedAt
+
+  behaviorRecord BehaviorRecord            @relation(fields: [behaviorRecordId], references: [id], onDelete: Cascade)
+  witnesses      BehaviorIncidentWitness[]
+
+  @@index([behaviorRecordId, createdAt])
+}
+
+model BehaviorIncidentWitness {
+  id                     String              @id @default(cuid())
+  behaviorIncidentReportId String
+  name                   String
+  phoneNumber            String?
+  role                   IncidentWitnessRole?
+  notes                  String?
+  sortOrder              Int                 @default(0)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  behaviorIncidentReport BehaviorIncidentReport @relation(fields: [behaviorIncidentReportId], references: [id], onDelete: Cascade)
+
+  @@index([behaviorIncidentReportId, sortOrder, createdAt])
+}
+
+model BehaviorRecordAttachment {
+  id               String   @id @default(cuid())
+  behaviorRecordId String
+  uploadedById     String
+  originalFileName String
+  mimeType         String
+  fileSize         Int
+  storagePath      String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  behaviorRecord BehaviorRecord @relation(fields: [behaviorRecordId], references: [id], onDelete: Cascade)
+  uploadedBy     User           @relation("BehaviorRecordAttachmentUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([behaviorRecordId, createdAt])
+  @@index([uploadedById, createdAt])
 }
 
 model Class {
   id           String @id @default(cuid())
   schoolId     String
   schoolYearId String
+  gradeLevelId String?
+  subjectOptionId String?
 
   name       String
   subject    String?
@@ -391,6 +569,8 @@ model Class {
 
   school     School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   schoolYear SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+  gradeLevel GradeLevel? @relation(fields: [gradeLevelId], references: [id], onDelete: SetNull)
+  subjectOption EnrollmentSubjectOption? @relation(fields: [subjectOptionId], references: [id], onDelete: SetNull)
 
   teachers TeacherClassAssignment[]
   students StudentClassEnrollment[]
@@ -401,7 +581,8 @@ model Class {
 
   attendanceSessionClasses AttendanceSessionClass[]
 
-  @@unique([schoolId, schoolYearId, name])
+  @@unique([schoolId, schoolYearId, name, gradeLevelId, subjectOptionId])
+  @@index([schoolId, schoolYearId, gradeLevelId, subjectOptionId, isActive])
 }
 
 model TeacherClassAssignment {

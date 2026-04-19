@@ -1,4 +1,5 @@
 import { apiFetch } from "./client";
+import { normalizeDateOnlyPayload } from "../date";
 
 export type EnrollmentHistoryStatus =
   | "ACTIVE"
@@ -38,6 +39,14 @@ export type EnrollmentSubjectOption = {
   updatedAt: string;
 };
 
+type RawEnrollmentHistoryRecord = Omit<
+  EnrollmentHistoryRecord,
+  "dateOfEnrollment" | "dateOfDeparture"
+> & {
+  dateOfEnrollment: string;
+  dateOfDeparture: string | null;
+};
+
 export type CreateEnrollmentHistoryInput = {
   dateOfEnrollment: string;
   dateOfDeparture?: string | null;
@@ -71,49 +80,71 @@ export type UpdateEnrollmentSubjectOptionInput = {
   isActive?: boolean;
 };
 
+function normalizeEnrollmentHistoryRecord(
+  record: RawEnrollmentHistoryRecord,
+): EnrollmentHistoryRecord {
+  return {
+    ...record,
+    dateOfEnrollment: normalizeDateOnlyPayload(record.dateOfEnrollment),
+    dateOfDeparture: normalizeDateOnlyPayload(record.dateOfDeparture) || null,
+  };
+}
+
 export function getEnrollmentHistory(studentId: string) {
-  return apiFetch<EnrollmentHistoryRecord | null>(
+  return apiFetch<RawEnrollmentHistoryRecord | null>(
     `/enrollment-history/students/${studentId}`,
-  );
+  ).then((record) => (record ? normalizeEnrollmentHistoryRecord(record) : null));
 }
 
 export function createEnrollmentHistory(
   studentId: string,
   input: CreateEnrollmentHistoryInput,
 ) {
-  return apiFetch<EnrollmentHistoryRecord>(
+  return apiFetch<RawEnrollmentHistoryRecord>(
     `/enrollment-history/students/${studentId}`,
     {
       method: "POST",
-      json: input,
+      json: {
+        ...input,
+        dateOfEnrollment: normalizeDateOnlyPayload(input.dateOfEnrollment),
+        dateOfDeparture: normalizeDateOnlyPayload(input.dateOfDeparture) || null,
+      },
     },
-  );
+  ).then(normalizeEnrollmentHistoryRecord);
 }
 
 export function updateEnrollmentHistory(
   studentId: string,
   input: UpdateEnrollmentHistoryInput,
 ) {
-  return apiFetch<EnrollmentHistoryRecord>(
+  return apiFetch<RawEnrollmentHistoryRecord>(
     `/enrollment-history/students/${studentId}`,
     {
       method: "PATCH",
-      json: input,
+      json: {
+        ...input,
+        ...(input.dateOfEnrollment !== undefined
+          ? { dateOfEnrollment: normalizeDateOnlyPayload(input.dateOfEnrollment) }
+          : {}),
+        ...(input.dateOfDeparture !== undefined
+          ? { dateOfDeparture: normalizeDateOnlyPayload(input.dateOfDeparture) || null }
+          : {}),
+      },
     },
-  );
+  ).then(normalizeEnrollmentHistoryRecord);
 }
 
 export function replaceEnrollmentSubjects(
   studentId: string,
   input: ReplaceEnrollmentSubjectsInput,
 ) {
-  return apiFetch<EnrollmentHistoryRecord>(
+  return apiFetch<RawEnrollmentHistoryRecord>(
     `/enrollment-history/students/${studentId}/subjects`,
     {
       method: "PATCH",
       json: input,
     },
-  );
+  ).then(normalizeEnrollmentHistoryRecord);
 }
 
 export function listEnrollmentSubjectOptions(options?: { includeInactive?: boolean }) {

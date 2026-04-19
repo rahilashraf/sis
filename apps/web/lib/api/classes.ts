@@ -28,6 +28,8 @@ export type SchoolClass = {
   id: string;
   schoolId: string;
   schoolYearId: string;
+  gradeLevelId: string | null;
+  subjectOptionId: string | null;
   name: string;
   subject: string | null;
   isHomeroom: boolean;
@@ -36,6 +38,15 @@ export type SchoolClass = {
   updatedAt: string;
   school: School;
   schoolYear: SchoolYear;
+  gradeLevel?: {
+    id: string;
+    name: string;
+  } | null;
+  subjectOption?: {
+    id: string;
+    name: string;
+    isActive: boolean;
+  } | null;
   teachers: TeacherAssignment[];
   students?: StudentEnrollment[];
   _count?: {
@@ -51,14 +62,16 @@ export type ClassRemovalResult = {
 export type CreateClassInput = {
   schoolId: string;
   schoolYearId: string;
+  gradeLevelId: string;
+  subjectOptionId: string;
   name: string;
-  subject?: string;
   isHomeroom?: boolean;
 };
 
 export type UpdateClassInput = {
   name?: string;
-  subject?: string;
+  gradeLevelId?: string;
+  subjectOptionId?: string;
   isHomeroom?: boolean;
   isActive?: boolean;
 };

@@ -12,6 +12,7 @@ import {
   getAccessibleSchoolIds,
   isBypassRole,
 } from '../common/access/school-access.util';
+import { parseDateOnlyOrThrow } from '../common/dates/date-only.util';
 import { CreateEnrollmentHistoryDto } from './dto/create-enrollment-history.dto';
 import { UpdateEnrollmentHistoryDto } from './dto/update-enrollment-history.dto';
 import { ReplaceEnrollmentSubjectsDto } from './dto/replace-enrollment-subjects.dto';
@@ -51,21 +52,6 @@ export class EnrollmentHistoryService {
 
   private canListSubjectOptions(role: UserRole) {
     return this.canReadEnrollmentHistory(role) || this.canManageSubjectOptions(role);
-  }
-
-  private normalizeDateOnlyOrThrow(value: string, fieldLabel: string) {
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      throw new BadRequestException(`${fieldLabel} must be a valid date`);
-    }
-
-    return new Date(
-      Date.UTC(
-        parsed.getUTCFullYear(),
-        parsed.getUTCMonth(),
-        parsed.getUTCDate(),
-      ),
-    );
   }
 
   private validateDateOrder(dateOfEnrollment: Date, dateOfDeparture: Date | null) {
@@ -224,12 +210,12 @@ export class EnrollmentHistoryService {
       );
     }
 
-    const dateOfEnrollment = this.normalizeDateOnlyOrThrow(
+    const dateOfEnrollment = parseDateOnlyOrThrow(
       data.dateOfEnrollment,
       'dateOfEnrollment',
     );
     const dateOfDeparture = data.dateOfDeparture
-      ? this.normalizeDateOnlyOrThrow(data.dateOfDeparture, 'dateOfDeparture')
+      ? parseDateOnlyOrThrow(data.dateOfDeparture, 'dateOfDeparture')
       : null;
 
     this.validateDateOrder(dateOfEnrollment, dateOfDeparture);
@@ -285,12 +271,12 @@ export class EnrollmentHistoryService {
 
     const nextDateOfEnrollment =
       data.dateOfEnrollment !== undefined
-        ? this.normalizeDateOnlyOrThrow(data.dateOfEnrollment, 'dateOfEnrollment')
+        ? parseDateOnlyOrThrow(data.dateOfEnrollment, 'dateOfEnrollment')
         : existing.dateOfEnrollment;
     const nextDateOfDeparture =
       data.dateOfDeparture !== undefined
         ? data.dateOfDeparture
-          ? this.normalizeDateOnlyOrThrow(data.dateOfDeparture, 'dateOfDeparture')
+          ? parseDateOnlyOrThrow(data.dateOfDeparture, 'dateOfDeparture')
           : null
         : existing.dateOfDeparture;
 

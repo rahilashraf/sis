@@ -11,6 +11,7 @@ import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { listClasses, listMyClasses, type SchoolClass } from "@/lib/api/classes";
 import { listReportingPeriods, type ReportingPeriod } from "@/lib/api/reporting-periods";
+import { dateOnlyFromDate, parseDateOnly } from "@/lib/date";
 
 type Mode = "teacher" | "admin";
 
@@ -39,11 +40,16 @@ function getStudentCount(schoolClass: SchoolClass) {
 }
 
 function findCurrentReportingPeriod(periods: ReportingPeriod[], now = new Date()) {
+  const currentDate = parseDateOnly(dateOnlyFromDate(now));
+  if (!currentDate) {
+    return null;
+  }
+
   const active = periods.filter((period) => period.isActive);
   const current = active.find((period) => {
-    const start = new Date(period.startsAt);
-    const end = new Date(period.endsAt);
-    return now >= start && now <= end;
+    const start = parseDateOnly(period.startsAt);
+    const end = parseDateOnly(period.endsAt);
+    return Boolean(start && end && currentDate >= start && currentDate <= end);
   });
 
   return current ?? active.sort((a, b) => a.order - b.order)[0] ?? null;

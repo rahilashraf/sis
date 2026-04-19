@@ -38,7 +38,7 @@ export class GradeLevelsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Post()
   create(
     @Req() req: AuthenticatedRequest,
@@ -48,7 +48,7 @@ export class GradeLevelsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Patch(':id')
   update(
     @Req() req: AuthenticatedRequest,
@@ -59,7 +59,7 @@ export class GradeLevelsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Patch(':id/archive')
   archive(
     @Req() req: AuthenticatedRequest,
@@ -69,7 +69,7 @@ export class GradeLevelsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Patch(':id/activate')
   activate(
     @Req() req: AuthenticatedRequest,
@@ -79,7 +79,7 @@ export class GradeLevelsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Delete(':id')
   remove(
     @Req() req: AuthenticatedRequest,

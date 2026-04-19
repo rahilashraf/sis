@@ -30,6 +30,7 @@ import {
   type ClassGradeSummary,
 } from "@/lib/api/gradebook";
 import { listReportingPeriods, type ReportingPeriod } from "@/lib/api/reporting-periods";
+import { formatDateOnly } from "@/lib/date";
 import { formatDisplayedPercent, getDisplayText, roundDisplayedPercent } from "@/lib/utils";
 
 type Mode = "teacher" | "admin";
@@ -52,9 +53,10 @@ function getFullName(firstName: unknown, lastName: unknown, fallback = "—") {
 
 function getClassOptionLabel(schoolClass: SchoolClass) {
   const className = getDisplayText(schoolClass.name);
-  const subject = getDisplayText(schoolClass.subject, "");
+  const gradeLevel = getDisplayText(schoolClass.gradeLevel?.name, "");
+  const subject = getDisplayText(schoolClass.subjectOption?.name ?? schoolClass.subject, "");
 
-  return `${className}${subject ? ` • ${subject}` : ""}${schoolClass.isActive ? "" : " • Inactive"}`;
+  return `${className}${gradeLevel ? ` • ${gradeLevel}` : ""}${subject ? ` • ${subject}` : ""}${schoolClass.isActive ? "" : " • Inactive"}`;
 }
 
 export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
@@ -64,6 +66,8 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
 
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState("");
+  const [selectedGradeLevelId, setSelectedGradeLevelId] = useState("");
+  const [selectedSubjectOptionId, setSelectedSubjectOptionId] = useState("");
   const [selectedClassId, setSelectedClassId] = useState("");
   const [includeInactiveClasses, setIncludeInactiveClasses] = useState(false);
 
@@ -109,13 +113,70 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
   }, [classes]);
 
   const visibleClasses = useMemo(() => {
-    if (mode === "teacher") {
-      return classes;
+    const schoolFiltered =
+      mode === "teacher"
+        ? classes
+        : selectedSchoolId
+          ? classes.filter((schoolClass) => schoolClass.schoolId === selectedSchoolId)
+          : classes;
+
+    return schoolFiltered.filter((schoolClass) => {
+      if (selectedGradeLevelId && schoolClass.gradeLevelId !== selectedGradeLevelId) {
+        return false;
+      }
+
+      if (selectedSubjectOptionId && schoolClass.subjectOptionId !== selectedSubjectOptionId) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [classes, mode, selectedGradeLevelId, selectedSchoolId, selectedSubjectOptionId]);
+
+  const availableGradeLevelOptions = useMemo(() => {
+    const map = new Map<string, string>();
+
+    for (const schoolClass of classes) {
+      if (mode === "admin" && selectedSchoolId && schoolClass.schoolId !== selectedSchoolId) {
+        continue;
+      }
+
+      if (!schoolClass.gradeLevelId) {
+        continue;
+      }
+
+      map.set(
+        schoolClass.gradeLevelId,
+        schoolClass.gradeLevel?.name ?? `Grade level ${schoolClass.gradeLevelId}`,
+      );
     }
 
-    return selectedSchoolId
-      ? classes.filter((schoolClass) => schoolClass.schoolId === selectedSchoolId)
-      : classes;
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }, [classes, mode, selectedSchoolId]);
+
+  const availableSubjectOptions = useMemo(() => {
+    const map = new Map<string, string>();
+
+    for (const schoolClass of classes) {
+      if (mode === "admin" && selectedSchoolId && schoolClass.schoolId !== selectedSchoolId) {
+        continue;
+      }
+
+      if (!schoolClass.subjectOptionId) {
+        continue;
+      }
+
+      map.set(
+        schoolClass.subjectOptionId,
+        schoolClass.subjectOption?.name ?? schoolClass.subject ?? "Subject",
+      );
+    }
+
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((left, right) => left.name.localeCompare(right.name));
   }, [classes, mode, selectedSchoolId]);
 
   const selectedClass = useMemo(
@@ -869,12 +930,16 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
       <Card>
         <CardHeader className="space-y-3">
           <CardTitle>Context</CardTitle>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
             {mode === "admin" ? (
               <Field htmlFor="scoresheet-school" label="School">
                 <Select
                   id="scoresheet-school"
-                  onChange={(event) => setSelectedSchoolId(event.target.value)}
+                  onChange={(event) => {
+                    setSelectedSchoolId(event.target.value);
+                    setSelectedGradeLevelId("");
+                    setSelectedSubjectOptionId("");
+                  }}
                   value={selectedSchoolId}
                 >
                   <option value="">All schools</option>
@@ -886,6 +951,36 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                 </Select>
               </Field>
             ) : null}
+
+            <Field htmlFor="scoresheet-grade-level" label="Grade level">
+              <Select
+                id="scoresheet-grade-level"
+                onChange={(event) => setSelectedGradeLevelId(event.target.value)}
+                value={selectedGradeLevelId}
+              >
+                <option value="">All grade levels</option>
+                {availableGradeLevelOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            <Field htmlFor="scoresheet-subject" label="Subject">
+              <Select
+                id="scoresheet-subject"
+                onChange={(event) => setSelectedSubjectOptionId(event.target.value)}
+                value={selectedSubjectOptionId}
+              >
+                <option value="">All subjects</option>
+                {availableSubjectOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
 
             <Field htmlFor="scoresheet-class" label="Class">
               <Select
@@ -1031,7 +1126,7 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                                     {assessment.categoryId
                                       ? categoryNameById.get(assessment.categoryId) ?? "Category"
                                       : "No category"}{" "}
-                                    • {assessment.dueAt ? new Date(assessment.dueAt).toLocaleDateString() : "No date"}
+                                    • {assessment.dueAt ? formatDateOnly(assessment.dueAt, "No date") : "No date"}
                                   </span>
                                   <span className="mt-0.5 block text-xs font-normal text-slate-500">
                                     {assessment.assessmentType.name}
@@ -1067,7 +1162,7 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                                 {assessment.categoryId
                                   ? categoryNameById.get(assessment.categoryId) ?? "Category"
                                   : "No category"}{" "}
-                                • {assessment.dueAt ? new Date(assessment.dueAt).toLocaleDateString() : "No date"}
+                                • {assessment.dueAt ? formatDateOnly(assessment.dueAt, "No date") : "No date"}
                               </span>
                               <span className="mt-0.5 block text-xs font-normal text-slate-500">
                                 {assessment.assessmentType.name}

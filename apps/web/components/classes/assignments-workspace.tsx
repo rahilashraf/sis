@@ -32,7 +32,7 @@ import {
   type AssessmentCategory,
   type GradebookSettings,
 } from "@/lib/api/gradebook";
-import { formatDateLabel, getLocalDateInputValue } from "@/lib/utils";
+import { formatDateOnly, normalizeDateOnlyPayload, parseDateOnly } from "@/lib/date";
 
 type Mode = "teacher" | "admin";
 
@@ -69,7 +69,7 @@ function buildDefaultForm(types: AssessmentType[]): AssessmentFormState {
 }
 
 function buildEditForm(assessment: Assessment): AssessmentFormState {
-  const dueDate = assessment.dueAt ? getLocalDateInputValue(new Date(assessment.dueAt)) : "";
+  const dueDate = normalizeDateOnlyPayload(assessment.dueAt);
 
   return {
     mode: "edit",
@@ -111,16 +111,16 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
       return null;
     }
 
-    const dueDate = new Date(`${formState.dueDate}T12:00:00`);
-    if (Number.isNaN(dueDate.getTime())) {
+    const dueDate = parseDateOnly(formState.dueDate);
+    if (!dueDate) {
       return null;
     }
 
     return (
       reportingPeriods.find((period) => {
-        const startsAt = new Date(period.startsAt);
-        const endsAt = new Date(period.endsAt);
-        return startsAt <= dueDate && dueDate <= endsAt;
+        const startsAt = parseDateOnly(period.startsAt);
+        const endsAt = parseDateOnly(period.endsAt);
+        return Boolean(startsAt && endsAt && startsAt <= dueDate && dueDate <= endsAt);
       }) ?? null
     );
   }, [formState.dueDate, reportingPeriods]);
@@ -375,7 +375,7 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
         assessmentTypeId: formState.assessmentTypeId,
         maxScore,
         ...(isAssessmentWeighted ? { weight } : {}),
-        dueAt: formState.dueDate ? new Date(formState.dueDate).toISOString() : undefined,
+        dueAt: formState.dueDate || undefined,
         isPublishedToParents: formState.isPublishedToParents,
       };
 
@@ -528,7 +528,7 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
                   <span className="font-medium text-slate-900">{assessment.title}</span>
                   <span className="text-xs text-slate-500">
                     Max {assessment.maxScore}
-                    {assessment.dueAt ? ` • ${formatDateLabel(assessment.dueAt)}` : ""}
+                    {assessment.dueAt ? ` • ${formatDateOnly(assessment.dueAt)}` : ""}
                   </span>
                 </button>
               ))}
@@ -924,7 +924,7 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
                               : "—"}
                         </td>
                         <td className="px-4 py-3 text-slate-600">
-                          {assessment.dueAt ? formatDateLabel(assessment.dueAt) : "—"}
+                          {assessment.dueAt ? formatDateOnly(assessment.dueAt) : "—"}
                         </td>
                         <td className="px-4 py-3 text-slate-600">{assessment.maxScore}</td>
                         <td className="px-4 py-3 text-slate-600">

@@ -8,11 +8,13 @@ export class CreateClassDto {
   schoolYearId: string;
 
   @IsString()
-  name: string;
+  gradeLevelId: string;
 
-  @IsOptional()
   @IsString()
-  subject?: string;
+  subjectOptionId: string;
+
+  @IsString()
+  name: string;
 
   @IsOptional()
   @IsBoolean()

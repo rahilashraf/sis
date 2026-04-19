@@ -1,4 +1,5 @@
 import { apiFetch } from "./client";
+import { normalizeDateOnlyPayload } from "../date";
 
 export type School = {
   id: string;
@@ -52,11 +53,15 @@ type RawSchoolYear = Omit<SchoolYear, "startDate" | "endDate"> & {
   startsAt?: string | null;
 };
 
+function toDateOnly(value?: string | null) {
+  return normalizeDateOnlyPayload(value);
+}
+
 function normalizeSchoolYear(schoolYear: RawSchoolYear): SchoolYear {
   return {
     ...schoolYear,
-    startDate: schoolYear.startDate ?? schoolYear.startsAt ?? "",
-    endDate: schoolYear.endDate ?? schoolYear.endsAt ?? "",
+    startDate: toDateOnly(schoolYear.startDate ?? schoolYear.startsAt ?? ""),
+    endDate: toDateOnly(schoolYear.endDate ?? schoolYear.endsAt ?? ""),
   };
 }
 
@@ -119,7 +124,11 @@ export async function listSchoolYears(
 export async function createSchoolYear(input: CreateSchoolYearInput) {
   const response = await apiFetch<RawSchoolYear>("/school-years", {
     method: "POST",
-    json: input,
+    json: {
+      ...input,
+      startDate: toDateOnly(input.startDate),
+      endDate: toDateOnly(input.endDate),
+    },
   });
 
   return normalizeSchoolYear(response);
@@ -131,7 +140,11 @@ export async function updateSchoolYear(
 ) {
   const response = await apiFetch<RawSchoolYear>(`/school-years/${schoolYearId}`, {
     method: "PATCH",
-    json: input,
+    json: {
+      ...input,
+      ...(input.startDate !== undefined ? { startDate: toDateOnly(input.startDate) } : {}),
+      ...(input.endDate !== undefined ? { endDate: toDateOnly(input.endDate) } : {}),
+    },
   });
 
   return normalizeSchoolYear(response);

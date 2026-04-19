@@ -18,6 +18,7 @@ import {
   isBypassRole,
   isSchoolAdminRole,
 } from '../common/access/school-access.util';
+import { formatDateOnly, parseDateOnlyOrThrow } from '../common/dates/date-only.util';
 import { safeUserSelect } from '../common/prisma/safe-user-response';
 
 type AuthUser = AuthenticatedUser;
@@ -257,20 +258,8 @@ export class FormsService {
       );
     }
 
-    const parsed = new Date(raw);
-    if (Number.isNaN(parsed.getTime())) {
-      throw new BadRequestException(`Field ${field.key} must be a valid date`);
-    }
-
-    return new Date(
-      Date.UTC(
-        parsed.getUTCFullYear(),
-        parsed.getUTCMonth(),
-        parsed.getUTCDate(),
-      ),
-    )
-      .toISOString()
-      .slice(0, 10);
+    const parsed = parseDateOnlyOrThrow(raw, `Field ${field.key}`);
+    return formatDateOnly(parsed);
   }
 
   private async getFormOrThrow(id: string) {

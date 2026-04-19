@@ -27,6 +27,7 @@ import {
 } from "@/lib/api/grade-levels";
 
 type GradeLevelsManagementProps = {
+  canManage?: boolean;
   selectedSchoolId: string;
   selectedSchoolName: string | null;
 };
@@ -66,6 +67,7 @@ function parseSortOrder(value: string) {
 }
 
 export function GradeLevelsManagement({
+  canManage = true,
   selectedSchoolId,
   selectedSchoolName,
 }: GradeLevelsManagementProps) {
@@ -256,6 +258,12 @@ export function GradeLevelsManagement({
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {successMessage ? <Notice tone="success">{successMessage}</Notice> : null}
 
+      {!canManage ? (
+        <Notice tone="info">
+          Grade levels are read-only for your role on this page.
+        </Notice>
+      ) : null}
+
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader>
@@ -267,44 +275,52 @@ export function GradeLevelsManagement({
           </CardHeader>
           <CardContent>
             {selectedSchoolId ? (
-              <form
-                className="grid gap-4 rounded-xl border border-slate-200 p-4 md:grid-cols-2"
-                onSubmit={handleCreateGradeLevel}
-              >
-                <Field htmlFor="create-grade-level-name" label="Grade level name">
-                  <Input
-                    id="create-grade-level-name"
-                    onChange={(event) =>
-                      setCreateForm((current) => ({
-                        ...current,
-                        name: event.target.value,
-                      }))
-                    }
-                    placeholder="Grade 1"
-                    value={createForm.name}
-                  />
-                </Field>
+              canManage ? (
+                <form
+                  className="grid gap-4 rounded-xl border border-slate-200 p-4 md:grid-cols-2"
+                  onSubmit={handleCreateGradeLevel}
+                >
+                  <Field htmlFor="create-grade-level-name" label="Grade level name">
+                    <Input
+                      id="create-grade-level-name"
+                      onChange={(event) =>
+                        setCreateForm((current) => ({
+                          ...current,
+                          name: event.target.value,
+                        }))
+                      }
+                      placeholder="Grade 1"
+                      value={createForm.name}
+                    />
+                  </Field>
 
-                <Field htmlFor="create-grade-level-sort-order" label="Display order">
-                  <Input
-                    id="create-grade-level-sort-order"
-                    inputMode="numeric"
-                    onChange={(event) =>
-                      setCreateForm((current) => ({
-                        ...current,
-                        sortOrder: event.target.value,
-                      }))
-                    }
-                    value={createForm.sortOrder}
-                  />
-                </Field>
+                  <Field htmlFor="create-grade-level-sort-order" label="Display order">
+                    <Input
+                      id="create-grade-level-sort-order"
+                      inputMode="numeric"
+                      onChange={(event) =>
+                        setCreateForm((current) => ({
+                          ...current,
+                          sortOrder: event.target.value,
+                        }))
+                      }
+                      value={createForm.sortOrder}
+                    />
+                  </Field>
 
-                <div className="md:col-span-2 flex justify-end">
-                  <Button disabled={isCreating} type="submit">
-                    {isCreating ? "Creating..." : "Create grade level"}
-                  </Button>
-                </div>
-              </form>
+                  <div className="md:col-span-2 flex justify-end">
+                    <Button disabled={isCreating} type="submit">
+                      {isCreating ? "Creating..." : "Create grade level"}
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <EmptyState
+                  compact
+                  description="Only owners and super admins can create or edit grade levels."
+                  title="Read-only access"
+                />
+              )
             ) : (
               <EmptyState
                 compact
@@ -315,7 +331,7 @@ export function GradeLevelsManagement({
           </CardContent>
         </Card>
 
-        {editingGradeLevel && editForm ? (
+        {canManage && editingGradeLevel && editForm ? (
           <Card>
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -438,55 +454,59 @@ export function GradeLevelsManagement({
                           </Badge>
                         </td>
                         <td className="px-4 py-4">
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              disabled={isSaving || isRunningAction}
-                              onClick={() => {
-                                setEditingGradeLevel(gradeLevel);
-                                setEditForm(buildEditForm(gradeLevel));
-                                setError(null);
-                                setSuccessMessage(null);
-                              }}
-                              type="button"
-                              variant="secondary"
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              disabled={isSaving || isRunningAction}
-                              onClick={() => {
-                                setActionTarget({
-                                  id: gradeLevel.id,
-                                  action: gradeLevel.isActive ? "archive" : "activate",
-                                  label: gradeLevel.name,
-                                  studentCount: gradeLevel._count.students,
-                                });
-                                setError(null);
-                                setSuccessMessage(null);
-                              }}
-                              type="button"
-                              variant={gradeLevel.isActive ? "danger" : "primary"}
-                            >
-                              {gradeLevel.isActive ? "Archive" : "Unarchive"}
-                            </Button>
-                            <Button
-                              disabled={isSaving || isRunningAction}
-                              onClick={() => {
-                                setActionTarget({
-                                  id: gradeLevel.id,
-                                  action: "delete",
-                                  label: gradeLevel.name,
-                                  studentCount: gradeLevel._count.students,
-                                });
-                                setError(null);
-                                setSuccessMessage(null);
-                              }}
-                              type="button"
-                              variant="danger"
-                            >
-                              Delete
-                            </Button>
-                          </div>
+                          {canManage ? (
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                disabled={isSaving || isRunningAction}
+                                onClick={() => {
+                                  setEditingGradeLevel(gradeLevel);
+                                  setEditForm(buildEditForm(gradeLevel));
+                                  setError(null);
+                                  setSuccessMessage(null);
+                                }}
+                                type="button"
+                                variant="secondary"
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                disabled={isSaving || isRunningAction}
+                                onClick={() => {
+                                  setActionTarget({
+                                    id: gradeLevel.id,
+                                    action: gradeLevel.isActive ? "archive" : "activate",
+                                    label: gradeLevel.name,
+                                    studentCount: gradeLevel._count.students,
+                                  });
+                                  setError(null);
+                                  setSuccessMessage(null);
+                                }}
+                                type="button"
+                                variant={gradeLevel.isActive ? "danger" : "primary"}
+                              >
+                                {gradeLevel.isActive ? "Archive" : "Unarchive"}
+                              </Button>
+                              <Button
+                                disabled={isSaving || isRunningAction}
+                                onClick={() => {
+                                  setActionTarget({
+                                    id: gradeLevel.id,
+                                    action: "delete",
+                                    label: gradeLevel.name,
+                                    studentCount: gradeLevel._count.students,
+                                  });
+                                  setError(null);
+                                  setSuccessMessage(null);
+                                }}
+                                type="button"
+                                variant="danger"
+                              >
+                                Delete
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-500">Read-only</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -540,7 +560,7 @@ export function GradeLevelsManagement({
               : `Unarchive ${actionTarget?.label}? This will make the option available in student grade-level dropdowns again.`
         }
         errorMessage={error}
-        isOpen={actionTarget !== null}
+        isOpen={canManage && actionTarget !== null}
         isPending={isRunningAction}
         onCancel={() => {
           if (!isRunningAction) {

@@ -28,6 +28,7 @@ import {
   updateReportingPeriod,
   type ReportingPeriod,
 } from "@/lib/api/reporting-periods";
+import { normalizeDateOnlyPayload } from "@/lib/date";
 import { formatDateLabel } from "@/lib/utils";
 
 const allowedRoles = new Set(["OWNER", "SUPER_ADMIN"]);
@@ -49,8 +50,8 @@ function buildEditForm(period: ReportingPeriod): PeriodFormState {
     name: period.name,
     key: period.key,
     order: String(period.order),
-    startsAt: period.startsAt.slice(0, 10),
-    endsAt: period.endsAt.slice(0, 10),
+    startsAt: normalizeDateOnlyPayload(period.startsAt),
+    endsAt: normalizeDateOnlyPayload(period.endsAt),
   };
 }
 

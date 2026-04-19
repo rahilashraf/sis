@@ -1,0 +1,5 @@
+-- RenameIndex
+ALTER INDEX "Class_schoolId_schoolYearId_gradeLevelId_subjectOptionId_isActi" RENAME TO "Class_schoolId_schoolYearId_gradeLevelId_subjectOptionId_is_idx";
+
+-- RenameIndex
+ALTER INDEX "Class_schoolId_schoolYearId_name_gradeLevelId_subjectOptionId_k" RENAME TO "Class_schoolId_schoolYearId_name_gradeLevelId_subjectOption_key";

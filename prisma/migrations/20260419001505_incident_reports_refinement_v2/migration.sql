@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "BehaviorIncidentWitness_behaviorIncidentReportId_sortOrder_crea" RENAME TO "BehaviorIncidentWitness_behaviorIncidentReportId_sortOrder__idx";

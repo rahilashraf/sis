@@ -27,6 +27,7 @@ import {
   isSchoolAdminRole,
   isTeacherRole,
 } from '../common/access/school-access.util';
+import { formatDateOnly, parseDateOnlyOrThrow } from '../common/dates/date-only.util';
 import {
   safeUserSelect,
   schoolSummarySelect,
@@ -229,15 +230,7 @@ export class AttendanceService {
   constructor(private readonly prisma: PrismaService) {}
 
   private normalizeDateOnly(input: string): Date {
-    const raw = new Date(input);
-
-    if (Number.isNaN(raw.getTime())) {
-      throw new BadRequestException('Invalid date');
-    }
-
-    return new Date(
-      Date.UTC(raw.getUTCFullYear(), raw.getUTCMonth(), raw.getUTCDate()),
-    );
+    return parseDateOnlyOrThrow(input, 'date');
   }
 
   private isAdminLike(role: UserRole) {
@@ -1566,8 +1559,8 @@ export class AttendanceService {
       schoolId: classContext.schoolId,
       schoolYearId: classContext.schoolYearId,
       className: classContext.name,
-      startDate: normalizedStartDate.toISOString().slice(0, 10),
-      endDate: normalizedEndDate.toISOString().slice(0, 10),
+      startDate: formatDateOnly(normalizedStartDate),
+      endDate: formatDateOnly(normalizedEndDate),
       totalSessions: sessions.length,
       totalRecords,
       sessions,
@@ -1921,8 +1914,8 @@ export class AttendanceService {
 
     return {
       studentId,
-      startDate: normalizedStartDate.toISOString().slice(0, 10),
-      endDate: normalizedEndDate.toISOString().slice(0, 10),
+      startDate: formatDateOnly(normalizedStartDate),
+      endDate: formatDateOnly(normalizedEndDate),
       totalDays: summarized.totalSessions,
       presentCount: summarized.presentCount,
       absentCount: summarized.absentCount,
@@ -2109,8 +2102,8 @@ export class AttendanceService {
 
     return {
       classId,
-      startDate: normalizedStartDate.toISOString().slice(0, 10),
-      endDate: normalizedEndDate.toISOString().slice(0, 10),
+      startDate: formatDateOnly(normalizedStartDate),
+      endDate: formatDateOnly(normalizedEndDate),
       totalSessions: summary.totalSessions,
       presentCount: summary.presentCount,
       absentCount: summary.absentCount,

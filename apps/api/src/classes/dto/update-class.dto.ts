@@ -7,7 +7,11 @@ export class UpdateClassDto {
 
   @IsOptional()
   @IsString()
-  subject?: string;
+  gradeLevelId?: string;
+
+  @IsOptional()
+  @IsString()
+  subjectOptionId?: string;
 
   @IsOptional()
   @IsBoolean()

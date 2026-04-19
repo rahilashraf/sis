@@ -92,7 +92,7 @@ describe('SchoolsController (HTTP)', () => {
     await app.close();
   });
 
-  it('creates a school for admin-level access', async () => {
+  it('creates a school for owner/super admin access', async () => {
     prisma.school.create.mockResolvedValue({
       id: 'school-2',
       name: 'South School',
@@ -102,8 +102,8 @@ describe('SchoolsController (HTTP)', () => {
 
     await request(app.getHttpServer())
       .post('/schools')
-      .set('x-test-user-id', 'admin-1')
-      .set('x-test-role', UserRole.ADMIN)
+      .set('x-test-user-id', 'owner-1')
+      .set('x-test-role', UserRole.OWNER)
       .send({
         name: 'South School',
         shortName: 'SS',
@@ -118,12 +118,6 @@ describe('SchoolsController (HTTP)', () => {
 
     expect(prisma.school.create).toHaveBeenCalledWith({
       data: {
-        memberships: {
-          create: {
-            userId: 'admin-1',
-            isActive: true,
-          },
-        },
         name: 'South School',
         shortName: 'SS',
       },
@@ -149,6 +143,20 @@ describe('SchoolsController (HTTP)', () => {
       .set('x-test-role', UserRole.OWNER)
       .expect(200)
       .expect({ success: true });
+  });
+
+  it('returns 403 when admin attempts to create a school', async () => {
+    await request(app.getHttpServer())
+      .post('/schools')
+      .set('x-test-user-id', 'admin-1')
+      .set('x-test-role', UserRole.ADMIN)
+      .send({
+        name: 'South School',
+        shortName: 'SS',
+      })
+      .expect(403);
+
+    expect(prisma.school.create).not.toHaveBeenCalled();
   });
 
   it('returns 403 for non-admin school deletion access', async () => {

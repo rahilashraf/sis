@@ -12,6 +12,7 @@ import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { normalizeDateOnlyPayload } from "@/lib/date";
 import {
   getStudentById,
   reRegisterStudent,
@@ -48,7 +49,7 @@ type FormState = {
 };
 
 function toDateInputValue(value: string | null) {
-  return value ? value.slice(0, 10) : "";
+  return normalizeDateOnlyPayload(value);
 }
 
 function normalizeText(value: string) {

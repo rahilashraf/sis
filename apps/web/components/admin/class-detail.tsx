@@ -19,6 +19,11 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth/auth-context";
 import { formatRoleLabel } from "@/lib/utils";
+import { listGradeLevels, type GradeLevel } from "@/lib/api/grade-levels";
+import {
+  listEnrollmentSubjectOptions,
+  type EnrollmentSubjectOption,
+} from "@/lib/api/enrollment-history";
 import {
   assignTeacher,
   enrollStudent,
@@ -39,7 +44,8 @@ const studentRoles = new Set(["STUDENT"]);
 
 type ClassEditFormState = {
   name: string;
-  subject: string;
+  gradeLevelId: string;
+  subjectOptionId: string;
   isHomeroom: boolean;
   isActive: boolean;
 };
@@ -47,7 +53,8 @@ type ClassEditFormState = {
 function buildEditForm(schoolClass: SchoolClass): ClassEditFormState {
   return {
     name: schoolClass.name,
-    subject: schoolClass.subject ?? "",
+    gradeLevelId: schoolClass.gradeLevelId ?? "",
+    subjectOptionId: schoolClass.subjectOptionId ?? "",
     isHomeroom: schoolClass.isHomeroom,
     isActive: schoolClass.isActive,
   };
@@ -102,6 +109,8 @@ export function ClassDetail({ classId }: { classId: string }) {
   const [schoolClass, setSchoolClass] = useState<SchoolClass | null>(null);
   const [teachers, setTeachers] = useState<ManagedUser[]>([]);
   const [students, setStudents] = useState<ManagedUser[]>([]);
+  const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
+  const [subjectOptions, setSubjectOptions] = useState<EnrollmentSubjectOption[]>([]);
   const [editForm, setEditForm] = useState<ClassEditFormState | null>(null);
   const [teacherId, setTeacherId] = useState("");
   const [teacherAssignmentType, setTeacherAssignmentType] =
@@ -140,7 +149,11 @@ export function ClassDetail({ classId }: { classId: string }) {
         );
 
         if (canManageClasses) {
-          const userResponse = await listUsers();
+          const [userResponse, gradeLevelResponse, subjectOptionResponse] = await Promise.all([
+            listUsers(),
+            listGradeLevels(classResponse.schoolId, { includeInactive: false }),
+            listEnrollmentSubjectOptions({ includeInactive: false }),
+          ]);
           const classTeachers = userResponse.filter(
             (user) =>
               teacherRoles.has(user.role) &&
@@ -158,6 +171,8 @@ export function ClassDetail({ classId }: { classId: string }) {
 
           setTeachers(classTeachers);
           setStudents(classStudents);
+          setGradeLevels(gradeLevelResponse.filter((gradeLevel) => gradeLevel.isActive));
+          setSubjectOptions(subjectOptionResponse.filter((option) => option.isActive));
           setTeacherId(classTeachers[0]?.id ?? "");
           setStudentId(classStudents[0]?.id ?? "");
         }
@@ -244,7 +259,8 @@ export function ClassDetail({ classId }: { classId: string }) {
     try {
       await updateClass(classId, {
         name: editForm.name.trim(),
-        subject: editForm.subject.trim() || undefined,
+        gradeLevelId: editForm.gradeLevelId,
+        subjectOptionId: editForm.subjectOptionId,
         isHomeroom: editForm.isHomeroom,
         isActive: editForm.isActive,
       });
@@ -493,7 +509,7 @@ export function ClassDetail({ classId }: { classId: string }) {
 
       {schoolClass ? (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <Card>
               <CardContent className="pt-6">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -530,10 +546,21 @@ export function ClassDetail({ classId }: { classId: string }) {
             <Card>
               <CardContent className="pt-6">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Grade level
+                </p>
+                <p className="mt-2 text-sm font-medium text-slate-900">
+                  {schoolClass.gradeLevel?.name ?? "Not specified"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Subject
                 </p>
                 <p className="mt-2 text-sm font-medium text-slate-900">
-                  {schoolClass.subject || "Not specified"}
+                  {schoolClass.subjectOption?.name ?? schoolClass.subject ?? "Not specified"}
                 </p>
               </CardContent>
             </Card>
@@ -567,21 +594,52 @@ export function ClassDetail({ classId }: { classId: string }) {
                     />
                   </Field>
 
-                  <Field htmlFor="edit-class-subject" label="Subject">
-                    <Input
-                      id="edit-class-subject"
+                  <Field htmlFor="edit-class-grade-level" label="Grade level">
+                    <Select
+                      id="edit-class-grade-level"
                       onChange={(event) =>
                         setEditForm((current) =>
                           current
                             ? {
                                 ...current,
-                                subject: event.target.value,
+                                gradeLevelId: event.target.value,
                               }
                             : current,
                         )
                       }
-                      value={editForm.subject}
-                    />
+                      value={editForm.gradeLevelId}
+                    >
+                      <option value="">Select grade level</option>
+                      {gradeLevels.map((gradeLevel) => (
+                        <option key={gradeLevel.id} value={gradeLevel.id}>
+                          {gradeLevel.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+
+                  <Field htmlFor="edit-class-subject-option" label="Subject">
+                    <Select
+                      id="edit-class-subject-option"
+                      onChange={(event) =>
+                        setEditForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                subjectOptionId: event.target.value,
+                              }
+                            : current,
+                        )
+                      }
+                      value={editForm.subjectOptionId}
+                    >
+                      <option value="">Select subject</option>
+                      {subjectOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </Select>
                   </Field>
 
                   <CheckboxField
@@ -617,7 +675,10 @@ export function ClassDetail({ classId }: { classId: string }) {
                   />
 
                   <div className="md:col-span-2 flex justify-end">
-                    <Button disabled={isSubmitting} type="submit">
+                    <Button
+                      disabled={isSubmitting || !editForm.gradeLevelId || !editForm.subjectOptionId}
+                      type="submit"
+                    >
                       {isSubmitting ? "Saving..." : "Save class"}
                     </Button>
                   </div>
