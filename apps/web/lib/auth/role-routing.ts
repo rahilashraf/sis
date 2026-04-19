@@ -31,6 +31,7 @@ export function getNavigationItems(role: UserRole) {
       { href: "/admin/attendance", label: "Attendance" },
       { href: "/admin/users", label: "Users" },
       { href: "/admin/classes", label: "Classes" },
+      { href: "/admin/timetable", label: "Timetable" },
       { href: "/admin/gradebook", label: "Gradebook" },
       { href: "/admin/behavior", label: "Incident Reports" },
       { href: "/admin/forms", label: "Forms" },
@@ -62,6 +63,7 @@ export function getNavigationItems(role: UserRole) {
       { href: "/admin/attendance", label: "Attendance" },
       { href: "/admin/users", label: "Users" },
       { href: "/admin/classes", label: "Classes" },
+      { href: "/admin/timetable", label: "Timetable" },
       { href: "/admin/gradebook", label: "Gradebook" },
       { href: "/admin/behavior", label: "Incident Reports" },
       { href: "/admin/forms", label: "Forms" },
@@ -76,6 +78,7 @@ export function getNavigationItems(role: UserRole) {
     items.push(
       { href: "/admin/attendance", label: "Attendance" },
       { href: "/admin/classes", label: "Classes" },
+      { href: "/admin/timetable", label: "Timetable" },
       { href: "/admin/gradebook", label: "Gradebook" },
       { href: "/admin/behavior", label: "Incident Reports" },
       { href: "/admin/forms", label: "Forms" },
@@ -87,6 +90,7 @@ export function getNavigationItems(role: UserRole) {
   if (role === "TEACHER") {
     items.push(
       { href: "/teacher/attendance", label: "Attendance" },
+      { href: "/teacher/timetable", label: "Timetable" },
       { href: "/teacher/classes", label: "Classes" },
       { href: "/teacher/gradebook", label: "Gradebook" },
       { href: "/teacher/behavior", label: "Incident Reports" },
@@ -105,6 +109,12 @@ export function getNavigationItems(role: UserRole) {
 
   if (role === "PARENT") {
     items.push({ href: "/parent/forms", label: "Forms" });
+
+    return items;
+  }
+
+  if (role === "STUDENT") {
+    items.push({ href: "/student/timetable", label: "Timetable" });
   }
 
   return items;

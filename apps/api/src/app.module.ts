@@ -23,6 +23,7 @@ import { FormsModule } from './forms/forms.module';
 import { EnrollmentHistoryModule } from './enrollment-history/enrollment-history.module';
 import { BehaviorModule } from './behavior/behavior.module';
 import { AuditModule } from './audit/audit.module';
+import { TimetableModule } from './timetable/timetable.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { AuditModule } from './audit/audit.module';
     EnrollmentHistoryModule,
     BehaviorModule,
     AuditModule,
+    TimetableModule,
   ],
   controllers: [AppController],
   providers: [AppService],

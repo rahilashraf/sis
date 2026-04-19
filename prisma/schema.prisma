@@ -50,6 +50,16 @@ enum AttendanceScopeType {
   CUSTOM
 }
 
+enum TimetableDayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
 enum StudentDocumentType {
   HEALTH_CARD
   IMMUNIZATION_RECORD
@@ -198,6 +208,8 @@ model User {
   emergencyContactRelationship String?
   role         UserRole
   isActive     Boolean  @default(true)
+  archivedAt   DateTime?
+  archiveReason String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -231,6 +243,7 @@ model User {
   auditLogsAsActor       AuditLog[]         @relation("AuditActor")
   auditExports           AuditArchiveHistory[] @relation("AuditExportedBy")
   auditPurges            AuditArchiveHistory[] @relation("AuditPurgedBy")
+  taughtTimetableBlocks  TimetableBlock[]   @relation("TimetableBlockTeacher")
 
   @@unique([schoolId, studentNumber])
 }
@@ -263,6 +276,7 @@ model School {
   behaviorRecords        BehaviorRecord[]
   behaviorCategoryOptions BehaviorCategoryOption[]
   auditLogs              AuditLog[]
+  timetableBlocks        TimetableBlock[]
 }
 
 model GradeScale {
@@ -342,6 +356,7 @@ model SchoolYear {
   reportingPeriods   ReportingPeriod[]
   assessments        Assessment[]
   reRegistrationWindows ReRegistrationWindow[]
+  timetableBlocks    TimetableBlock[]
 
   @@unique([schoolId, name])
 }
@@ -595,6 +610,7 @@ model Class {
   assessments Assessment[]
   assessmentCategories AssessmentCategory[]
   gradeOverrides GradeOverride[]
+  timetableBlockLinks TimetableBlockClass[]
 
   attendanceSessionClasses AttendanceSessionClass[]
 
@@ -653,6 +669,44 @@ model AttendanceSession {
 
   @@index([schoolId, date])
   @@index([takenById, date])
+}
+
+model TimetableBlock {
+  id           String             @id @default(cuid())
+  schoolId     String
+  schoolYearId String
+  teacherId    String
+  dayOfWeek    TimetableDayOfWeek
+  startTime    String
+  endTime      String
+  roomLabel    String?
+  notes        String?
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  school     School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolYear SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+  teacher    User       @relation("TimetableBlockTeacher", fields: [teacherId], references: [id], onDelete: Restrict)
+
+  classes TimetableBlockClass[]
+
+  @@index([schoolId, schoolYearId, dayOfWeek, startTime, endTime, isActive])
+  @@index([teacherId, dayOfWeek, startTime, endTime, isActive])
+  @@index([roomLabel, dayOfWeek, startTime, endTime, isActive])
+}
+
+model TimetableBlockClass {
+  id               String   @id @default(cuid())
+  timetableBlockId String
+  classId          String
+  createdAt        DateTime @default(now())
+
+  timetableBlock TimetableBlock @relation(fields: [timetableBlockId], references: [id], onDelete: Cascade)
+  class          Class          @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([timetableBlockId, classId])
+  @@index([classId])
 }
 
 model AttendanceSessionClass {

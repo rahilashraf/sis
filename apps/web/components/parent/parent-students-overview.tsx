@@ -226,6 +226,12 @@ export function ParentStudentsOverview() {
                   </Link>
                   <Link
                     className={buttonClassName({ variant: "secondary" })}
+                    href={`/parent/students/${selectedStudentId}/timetable`}
+                  >
+                    Timetable
+                  </Link>
+                  <Link
+                    className={buttonClassName({ variant: "secondary" })}
                     href={`/parent/forms?studentId=${encodeURIComponent(selectedStudentId)}`}
                   >
                     Forms
