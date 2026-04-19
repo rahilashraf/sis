@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { ManageUserMembershipsDto } from './dto/manage-user-memberships.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -60,6 +61,17 @@ export class UsersController {
     @Body() body: UpdateUserDto,
   ) {
     return this.usersService.update(req.user, id, body);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Patch(':id/memberships')
+  setMemberships(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+    @Body() body: ManageUserMembershipsDto,
+  ) {
+    return this.usersService.setMemberships(req.user, id, body);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

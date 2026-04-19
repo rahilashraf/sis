@@ -20,6 +20,7 @@ import { Select } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAuth } from "@/lib/auth/auth-context";
 import type { UserRole } from "@/lib/auth/types";
+import { getAccessibleSchoolIds as getUserAccessibleSchoolIds, getDefaultSchoolContextId } from "@/lib/auth/school-membership";
 import { formatRoleLabel } from "@/lib/utils";
 import { listSchools, type School } from "@/lib/api/schools";
 import { listGradeLevels, type GradeLevel } from "@/lib/api/grade-levels";
@@ -27,6 +28,7 @@ import {
   createUser,
   deleteUser,
   listUsers,
+  updateUserMemberships,
   updateUser as saveUser,
   type ManagedUser,
   type UpdateUserInput,
@@ -51,7 +53,8 @@ type CreateUserFormState = {
   email: string;
   password: string;
   role: UserRole;
-  schoolId: string;
+  schoolIds: string[];
+  primarySchoolId: string;
 };
 
 type EditUserFormState = {
@@ -71,7 +74,8 @@ const emptyCreateForm: CreateUserFormState = {
   email: "",
   password: "",
   role: "TEACHER",
-  schoolId: "",
+  schoolIds: [],
+  primarySchoolId: "",
 };
 
 function getRoleOptions(role: UserRole) {
@@ -97,7 +101,21 @@ function buildEditForm(user: ManagedUser): EditUserFormState {
 }
 
 function getPrimarySchoolId(user: ManagedUser) {
-  return user.memberships[0]?.schoolId ?? "";
+  return getDefaultSchoolContextId(user) ?? "";
+}
+
+function getUserSchoolIds(user: ManagedUser) {
+  return getUserAccessibleSchoolIds(user);
+}
+
+function toggleSchoolId(selectedSchoolIds: string[], schoolId: string, checked: boolean) {
+  if (checked) {
+    return selectedSchoolIds.includes(schoolId)
+      ? selectedSchoolIds
+      : [...selectedSchoolIds, schoolId];
+  }
+
+  return selectedSchoolIds.filter((entry) => entry !== schoolId);
 }
 
 function buildUpdatePayload(
@@ -161,6 +179,8 @@ export function UsersManagement() {
   const [createForm, setCreateForm] = useState<CreateUserFormState>(emptyCreateForm);
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
   const [editForm, setEditForm] = useState<EditUserFormState | null>(null);
+  const [editingSchoolIds, setEditingSchoolIds] = useState<string[]>([]);
+  const [editingPrimarySchoolId, setEditingPrimarySchoolId] = useState<string>("");
   const [deleteTarget, setDeleteTarget] = useState<ManagedUser | null>(null);
   const [showRemoved, setShowRemoved] = useState(false);
   const [roleFilter, setRoleFilter] = useState<UserRole | "ALL">("ALL");
@@ -205,7 +225,14 @@ export function UsersManagement() {
         setSchools(schoolResponse);
         setCreateForm((current) => ({
           ...current,
-          schoolId: current.schoolId || schoolResponse[0]?.id || "",
+          schoolIds:
+            current.schoolIds.length > 0
+              ? current.schoolIds
+              : schoolResponse[0]
+                ? [schoolResponse[0].id]
+                : [],
+          primarySchoolId:
+            current.primarySchoolId || current.schoolIds[0] || schoolResponse[0]?.id || "",
         }));
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Unable to load users.");
@@ -271,6 +298,9 @@ export function UsersManagement() {
   function handleStartEdit(user: ManagedUser) {
     setEditingUser(user);
     setEditForm(buildEditForm(user));
+    const userSchoolIds = getUserSchoolIds(user);
+    setEditingSchoolIds(userSchoolIds);
+    setEditingPrimarySchoolId(getPrimarySchoolId(user));
     setSuccessMessage(null);
     setError(null);
   }
@@ -290,14 +320,21 @@ export function UsersManagement() {
       if (
         currentRole !== "OWNER" &&
         currentRole !== "SUPER_ADMIN" &&
-        !createForm.schoolId
+        createForm.schoolIds.length === 0
       ) {
-        throw new Error("Select a school before creating this user.");
+        throw new Error("Select at least one school before creating this user.");
       }
 
       if (createForm.password.length < 6) {
         throw new Error("Password must be at least 6 characters.");
       }
+
+      const normalizedSchoolIds = Array.from(new Set(createForm.schoolIds.filter(Boolean)));
+      const primarySchoolId =
+        (createForm.primarySchoolId &&
+        normalizedSchoolIds.includes(createForm.primarySchoolId)
+          ? createForm.primarySchoolId
+          : normalizedSchoolIds[0]) || undefined;
 
       await createUser({
         firstName: createForm.firstName.trim(),
@@ -306,14 +343,16 @@ export function UsersManagement() {
         email: createForm.email.trim() || undefined,
         password: createForm.password,
         role: createForm.role,
-        schoolId: createForm.schoolId || undefined,
+        schoolId: primarySchoolId,
+        schoolIds: normalizedSchoolIds,
       });
 
       await refreshUsers();
       setCreateForm({
         ...emptyCreateForm,
         role: createForm.role,
-        schoolId: createForm.schoolId,
+        schoolIds: normalizedSchoolIds,
+        primarySchoolId: primarySchoolId ?? "",
       });
       setSuccessMessage("User created successfully.");
     } catch (submissionError) {
@@ -344,22 +383,51 @@ export function UsersManagement() {
       }
 
       const payload = buildUpdatePayload(editingUser, editForm);
+      const originalSchoolIds = getUserSchoolIds(editingUser);
+      const normalizedEditingSchoolIds = Array.from(
+        new Set(editingSchoolIds.filter(Boolean)),
+      );
+      const hasMembershipChanges =
+        originalSchoolIds.length !== normalizedEditingSchoolIds.length ||
+        originalSchoolIds.some((schoolId) => !normalizedEditingSchoolIds.includes(schoolId)) ||
+        getPrimarySchoolId(editingUser) !== editingPrimarySchoolId;
 
-      if (Object.keys(payload).length === 0) {
+      if (Object.keys(payload).length === 0 && !hasMembershipChanges) {
         setSuccessMessage("No changes to save.");
         setIsSubmitting(false);
         return;
       }
 
-      const updatedUser = await saveUser(editingUser.id, payload);
+      if (normalizedEditingSchoolIds.length === 0) {
+        throw new Error("At least one school assignment is required.");
+      }
+
+      const effectivePrimarySchoolId =
+        editingPrimarySchoolId && normalizedEditingSchoolIds.includes(editingPrimarySchoolId)
+          ? editingPrimarySchoolId
+          : normalizedEditingSchoolIds[0];
+
+      const updatedUser =
+        Object.keys(payload).length > 0
+          ? await saveUser(editingUser.id, payload)
+          : editingUser;
+
+      const updatedUserWithMemberships = hasMembershipChanges
+        ? await updateUserMemberships(editingUser.id, {
+            schoolIds: normalizedEditingSchoolIds,
+            primarySchoolId: effectivePrimarySchoolId,
+          })
+        : updatedUser;
 
       await refreshUsers();
-      setEditingUser(updatedUser);
-      setEditForm(buildEditForm(updatedUser));
+      setEditingUser(updatedUserWithMemberships);
+      setEditForm(buildEditForm(updatedUserWithMemberships));
+      setEditingSchoolIds(getUserSchoolIds(updatedUserWithMemberships));
+      setEditingPrimarySchoolId(getPrimarySchoolId(updatedUserWithMemberships));
       setSuccessMessage("User updated successfully.");
 
-      if (session?.user.id === updatedUser.id) {
-        updateSessionUser(updatedUser);
+      if (session?.user.id === updatedUserWithMemberships.id) {
+        updateSessionUser(updatedUserWithMemberships);
       }
     } catch (submissionError) {
       setError(
@@ -427,6 +495,8 @@ export function UsersManagement() {
       if (editingUser?.id === deleteTarget.id) {
         setEditingUser(null);
         setEditForm(null);
+        setEditingSchoolIds([]);
+        setEditingPrimarySchoolId("");
       }
 
       setSuccessMessage(
@@ -447,15 +517,17 @@ export function UsersManagement() {
   }
 
   function getSchoolLabel(user: ManagedUser) {
-    const schoolId = getPrimarySchoolId(user);
-
-    if (!schoolId) {
+    const schoolIds = getUserSchoolIds(user);
+    if (schoolIds.length === 0) {
       return "No school assigned";
     }
 
-    return (
-      schools.find((school) => school.id === schoolId)?.name ?? "School assignment unavailable"
-    );
+    const schoolLabels = schoolIds.map((schoolId) => {
+      const school = schools.find((entry) => entry.id === schoolId);
+      return school?.shortName ?? school?.name ?? schoolId;
+    });
+
+    return schoolLabels.join(", ");
   }
 
   if (!canManageUsers) {
@@ -598,27 +670,75 @@ export function UsersManagement() {
 
               <Field
                 className="md:col-span-2"
-                description="Admins should attach each user to the correct school before access is granted."
-                htmlFor="create-user-school"
-                label="School"
+                description="Assign one or more schools. Access is scoped to active school memberships."
+                htmlFor="create-user-school-primary"
+                label="School assignments"
               >
-                <Select
-                  id="create-user-school"
-                  onChange={(event) =>
-                    setCreateForm((current) => ({
-                      ...current,
-                      schoolId: event.target.value,
-                    }))
-                  }
-                  value={createForm.schoolId}
-                >
-                  <option value="">Select school</option>
-                  {schools.map((school) => (
-                    <option key={school.id} value={school.id}>
-                      {school.name}
-                    </option>
-                  ))}
-                </Select>
+                <div className="space-y-3 rounded-xl border border-slate-200 p-3">
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {schools.map((school) => {
+                      const checked = createForm.schoolIds.includes(school.id);
+                      return (
+                        <label
+                          key={school.id}
+                          className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                        >
+                          <input
+                            checked={checked}
+                            className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-4 focus:ring-slate-950/10"
+                            onChange={(event) =>
+                              setCreateForm((current) => {
+                                const nextSchoolIds = toggleSchoolId(
+                                  current.schoolIds,
+                                  school.id,
+                                  event.target.checked,
+                                );
+                                const nextPrimarySchoolId =
+                                  nextSchoolIds.length === 0
+                                    ? ""
+                                    : nextSchoolIds.includes(current.primarySchoolId)
+                                      ? current.primarySchoolId
+                                      : nextSchoolIds[0];
+                                return {
+                                  ...current,
+                                  schoolIds: nextSchoolIds,
+                                  primarySchoolId: nextPrimarySchoolId,
+                                };
+                              })
+                            }
+                            type="checkbox"
+                          />
+                          <span>{school.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  <Field htmlFor="create-user-school-primary" label="Default school">
+                    <Select
+                      id="create-user-school-primary"
+                      onChange={(event) =>
+                        setCreateForm((current) => ({
+                          ...current,
+                          primarySchoolId: event.target.value,
+                        }))
+                      }
+                      value={createForm.primarySchoolId}
+                    >
+                      {createForm.schoolIds.length === 0 ? (
+                        <option value="">Select school assignments first</option>
+                      ) : null}
+                      {createForm.schoolIds.map((schoolId) => {
+                        const school = schools.find((entry) => entry.id === schoolId);
+                        return (
+                          <option key={schoolId} value={schoolId}>
+                            {school?.name ?? schoolId}
+                          </option>
+                        );
+                      })}
+                    </Select>
+                  </Field>
+                </div>
               </Field>
 
               <div className="md:col-span-2 flex justify-end">
@@ -643,6 +763,8 @@ export function UsersManagement() {
                 onClick={() => {
                   setEditingUser(null);
                   setEditForm(null);
+                  setEditingSchoolIds([]);
+                  setEditingPrimarySchoolId("");
                 }}
                 type="button"
                 variant="secondary"
@@ -769,6 +891,71 @@ export function UsersManagement() {
                     type="password"
                     value={editForm.password}
                   />
+                </Field>
+
+                <Field
+                  className="md:col-span-2"
+                  description="Use active memberships to control cross-school access."
+                  htmlFor="edit-user-primary-school"
+                  label="School assignments"
+                >
+                  <div className="space-y-3 rounded-xl border border-slate-200 p-3">
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {schools.map((school) => {
+                        const checked = editingSchoolIds.includes(school.id);
+                        return (
+                          <label
+                            key={school.id}
+                            className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                          >
+                            <input
+                              checked={checked}
+                              className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-4 focus:ring-slate-950/10"
+                              onChange={(event) => {
+                                const nextSchoolIds = toggleSchoolId(
+                                  editingSchoolIds,
+                                  school.id,
+                                  event.target.checked,
+                                );
+                                setEditingSchoolIds(nextSchoolIds);
+                                setEditingPrimarySchoolId((current) => {
+                                  if (nextSchoolIds.length === 0) {
+                                    return "";
+                                  }
+                                  if (current && nextSchoolIds.includes(current)) {
+                                    return current;
+                                  }
+                                  return nextSchoolIds[0];
+                                });
+                              }}
+                              type="checkbox"
+                            />
+                            <span>{school.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    <Field htmlFor="edit-user-primary-school" label="Default school">
+                      <Select
+                        id="edit-user-primary-school"
+                        onChange={(event) => setEditingPrimarySchoolId(event.target.value)}
+                        value={editingPrimarySchoolId}
+                      >
+                        {editingSchoolIds.length === 0 ? (
+                          <option value="">Select school assignments first</option>
+                        ) : null}
+                        {editingSchoolIds.map((schoolId) => {
+                          const school = schools.find((entry) => entry.id === schoolId);
+                          return (
+                            <option key={schoolId} value={schoolId}>
+                              {school?.name ?? schoolId}
+                            </option>
+                          );
+                        })}
+                      </Select>
+                    </Field>
+                  </div>
                 </Field>
 
                 <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">

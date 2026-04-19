@@ -18,6 +18,7 @@ import {
   isBypassRole,
   isSchoolAdminRole,
 } from '../common/access/school-access.util';
+import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
 import { formatDateOnly, parseDateOnlyOrThrow } from '../common/dates/date-only.util';
 import { safeUserSelect } from '../common/prisma/safe-user-response';
 
@@ -289,6 +290,7 @@ export class FormsService {
             id: true,
             firstName: true,
             lastName: true,
+            schoolId: true,
             memberships: {
               where: { isActive: true },
               select: {
@@ -313,6 +315,7 @@ export class FormsService {
         student: {
           select: {
             id: true,
+            schoolId: true,
             memberships: {
               where: { isActive: true },
               select: {
@@ -481,11 +484,17 @@ export class FormsService {
         user.id,
         normalizedStudentId,
       );
-      schoolIds = linkedStudent.memberships.map((membership) => membership.schoolId);
+      schoolIds = getAccessibleSchoolIdsWithLegacyFallback({
+        memberships: linkedStudent.memberships,
+        legacySchoolId: linkedStudent.schoolId,
+      });
     } else {
       const linkedStudents = await this.getParentLinkedStudents(user.id);
       schoolIds = linkedStudents.flatMap((entry) =>
-        entry.student.memberships.map((membership) => membership.schoolId),
+        getAccessibleSchoolIdsWithLegacyFallback({
+          memberships: entry.student.memberships,
+          legacySchoolId: entry.student.schoolId,
+        }),
       );
     }
 
@@ -793,11 +802,17 @@ export class FormsService {
         user.id,
         studentId.trim(),
       );
-      schoolIds = linkedStudent.memberships.map((membership) => membership.schoolId);
+      schoolIds = getAccessibleSchoolIdsWithLegacyFallback({
+        memberships: linkedStudent.memberships,
+        legacySchoolId: linkedStudent.schoolId,
+      });
     } else {
       const linkedStudents = await this.getParentLinkedStudents(user.id);
       schoolIds = linkedStudents.flatMap((entry) =>
-        entry.student.memberships.map((membership) => membership.schoolId),
+        getAccessibleSchoolIdsWithLegacyFallback({
+          memberships: entry.student.memberships,
+          legacySchoolId: entry.student.schoolId,
+        }),
       );
     }
 
@@ -868,11 +883,13 @@ export class FormsService {
 
     const linkedStudents = await this.getParentLinkedStudents(user.id);
     const linkedStudentsInSchool = linkedStudents
-      .filter((entry) =>
-        entry.student.memberships.some(
-          (membership) => membership.schoolId === form.schoolId,
-        ),
-      )
+      .filter((entry) => {
+        const schoolIds = getAccessibleSchoolIdsWithLegacyFallback({
+          memberships: entry.student.memberships,
+          legacySchoolId: entry.student.schoolId,
+        });
+        return schoolIds.includes(form.schoolId);
+      })
       .map((entry) => entry.student);
 
     if (linkedStudentsInSchool.length === 0) {
@@ -886,9 +903,10 @@ export class FormsService {
       );
 
       if (
-        !selectedStudent.memberships.some(
-          (membership) => membership.schoolId === form.schoolId,
-        )
+        !getAccessibleSchoolIdsWithLegacyFallback({
+          memberships: selectedStudent.memberships,
+          legacySchoolId: selectedStudent.schoolId,
+        }).includes(form.schoolId)
       ) {
         throw new ForbiddenException('Selected student is not in the form school');
       }
@@ -949,18 +967,20 @@ export class FormsService {
         normalizedStudentId,
       );
       if (
-        !linkedStudent.memberships.some(
-          (membership) => membership.schoolId === form.schoolId,
-        )
+        !getAccessibleSchoolIdsWithLegacyFallback({
+          memberships: linkedStudent.memberships,
+          legacySchoolId: linkedStudent.schoolId,
+        }).includes(form.schoolId)
       ) {
         throw new ForbiddenException('Selected student is not in the form school');
       }
     } else {
       const linkedStudents = await this.getParentLinkedStudents(user.id);
       const hasSchoolAccess = linkedStudents.some((entry) =>
-        entry.student.memberships.some(
-          (membership) => membership.schoolId === form.schoolId,
-        ),
+        getAccessibleSchoolIdsWithLegacyFallback({
+          memberships: entry.student.memberships,
+          legacySchoolId: entry.student.schoolId,
+        }).includes(form.schoolId),
       );
       if (!hasSchoolAccess) {
         throw new ForbiddenException('You do not have access to this form');

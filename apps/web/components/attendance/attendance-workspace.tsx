@@ -18,6 +18,7 @@ import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/lib/auth/auth-context";
 import {
   formatAttendanceStatusLabel,
   formatDateLabel,
@@ -239,6 +240,7 @@ export function AttendanceWorkspace({
 }: {
   mode: "teacher" | "admin";
 }) {
+  const { selectedSchoolId: schoolContextId, setSelectedSchoolId: setSchoolContextId } = useAuth();
   const searchParams = useSearchParams();
   const requestedClassId = searchParams.get("classId") ?? "";
   const [classes, setClasses] = useState<SchoolClass[]>([]);
@@ -503,11 +505,18 @@ export function AttendanceWorkspace({
             ? requestedClassId
             : "";
         const initialClassId = requested || classResponse[0]?.id || "";
+        const contextSchoolId =
+          mode === "admin" &&
+          schoolContextId &&
+          classResponse.some((entry) => entry.schoolId === schoolContextId)
+            ? schoolContextId
+            : "";
         const initialSchoolId =
           mode === "admin"
-            ? classResponse.find((entry) => entry.id === initialClassId)?.schoolId ??
+            ? (classResponse.find((entry) => entry.id === initialClassId)?.schoolId ??
+              contextSchoolId ??
               classResponse[0]?.schoolId ??
-              ""
+              "")
             : "";
 
         setSelectedSchoolId((current) => {
@@ -540,7 +549,15 @@ export function AttendanceWorkspace({
     }
 
     void loadClasses();
-  }, [mode, requestedClassId]);
+  }, [mode, requestedClassId, schoolContextId]);
+
+  useEffect(() => {
+    if (mode !== "admin") {
+      return;
+    }
+
+    setSchoolContextId(selectedSchoolId || null);
+  }, [mode, selectedSchoolId, setSchoolContextId]);
 
   useEffect(() => {
     if (!selectedClassId && visibleClasses[0]) {

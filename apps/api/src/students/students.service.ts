@@ -13,6 +13,10 @@ import {
   isBypassRole,
   isSchoolAdminRole,
 } from '../common/access/school-access.util';
+import {
+  getAccessibleSchoolIdsWithLegacyFallback,
+  getPrimarySchoolIdWithLegacyFallback,
+} from '../common/access/school-membership.util';
 import { parseDateOnlyOrThrow } from '../common/dates/date-only.util';
 import {
   safeUserSchoolMembershipSelect,
@@ -171,6 +175,7 @@ export class StudentsService {
       select: {
         id: true,
         role: true,
+        schoolId: true,
         memberships: {
           where: {
             isActive: true,
@@ -206,17 +211,10 @@ export class StudentsService {
   private getPrimaryStudentSchoolId(
     student: Awaited<ReturnType<StudentsService['getStudentOrThrow']>>,
   ) {
-    if (student.memberships.length === 0) {
-      return null;
-    }
-
-    if (student.memberships.length > 1) {
-      throw new BadRequestException(
-        'Student profile updates require a single active school membership',
-      );
-    }
-
-    return student.memberships[0].schoolId;
+    return getPrimarySchoolIdWithLegacyFallback({
+      memberships: student.memberships,
+      legacySchoolId: student.schoolId,
+    });
   }
 
   private getMissingStudentProfileFieldName(error: unknown) {
@@ -385,8 +383,12 @@ export class StudentsService {
     }
 
     const accessibleSchoolIds = new Set(getAccessibleSchoolIds(actor));
-    const hasAccess = student.memberships.some((membership) =>
-      accessibleSchoolIds.has(membership.schoolId),
+    const studentSchoolIds = getAccessibleSchoolIdsWithLegacyFallback({
+      memberships: student.memberships,
+      legacySchoolId: student.schoolId,
+    });
+    const hasAccess = studentSchoolIds.some((schoolId) =>
+      accessibleSchoolIds.has(schoolId),
     );
 
     if (!hasAccess) {

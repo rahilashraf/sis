@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
+import { useAuth } from "@/lib/auth/auth-context";
 import { listClasses, listMyClasses, type SchoolClass } from "@/lib/api/classes";
 import {
   listAssessmentResultStatusLabels,
@@ -60,6 +61,7 @@ function getClassOptionLabel(schoolClass: SchoolClass) {
 }
 
 export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
+  const { selectedSchoolId: schoolContextId, setSelectedSchoolId: setSchoolContextId } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedClassId = searchParams.get("classId") ?? "";
@@ -406,11 +408,18 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
             ? requestedClassId
             : "";
         const initialClassId = requested || classResponse[0]?.id || "";
+        const contextSchoolId =
+          mode === "admin" &&
+          schoolContextId &&
+          classResponse.some((entry) => entry.schoolId === schoolContextId)
+            ? schoolContextId
+            : "";
         const initialSchoolId =
           mode === "admin"
-            ? classResponse.find((entry) => entry.id === initialClassId)?.schoolId ??
+            ? (classResponse.find((entry) => entry.id === initialClassId)?.schoolId ??
+              contextSchoolId ??
               classResponse[0]?.schoolId ??
-              ""
+              "")
             : "";
 
         setClasses(classResponse);
@@ -448,7 +457,15 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
     }
 
     void loadInitial();
-  }, [includeInactiveClasses, mode, requestedClassId]);
+  }, [includeInactiveClasses, mode, requestedClassId, schoolContextId]);
+
+  useEffect(() => {
+    if (mode !== "admin") {
+      return;
+    }
+
+    setSchoolContextId(selectedSchoolId || null);
+  }, [mode, selectedSchoolId, setSchoolContextId]);
 
   useEffect(() => {
     if (!selectedClassId && visibleClasses[0]) {

@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useAuth } from "@/lib/auth/auth-context";
 import {
   createAssessment,
   deleteAssessment,
@@ -126,6 +127,7 @@ function getFullName(firstName: unknown, lastName: unknown, fallback = "—") {
 }
 
 export function GradebookWorkspace({ mode }: { mode: Mode }) {
+  const { selectedSchoolId: schoolContextId, setSelectedSchoolId: setSchoolContextId } = useAuth();
   const searchParams = useSearchParams();
   const requestedClassId = searchParams.get("classId") ?? "";
   const [classes, setClasses] = useState<SchoolClass[]>([]);
@@ -466,11 +468,18 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
             ? requestedClassId
             : "";
         const initialClassId = requested || classResponse[0]?.id || "";
+        const contextSchoolId =
+          mode === "admin" &&
+          schoolContextId &&
+          classResponse.some((entry) => entry.schoolId === schoolContextId)
+            ? schoolContextId
+            : "";
         const initialSchoolId =
           mode === "admin"
-            ? classResponse.find((entry) => entry.id === initialClassId)?.schoolId ??
+            ? (classResponse.find((entry) => entry.id === initialClassId)?.schoolId ??
+              contextSchoolId ??
               classResponse[0]?.schoolId ??
-              ""
+              "")
             : "";
 
         setClasses(classResponse);
@@ -508,7 +517,15 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
     }
 
     void loadInitial();
-  }, [includeInactiveClasses, mode, requestedClassId]);
+  }, [includeInactiveClasses, mode, requestedClassId, schoolContextId]);
+
+  useEffect(() => {
+    if (mode !== "admin") {
+      return;
+    }
+
+    setSchoolContextId(selectedSchoolId || null);
+  }, [mode, selectedSchoolId, setSchoolContextId]);
 
   useEffect(() => {
     async function loadAssessmentTypes() {

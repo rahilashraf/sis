@@ -14,6 +14,7 @@ import { getStudentById, type StudentProfile } from "@/lib/api/students";
 import { listSchoolYears, type SchoolYear } from "@/lib/api/schools";
 import { getReRegistrationWindowStatus, type ReRegistrationWindowStatus } from "@/lib/api/re-registration";
 import { ParentReRegistrationForm } from "@/components/parent/re-registration-form";
+import { getDefaultSchoolContextId } from "@/lib/auth/school-membership";
 import { parseDateOnly } from "@/lib/date";
 
 function pickDefaultSchoolYear(years: SchoolYear[], now = new Date()) {
@@ -39,7 +40,7 @@ export function ParentReRegistrationGate({ studentId }: { studentId: string }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const schoolId = student?.memberships[0]?.schoolId ?? "";
+  const schoolId = getDefaultSchoolContextId(student) ?? "";
 
   const selectedYear = useMemo(
     () => schoolYears.find((year) => year.id === selectedSchoolYearId) ?? null,
@@ -55,7 +56,7 @@ export function ParentReRegistrationGate({ studentId }: { studentId: string }) {
         const profile = await getStudentById(studentId);
         setStudent(profile);
 
-        const membershipSchoolId = profile.memberships[0]?.schoolId ?? "";
+        const membershipSchoolId = getDefaultSchoolContextId(profile) ?? "";
         if (!membershipSchoolId) {
           setSchoolYears([]);
           setSelectedSchoolYearId("");

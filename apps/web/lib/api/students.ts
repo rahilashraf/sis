@@ -103,6 +103,7 @@ function normalizeStudentProfile(student: Partial<StudentProfile>): StudentProfi
 
   return {
     id: student.id ?? "",
+    schoolId: student.schoolId ?? null,
     username: student.username ?? "",
     email: student.email ?? null,
     firstName: student.firstName ?? "",

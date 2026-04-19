@@ -12,6 +12,7 @@ import {
   getAccessibleSchoolIds,
   isBypassRole,
 } from '../common/access/school-access.util';
+import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
 import { parseDateOnlyOrThrow } from '../common/dates/date-only.util';
 import { CreateEnrollmentHistoryDto } from './dto/create-enrollment-history.dto';
 import { UpdateEnrollmentHistoryDto } from './dto/update-enrollment-history.dto';
@@ -78,6 +79,7 @@ export class EnrollmentHistoryService {
       select: {
         id: true,
         role: true,
+        schoolId: true,
         memberships: {
           where: { isActive: true },
           select: { schoolId: true },
@@ -116,7 +118,10 @@ export class EnrollmentHistoryService {
       return;
     }
 
-    const studentSchoolIds = student.memberships.map((membership) => membership.schoolId);
+    const studentSchoolIds = getAccessibleSchoolIdsWithLegacyFallback({
+      memberships: student.memberships,
+      legacySchoolId: student.schoolId,
+    });
     const userSchoolIds = getAccessibleSchoolIds(user);
     const hasOverlap = studentSchoolIds.some((schoolId) =>
       userSchoolIds.includes(schoolId),

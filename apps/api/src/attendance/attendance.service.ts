@@ -27,6 +27,7 @@ import {
   isSchoolAdminRole,
   isTeacherRole,
 } from '../common/access/school-access.util';
+import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
 import { formatDateOnly, parseDateOnlyOrThrow } from '../common/dates/date-only.util';
 import {
   safeUserSelect,
@@ -667,6 +668,7 @@ export class AttendanceService {
       where: { id: studentId },
       select: {
         id: true,
+        schoolId: true,
         memberships: {
           where: {
             isActive: true,
@@ -683,8 +685,12 @@ export class AttendanceService {
     }
 
     const accessibleSchoolIds = new Set(getAccessibleSchoolIds(user));
-    const hasAccess = student.memberships.some((membership) =>
-      accessibleSchoolIds.has(membership.schoolId),
+    const studentSchoolIds = getAccessibleSchoolIdsWithLegacyFallback({
+      memberships: student.memberships,
+      legacySchoolId: student.schoolId,
+    });
+    const hasAccess = studentSchoolIds.some((schoolId) =>
+      accessibleSchoolIds.has(schoolId),
     );
 
     if (!hasAccess) {

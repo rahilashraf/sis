@@ -1,6 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/auth-user';
+import { getAccessibleSchoolIdsWithLegacyFallback } from './school-membership.util';
 
 export function isBypassRole(role: UserRole) {
   return (
@@ -23,9 +24,10 @@ export function isTeacherRole(role: UserRole) {
 }
 
 export function getAccessibleSchoolIds(user: AuthenticatedUser) {
-  return (user.memberships ?? [])
-    .filter((membership) => membership.isActive)
-    .map((membership) => membership.schoolId);
+  return getAccessibleSchoolIdsWithLegacyFallback({
+    memberships: user.memberships,
+    legacySchoolId: user.schoolId ?? null,
+  });
 }
 
 export function ensureUserHasSchoolAccess(

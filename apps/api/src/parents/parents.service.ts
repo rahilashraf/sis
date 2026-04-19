@@ -11,6 +11,7 @@ import {
   isBypassRole,
   isSchoolAdminRole,
 } from '../common/access/school-access.util';
+import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
 import { safeUserSelect } from '../common/prisma/safe-user-response';
 
 @Injectable()
@@ -27,6 +28,7 @@ export class ParentsService {
       select: {
         id: true,
         role: true,
+        schoolId: true,
         memberships: {
           where: {
             isActive: true,
@@ -59,8 +61,12 @@ export class ParentsService {
 
       if (!isBypassRole(actor.role)) {
         const accessibleSchoolIds = new Set(getAccessibleSchoolIds(actor));
-        const hasAccess = parent.memberships.some((membership) =>
-          accessibleSchoolIds.has(membership.schoolId),
+        const parentSchoolIds = getAccessibleSchoolIdsWithLegacyFallback({
+          memberships: parent.memberships,
+          legacySchoolId: parent.schoolId,
+        });
+        const hasAccess = parentSchoolIds.some((schoolId) =>
+          accessibleSchoolIds.has(schoolId),
         );
 
         if (!hasAccess) {

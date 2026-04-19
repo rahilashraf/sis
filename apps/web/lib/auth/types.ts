@@ -23,6 +23,7 @@ export type UserSchoolMembership = {
 
 export type AuthenticatedUser = {
   id: string;
+  schoolId: string | null;
   username: string;
   email: string | null;
   firstName: string;

@@ -17,6 +17,7 @@ export type CreateUserInput = {
   role: UserRole;
   isActive?: boolean;
   schoolId?: string;
+  schoolIds?: string[];
 };
 
 export type UpdateUserInput = {
@@ -27,6 +28,11 @@ export type UpdateUserInput = {
   lastName?: string;
   role?: UserRole;
   isActive?: boolean;
+};
+
+export type UpdateUserMembershipsInput = {
+  schoolIds: string[];
+  primarySchoolId?: string;
 };
 
 export function listUsers(options?: {
@@ -73,5 +79,12 @@ export function updateUser(userId: string, input: UpdateUserInput) {
 export function deleteUser(userId: string) {
   return apiFetch<UserRemovalResult>(`/users/${userId}`, {
     method: "DELETE",
+  });
+}
+
+export function updateUserMemberships(userId: string, input: UpdateUserMembershipsInput) {
+  return apiFetch<ManagedUser>(`/users/${userId}/memberships`, {
+    method: "PATCH",
+    json: input,
   });
 }

@@ -24,6 +24,7 @@ import { getAttendanceStudentSummary, type AttendanceStudentSummary } from "@/li
 import { listSchoolYears } from "@/lib/api/schools";
 import { getReRegistrationWindowStatus, type ReRegistrationWindowStatus } from "@/lib/api/re-registration";
 import { listParentForms, type ParentFormSummary } from "@/lib/api/forms";
+import { getDefaultSchoolContextId } from "@/lib/auth/school-membership";
 import { dateOnlyFromDate, parseDateOnly } from "@/lib/date";
 import { formatDisplayedPercent } from "@/lib/utils";
 
@@ -113,7 +114,7 @@ export function ParentStudentsOverview() {
         setAttendanceSummary(attendanceResponse);
         setParentForms(formsResponse);
 
-        const membershipSchoolId = selectedLink?.student.memberships[0]?.schoolId ?? "";
+        const membershipSchoolId = getDefaultSchoolContextId(selectedLink?.student) ?? "";
         if (!membershipSchoolId) {
           setReRegistrationStatus(null);
           return;
@@ -159,7 +160,7 @@ export function ParentStudentsOverview() {
     }
 
     void loadStudentDashboard();
-  }, [selectedLink?.student.memberships, selectedStudentId]);
+  }, [selectedLink?.student, selectedStudentId]);
 
   return (
     <div className="space-y-6">

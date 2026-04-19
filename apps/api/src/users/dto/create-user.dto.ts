@@ -1,8 +1,10 @@
 import { Transform } from 'class-transformer';
 import {
+  ArrayUnique,
   IsBoolean,
   IsEmail,
   IsEnum,
+  IsArray,
   IsOptional,
   IsString,
   MinLength,
@@ -66,4 +68,19 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   schoolId?: string;
+
+  @Transform(({ value }) => {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+
+    return value
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter(Boolean);
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  schoolIds?: string[];
 }

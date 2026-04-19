@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import { AppUserRole, CreateUserDto } from './dto/create-user.dto';
+import { ManageUserMembershipsDto } from './dto/manage-user-memberships.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
 import { AuthenticatedUser } from '../common/auth/auth-user';
@@ -17,6 +18,7 @@ import {
   isBypassRole,
   isHighPrivilegeRole,
 } from '../common/access/school-access.util';
+import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
 import { safeUserSelect } from '../common/prisma/safe-user-response';
 
 @Injectable()
@@ -32,6 +34,7 @@ export class UsersService {
       select: {
         id: true,
         role: true,
+        schoolId: true,
         memberships: {
           where: {
             isActive: true,
@@ -56,8 +59,12 @@ export class UsersService {
     }
 
     const accessibleSchoolIds = new Set(getAccessibleSchoolIds(actor));
-    const hasSchoolAccess = existingUser.memberships.some((membership) =>
-      accessibleSchoolIds.has(membership.schoolId),
+    const manageableSchoolIds = getAccessibleSchoolIdsWithLegacyFallback({
+      memberships: existingUser.memberships,
+      legacySchoolId: existingUser.schoolId,
+    });
+    const hasSchoolAccess = manageableSchoolIds.some((schoolId) =>
+      accessibleSchoolIds.has(schoolId),
     );
 
     if (!hasSchoolAccess) {
@@ -74,6 +81,59 @@ export class UsersService {
     if (!isHighPrivilegeRole(actor.role) && isHighPrivilegeRole(targetRole)) {
       throw new ForbiddenException('You cannot assign this role');
     }
+  }
+
+  private getNormalizedRequestedSchoolIds(options: {
+    schoolId?: string | null;
+    schoolIds?: string[] | null;
+  }) {
+    const normalizedSchoolIds = new Set<string>();
+
+    if (options.schoolId?.trim()) {
+      normalizedSchoolIds.add(options.schoolId.trim());
+    }
+
+    for (const schoolId of options.schoolIds ?? []) {
+      const normalizedSchoolId = schoolId.trim();
+      if (normalizedSchoolId) {
+        normalizedSchoolIds.add(normalizedSchoolId);
+      }
+    }
+
+    return [...normalizedSchoolIds];
+  }
+
+  private async ensureSchoolsExistAndAccessible(
+    actor: AuthenticatedUser,
+    schoolIds: string[],
+  ) {
+    for (const schoolId of schoolIds) {
+      if (!isBypassRole(actor.role)) {
+        ensureUserHasSchoolAccess(actor, schoolId);
+      }
+
+      const school = await this.prisma.school.findUnique({
+        where: { id: schoolId },
+        select: { id: true },
+      });
+
+      if (!school) {
+        throw new NotFoundException('School not found');
+      }
+    }
+  }
+
+  private resolvePrimarySchoolId(options: {
+    primarySchoolId?: string | null;
+    schoolIds: string[];
+  }) {
+    const normalizedPrimarySchoolId = options.primarySchoolId?.trim() || null;
+
+    if (normalizedPrimarySchoolId && !options.schoolIds.includes(normalizedPrimarySchoolId)) {
+      throw new BadRequestException('primarySchoolId must be included in schoolIds');
+    }
+
+    return normalizedPrimarySchoolId ?? options.schoolIds[0] ?? null;
   }
 
   findAll(
@@ -122,21 +182,30 @@ export class UsersService {
         ...(isBypassRole(user.role)
           ? {}
           : {
-              memberships: {
-                some: {
+              OR: [
+                {
+                  memberships: {
+                    some: {
+                      schoolId: {
+                        in: accessibleSchoolIds,
+                      },
+                      ...(includeInactive
+                        ? {}
+                        : {
+                            isActive: true,
+                            school: {
+                              isActive: true,
+                            },
+                          }),
+                    },
+                  },
+                },
+                {
                   schoolId: {
                     in: accessibleSchoolIds,
                   },
-                  ...(includeInactive
-                    ? {}
-                    : {
-                        isActive: true,
-                        school: {
-                          isActive: true,
-                        },
-                      }),
                 },
-              },
+              ],
             }),
       },
       orderBy,
@@ -145,28 +214,22 @@ export class UsersService {
   }
 
   async create(user: AuthenticatedUser, data: CreateUserDto) {
-    const { schoolId, password, ...userData } = data;
+    const { schoolId, schoolIds, password, ...userData } = data;
+    const requestedSchoolIds = this.getNormalizedRequestedSchoolIds({
+      schoolId,
+      schoolIds,
+    });
 
     this.ensureActorCanAssignRole(user, data.role);
 
-    if (!schoolId && !isHighPrivilegeRole(user.role)) {
+    if (requestedSchoolIds.length === 0 && !isHighPrivilegeRole(user.role)) {
       throw new BadRequestException(
-        'schoolId is required for school-scoped user creation',
+        'At least one school assignment is required for school-scoped user creation',
       );
     }
 
-    if (schoolId) {
-      ensureUserHasSchoolAccess(user, schoolId);
-
-      const school = await this.prisma.school.findUnique({
-        where: { id: schoolId },
-        select: { id: true },
-      });
-
-      if (!school) {
-        throw new NotFoundException('School not found');
-      }
-    }
+    await this.ensureSchoolsExistAndAccessible(user, requestedSchoolIds);
+    const primarySchoolId = requestedSchoolIds[0] ?? null;
 
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -174,17 +237,19 @@ export class UsersService {
       data: {
         ...userData,
         passwordHash,
-        school: schoolId
+        school: primarySchoolId
           ? {
               connect: {
-                id: schoolId,
+                id: primarySchoolId,
               },
             }
           : undefined,
-        memberships: schoolId
+        memberships: requestedSchoolIds.length
           ? {
-              create: {
-                schoolId,
+              createMany: {
+                data: requestedSchoolIds.map((membershipSchoolId) => ({
+                  schoolId: membershipSchoolId,
+                })),
               },
             }
           : undefined,
@@ -253,6 +318,74 @@ export class UsersService {
     return this.prisma.user.update({
       where: { id: userId },
       data: updateData,
+      select: safeUserSelect,
+    });
+  }
+
+  async setMemberships(
+    actor: AuthenticatedUser,
+    userId: string,
+    data: ManageUserMembershipsDto,
+  ) {
+    const existingUser = await this.getManageableUserOrThrow(actor, userId);
+    const normalizedSchoolIds = this.getNormalizedRequestedSchoolIds({
+      schoolIds: data.schoolIds,
+    });
+
+    if (normalizedSchoolIds.length === 0 && !isHighPrivilegeRole(actor.role)) {
+      throw new BadRequestException(
+        'At least one school assignment is required for school-scoped users',
+      );
+    }
+
+    await this.ensureSchoolsExistAndAccessible(actor, normalizedSchoolIds);
+    const primarySchoolId = this.resolvePrimarySchoolId({
+      primarySchoolId: data.primarySchoolId,
+      schoolIds: normalizedSchoolIds,
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.userSchoolMembership.updateMany({
+        where: {
+          userId: existingUser.id,
+          schoolId: {
+            notIn: normalizedSchoolIds,
+          },
+        },
+        data: {
+          isActive: false,
+        },
+      });
+
+      for (const schoolId of normalizedSchoolIds) {
+        await tx.userSchoolMembership.upsert({
+          where: {
+            userId_schoolId: {
+              userId: existingUser.id,
+              schoolId,
+            },
+          },
+          update: {
+            isActive: true,
+          },
+          create: {
+            userId: existingUser.id,
+            schoolId,
+            isActive: true,
+          },
+        });
+      }
+
+      await tx.user.update({
+        where: { id: existingUser.id },
+        data: {
+          schoolId: primarySchoolId,
+        },
+      });
+    });
+
+    return this.prisma.user.findUniqueOrThrow({
+      where: { id: existingUser.id },
       select: safeUserSelect,
     });
   }

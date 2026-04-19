@@ -14,7 +14,7 @@ type AppShellProps = {
 
 export function AppShell({ user, children }: AppShellProps) {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, selectedSchoolId, setSelectedSchoolId } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   function handleLogout() {
@@ -37,6 +37,8 @@ export function AppShell({ user, children }: AppShellProps) {
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <Topbar
           user={user}
+          selectedSchoolId={selectedSchoolId}
+          onSchoolChange={setSelectedSchoolId}
           onLogout={handleLogout}
           onToggleSidebar={() => setMobileOpen((current) => !current)}
         />

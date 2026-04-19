@@ -19,6 +19,10 @@ import path from 'node:path';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedUser } from '../common/auth/auth-user';
 import { getAccessibleSchoolIds, isBypassRole } from '../common/access/school-access.util';
+import {
+  getAccessibleSchoolIdsWithLegacyFallback,
+  getPrimarySchoolIdWithLegacyFallback,
+} from '../common/access/school-membership.util';
 import { parseDateOnlyOrNull, parseDateOnlyOrThrow } from '../common/dates/date-only.util';
 import { CreateBehaviorRecordDto } from './dto/create-behavior-record.dto';
 import { UpdateBehaviorRecordDto } from './dto/update-behavior-record.dto';
@@ -441,6 +445,7 @@ export class BehaviorService {
       select: {
         id: true,
         role: true,
+        schoolId: true,
         memberships: {
           where: { isActive: true },
           select: { schoolId: true },
@@ -458,7 +463,10 @@ export class BehaviorService {
   private getPrimarySchoolIdOrThrow(
     student: Awaited<ReturnType<BehaviorService['getStudentOrThrow']>>,
   ) {
-    const schoolId = student.memberships[0]?.schoolId;
+    const schoolId = getPrimarySchoolIdWithLegacyFallback({
+      memberships: student.memberships,
+      legacySchoolId: student.schoolId,
+    });
     if (!schoolId) {
       throw new BadRequestException(
         'Student must have an active school membership to record behavior',
@@ -487,8 +495,12 @@ export class BehaviorService {
     }
 
     const actorSchoolIds = new Set(getAccessibleSchoolIds(actor));
-    const hasOverlap = student.memberships.some((membership) =>
-      actorSchoolIds.has(membership.schoolId),
+    const studentSchoolIds = getAccessibleSchoolIdsWithLegacyFallback({
+      memberships: student.memberships,
+      legacySchoolId: student.schoolId,
+    });
+    const hasOverlap = studentSchoolIds.some((schoolId) =>
+      actorSchoolIds.has(schoolId),
     );
 
     if (!hasOverlap) {

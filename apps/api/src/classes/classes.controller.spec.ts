@@ -21,9 +21,30 @@ import { GradebookService } from '../gradebook/gradebook.service';
 class TestJwtAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
+    const schoolIdsHeader = request.headers['x-test-school-ids'];
+    const primarySchoolIdHeader = request.headers['x-test-primary-school-id'];
+    const schoolIdsRaw = Array.isArray(schoolIdsHeader)
+      ? schoolIdsHeader[0]
+      : schoolIdsHeader;
+    const schoolIds =
+      typeof schoolIdsRaw === 'string'
+        ? schoolIdsRaw
+            .split(',')
+            .map((entry: string) => entry.trim())
+            .filter(Boolean)
+        : [];
+    const primarySchoolId = Array.isArray(primarySchoolIdHeader)
+      ? primarySchoolIdHeader[0]
+      : primarySchoolIdHeader;
+
     request.user = {
       id: request.headers['x-test-user-id'],
       role: request.headers['x-test-role'],
+      schoolId: typeof primarySchoolId === 'string' ? primarySchoolId : undefined,
+      memberships: schoolIds.map((schoolId: string) => ({
+        schoolId,
+        isActive: true,
+      })),
     };
     return true;
   }
@@ -134,6 +155,7 @@ describe('ClassesController (HTTP)', () => {
       .get('/classes')
       .set('x-test-user-id', 'staff-1')
       .set('x-test-role', UserRole.STAFF)
+      .set('x-test-school-ids', 'school-1')
       .expect(200)
       .expect([
         {
@@ -141,6 +163,16 @@ describe('ClassesController (HTTP)', () => {
           name: 'Math',
         },
       ]);
+
+    expect(prisma.class.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          schoolId: {
+            in: ['school-1'],
+          },
+        }),
+      }),
+    );
   });
 
   it('returns 403 when a teacher requests all classes directly', async () => {
@@ -156,16 +188,63 @@ describe('ClassesController (HTTP)', () => {
   it('routes /classes/my to the teacher assigned-classes handler instead of the :id route', async () => {
     prisma.teacherClassAssignment.findMany.mockResolvedValue([
       { class: { id: 'class-1', name: 'Math' } },
+      { class: { id: 'class-2', name: 'Science' } },
     ]);
 
     await request(app.getHttpServer())
       .get('/classes/my')
       .set('x-test-user-id', 'teacher-1')
       .set('x-test-role', UserRole.TEACHER)
+      .set('x-test-school-ids', 'school-1,school-2')
       .expect(200)
-      .expect([{ id: 'class-1', name: 'Math' }]);
+      .expect([
+        { id: 'class-1', name: 'Math' },
+        { id: 'class-2', name: 'Science' },
+      ]);
 
     expect(prisma.class.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('scopes class listing to all assigned schools for multi-school staff users', async () => {
+    prisma.class.findMany.mockResolvedValue([]);
+
+    await request(app.getHttpServer())
+      .get('/classes')
+      .set('x-test-user-id', 'staff-1')
+      .set('x-test-role', UserRole.STAFF)
+      .set('x-test-school-ids', 'school-1,school-2')
+      .expect(200);
+
+    expect(prisma.class.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          schoolId: {
+            in: ['school-1', 'school-2'],
+          },
+        }),
+      }),
+    );
+  });
+
+  it('falls back to legacy user.schoolId when memberships are missing for staff users', async () => {
+    prisma.class.findMany.mockResolvedValue([]);
+
+    await request(app.getHttpServer())
+      .get('/classes')
+      .set('x-test-user-id', 'legacy-staff-1')
+      .set('x-test-role', UserRole.STAFF)
+      .set('x-test-primary-school-id', 'school-legacy')
+      .expect(200);
+
+    expect(prisma.class.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          schoolId: {
+            in: ['school-legacy'],
+          },
+        }),
+      }),
+    );
   });
 
   it('returns class students for an assigned teacher', async () => {

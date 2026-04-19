@@ -20,9 +20,30 @@ import { UsersService } from './users.service';
 class TestJwtAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
+    const schoolIdsHeader = request.headers['x-test-school-ids'];
+    const primarySchoolIdHeader = request.headers['x-test-primary-school-id'];
+    const schoolIdsRaw = Array.isArray(schoolIdsHeader)
+      ? schoolIdsHeader[0]
+      : schoolIdsHeader;
+    const schoolIds =
+      typeof schoolIdsRaw === 'string'
+        ? schoolIdsRaw
+            .split(',')
+            .map((entry: string) => entry.trim())
+            .filter(Boolean)
+        : [];
+    const primarySchoolId = Array.isArray(primarySchoolIdHeader)
+      ? primarySchoolIdHeader[0]
+      : primarySchoolIdHeader;
+
     request.user = {
       id: request.headers['x-test-user-id'],
       role: request.headers['x-test-role'],
+      schoolId: typeof primarySchoolId === 'string' ? primarySchoolId : undefined,
+      memberships: schoolIds.map((schoolId: string) => ({
+        schoolId,
+        isActive: true,
+      })),
     };
     return true;
   }
@@ -53,8 +74,13 @@ describe('UsersController (HTTP)', () => {
     user: {
       findMany: jest.Mock;
       findUnique: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
       delete: jest.Mock;
+      update: jest.Mock;
     };
+    userSchoolMembership: { updateMany: jest.Mock; upsert: jest.Mock };
+    school: { findUnique: jest.Mock };
+    $transaction: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -62,9 +88,22 @@ describe('UsersController (HTTP)', () => {
       user: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
         delete: jest.fn(),
+        update: jest.fn(),
       },
+      userSchoolMembership: { updateMany: jest.fn(), upsert: jest.fn() },
+      school: { findUnique: jest.fn() },
+      $transaction: jest.fn(),
     };
+
+    prisma.$transaction.mockImplementation(async (arg: unknown) => {
+      if (typeof arg === 'function') {
+        return arg(prisma);
+      }
+
+      return arg;
+    });
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
@@ -111,6 +150,7 @@ describe('UsersController (HTTP)', () => {
       .get('/users')
       .set('x-test-user-id', 'admin-1')
       .set('x-test-role', UserRole.ADMIN)
+      .set('x-test-school-ids', 'school-1')
       .expect(200)
       .expect([
         {
@@ -160,6 +200,37 @@ describe('UsersController (HTTP)', () => {
       .set('x-test-role', UserRole.OWNER)
       .expect(200)
       .expect({ success: true });
+  });
+
+  it('updates user memberships for admin-level access', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-2',
+      role: UserRole.TEACHER,
+      schoolId: 'school-1',
+      memberships: [{ schoolId: 'school-1', isActive: true }],
+    });
+    prisma.school.findUnique.mockResolvedValue({ id: 'school-1' });
+    prisma.user.findUniqueOrThrow.mockResolvedValue({
+      id: 'user-2',
+      username: 'teacher-2',
+      schoolId: 'school-1',
+      memberships: [{ schoolId: 'school-1', isActive: true }],
+    });
+
+    await request(app.getHttpServer())
+      .patch('/users/user-2/memberships')
+      .set('x-test-user-id', 'admin-1')
+      .set('x-test-role', UserRole.ADMIN)
+      .set('x-test-school-ids', 'school-1')
+      .send({
+        schoolIds: ['school-1'],
+        primarySchoolId: 'school-1',
+      })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.id).toBe('user-2');
+        expect(response.body.schoolId).toBe('school-1');
+      });
   });
 
   it('returns 403 for non-admin user deletion access', async () => {

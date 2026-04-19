@@ -5,17 +5,31 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import type { AuthenticatedUser } from "@/lib/auth/types";
+import { getActiveSchoolMemberships, getPrimarySchoolName } from "@/lib/auth/school-membership";
 import { formatRoleLabel, getInitials } from "@/lib/utils";
 
 type TopbarProps = {
   user: AuthenticatedUser;
+  selectedSchoolId: string | null;
+  onSchoolChange: (schoolId: string | null) => void;
   onLogout: () => void;
   onToggleSidebar: () => void;
 };
 
-export function Topbar({ user, onLogout, onToggleSidebar }: TopbarProps) {
-  const primarySchoolName = user.memberships[0]?.school.name;
+export function Topbar({
+  user,
+  selectedSchoolId,
+  onSchoolChange,
+  onLogout,
+  onToggleSidebar,
+}: TopbarProps) {
+  const schoolMemberships = getActiveSchoolMemberships(user);
+  const selectedSchoolName =
+    schoolMemberships.find((membership) => membership.schoolId === selectedSchoolId)?.school.name ??
+    getPrimarySchoolName(user);
+  const hasMultipleSchools = schoolMemberships.length > 1;
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -59,7 +73,7 @@ export function Topbar({ user, onLogout, onToggleSidebar }: TopbarProps) {
             <div className="leading-tight">
               <p className="text-sm font-semibold text-slate-900">AIOK SIS</p>
               <p className="text-xs text-slate-500 -mt-0.5">
-                {primarySchoolName ?? "Student Information System"}
+                {selectedSchoolName ?? "Student Information System"}
               </p>
             </div>
           </Link>
@@ -73,6 +87,22 @@ export function Topbar({ user, onLogout, onToggleSidebar }: TopbarProps) {
             <div className="mt-1 flex items-center justify-end gap-2">
               <Badge variant="neutral">{formatRoleLabel(user.role)}</Badge>
             </div>
+            {hasMultipleSchools ? (
+              <div className="mt-2">
+                <Select
+                  aria-label="School context"
+                  className="h-8 min-w-[180px] text-xs"
+                  value={selectedSchoolId ?? ""}
+                  onChange={(event) => onSchoolChange(event.target.value || null)}
+                >
+                  {schoolMemberships.map((membership) => (
+                    <option key={membership.schoolId} value={membership.schoolId}>
+                      {membership.school.shortName || membership.school.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            ) : null}
           </div>
 
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-sm font-semibold text-white">

@@ -20,6 +20,7 @@ import {
   isSchoolAdminRole,
   isTeacherRole,
 } from '../common/access/school-access.util';
+import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
 import {
   safeUserSelect,
   schoolSummarySelect,
@@ -225,6 +226,7 @@ export class ClassesService {
       select: {
         id: true,
         role: true,
+        schoolId: true,
         memberships: {
           where: {
             isActive: true,
@@ -244,7 +246,10 @@ export class ClassesService {
       throw new BadRequestException(`User must have role ${expectedRole}`);
     }
 
-    return user.memberships.map((membership) => membership.schoolId);
+    return getAccessibleSchoolIdsWithLegacyFallback({
+      memberships: user.memberships,
+      legacySchoolId: user.schoolId,
+    });
   }
 
   private buildActiveSupplyAssignmentWindowWhere(now: Date) {

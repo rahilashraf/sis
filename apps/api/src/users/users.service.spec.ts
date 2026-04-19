@@ -9,11 +9,13 @@ describe('UsersService', () => {
       findMany: jest.Mock;
       create: jest.Mock;
       findUnique: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
       update: jest.Mock;
       delete: jest.Mock;
     };
     userSchoolMembership: {
       updateMany: jest.Mock;
+      upsert: jest.Mock;
     };
     school: {
       findUnique: jest.Mock;
@@ -27,16 +29,24 @@ describe('UsersService', () => {
         findMany: jest.fn(),
         create: jest.fn(),
         findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
       },
       userSchoolMembership: {
         updateMany: jest.fn(),
+        upsert: jest.fn(),
       },
       school: {
         findUnique: jest.fn(),
       },
-      $transaction: jest.fn().mockResolvedValue([]),
+    $transaction: jest.fn().mockImplementation(async (arg: unknown) => {
+      if (typeof arg === 'function') {
+        return arg(prisma);
+      }
+
+      return arg;
+    }),
     };
 
     service = new UsersService(prisma as never);
@@ -77,6 +87,82 @@ describe('UsersService', () => {
         } as never,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('creates school-scoped users with multiple memberships', async () => {
+    prisma.school.findUnique.mockResolvedValue({ id: 'school-1' });
+    prisma.user.create.mockResolvedValue({ id: 'teacher-1' });
+
+    await service.create(
+      {
+        id: 'owner-1',
+        role: UserRole.OWNER,
+        memberships: [],
+      } as never,
+      {
+        username: 'teacher-1',
+        password: 'secret123',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        role: UserRole.TEACHER,
+        schoolIds: ['school-1'],
+      } as never,
+    );
+
+    expect(prisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          school: { connect: { id: 'school-1' } },
+          memberships: {
+            createMany: {
+              data: [{ schoolId: 'school-1' }],
+            },
+          },
+        }),
+      }),
+    );
+  });
+
+  it('supports legacy schoolId fallback when updating memberships', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'teacher-1',
+      role: UserRole.TEACHER,
+      schoolId: 'school-legacy',
+      memberships: [],
+    });
+    prisma.school.findUnique.mockResolvedValue({ id: 'school-legacy' });
+    prisma.user.findUniqueOrThrow.mockResolvedValue({
+      id: 'teacher-1',
+      role: UserRole.TEACHER,
+      schoolId: 'school-legacy',
+      memberships: [{ schoolId: 'school-legacy', isActive: true }],
+    });
+
+    const result = await service.setMemberships(
+      {
+        id: 'admin-1',
+        role: UserRole.ADMIN,
+        schoolId: 'school-legacy',
+        memberships: [],
+      } as never,
+      'teacher-1',
+      {
+        schoolIds: ['school-legacy'],
+        primarySchoolId: 'school-legacy',
+      },
+    );
+
+    expect(result.schoolId).toBe('school-legacy');
+    expect(prisma.userSchoolMembership.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId_schoolId: {
+            userId: 'teacher-1',
+            schoolId: 'school-legacy',
+          },
+        },
+      }),
+    );
   });
 
   it('blocks deleting the current user account', async () => {

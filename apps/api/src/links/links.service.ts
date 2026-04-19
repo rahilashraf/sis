@@ -13,6 +13,7 @@ import {
   getAccessibleSchoolIds,
   isBypassRole,
 } from '../common/access/school-access.util';
+import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
 import { safeUserSelect } from '../common/prisma/safe-user-response';
 
 @Injectable()
@@ -28,6 +29,7 @@ export class LinksService {
       select: {
         id: true,
         role: true,
+        schoolId: true,
         memberships: {
           where: {
             isActive: true,
@@ -45,9 +47,10 @@ export class LinksService {
 
     return {
       role: existingUser.role,
-      schoolIds: existingUser.memberships.map(
-        (membership) => membership.schoolId,
-      ),
+      schoolIds: getAccessibleSchoolIdsWithLegacyFallback({
+        memberships: existingUser.memberships,
+        legacySchoolId: existingUser.schoolId,
+      }),
     };
   }
 
@@ -165,6 +168,7 @@ export class LinksService {
         id: true,
         parent: {
           select: {
+            schoolId: true,
             memberships: {
               where: {
                 isActive: true,
@@ -177,6 +181,7 @@ export class LinksService {
         },
         student: {
           select: {
+            schoolId: true,
             memberships: {
               where: {
                 isActive: true,
@@ -196,10 +201,14 @@ export class LinksService {
 
     const linkedSchoolIds = [
       ...new Set([
-        ...existingLink.parent.memberships.map((membership) => membership.schoolId),
-        ...existingLink.student.memberships.map(
-          (membership) => membership.schoolId,
-        ),
+        ...getAccessibleSchoolIdsWithLegacyFallback({
+          memberships: existingLink.parent.memberships,
+          legacySchoolId: existingLink.parent.schoolId,
+        }),
+        ...getAccessibleSchoolIdsWithLegacyFallback({
+          memberships: existingLink.student.memberships,
+          legacySchoolId: existingLink.student.schoolId,
+        }),
       ]),
     ];
 

@@ -8,6 +8,10 @@ import { Prisma, StudentDocumentVisibility, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedUser } from '../common/auth/auth-user';
 import { getAccessibleSchoolIds, isBypassRole } from '../common/access/school-access.util';
+import {
+  getAccessibleSchoolIdsWithLegacyFallback,
+  getPrimarySchoolIdWithLegacyFallback,
+} from '../common/access/school-membership.util';
 
 const staffDocumentSelect = Prisma.validator<Prisma.StudentDocumentSelect>()({
   id: true,
@@ -73,6 +77,7 @@ export class StudentDocumentsService {
       select: {
         id: true,
         role: true,
+        schoolId: true,
         memberships: {
           where: { isActive: true },
           select: { schoolId: true },
@@ -123,8 +128,12 @@ export class StudentDocumentsService {
     }
 
     const accessibleSchoolIds = new Set(getAccessibleSchoolIds(actor));
-    const hasAccess = student.memberships.some((membership) =>
-      accessibleSchoolIds.has(membership.schoolId),
+    const studentSchoolIds = getAccessibleSchoolIdsWithLegacyFallback({
+      memberships: student.memberships,
+      legacySchoolId: student.schoolId,
+    });
+    const hasAccess = studentSchoolIds.some((schoolId) =>
+      accessibleSchoolIds.has(schoolId),
     );
 
     if (!hasAccess) {
@@ -180,7 +189,10 @@ export class StudentDocumentsService {
       throw new BadRequestException('Invalid document upload');
     }
 
-    const schoolId = student.memberships[0]?.schoolId ?? null;
+    const schoolId = getPrimarySchoolIdWithLegacyFallback({
+      memberships: student.memberships,
+      legacySchoolId: student.schoolId,
+    });
 
     return this.prisma.studentDocument.create({
       data: {

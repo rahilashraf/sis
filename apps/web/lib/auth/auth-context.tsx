@@ -13,11 +13,14 @@ import {
 import {
   clearStoredSession,
   getStoredSessionSnapshot,
+  getStoredSchoolContextSnapshot,
   storeSession,
+  storeSchoolContext,
   subscribeToStoredSession,
   type SessionSnapshot,
 } from "./storage";
 import type { AuthenticatedUser, StoredSession } from "./types";
+import { normalizeSchoolContextId } from "./school-membership";
 
 type AuthContextValue = {
   session: StoredSession | null;
@@ -25,8 +28,10 @@ type AuthContextValue = {
   user: AuthenticatedUser | null;
   accessToken: string | null;
   isAuthenticated: boolean;
+  selectedSchoolId: string | null;
   setSession: (session: StoredSession) => void;
   updateUser: (user: AuthenticatedUser) => void;
+  setSelectedSchoolId: (schoolId: string | null) => void;
   logout: () => void;
 };
 
@@ -37,6 +42,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionSnapshot = useSyncExternalStore<SessionSnapshot>(
     subscribeToStoredSession,
     getStoredSessionSnapshot,
+    () => null,
+  );
+  const selectedSchoolContextSnapshot = useSyncExternalStore<string | null>(
+    subscribeToStoredSession,
+    getStoredSchoolContextSnapshot,
     () => null,
   );
 
@@ -68,6 +78,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearStoredSession();
   }, []);
 
+  const setSelectedSchoolId = useCallback((schoolId: string | null) => {
+    storeSchoolContext(schoolId);
+  }, []);
+
+  const selectedSchoolId = useMemo(
+    () =>
+      normalizeSchoolContextId(
+        sessionSnapshot?.user ?? null,
+        selectedSchoolContextSnapshot,
+      ),
+    [selectedSchoolContextSnapshot, sessionSnapshot?.user],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session: sessionSnapshot,
@@ -79,11 +102,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: sessionSnapshot?.user ?? null,
       accessToken: sessionSnapshot?.accessToken ?? null,
       isAuthenticated: Boolean(sessionSnapshot?.accessToken),
+      selectedSchoolId,
+      setSession,
+      updateUser,
+      setSelectedSchoolId,
+      logout,
+    }),
+    [
+      hydrated,
+      selectedSchoolId,
+      sessionSnapshot,
+      setSelectedSchoolId,
       setSession,
       updateUser,
       logout,
-    }),
-    [hydrated, sessionSnapshot, setSession, updateUser, logout],
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
