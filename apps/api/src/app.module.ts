@@ -24,6 +24,7 @@ import { EnrollmentHistoryModule } from './enrollment-history/enrollment-history
 import { BehaviorModule } from './behavior/behavior.module';
 import { AuditModule } from './audit/audit.module';
 import { TimetableModule } from './timetable/timetable.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { TimetableModule } from './timetable/timetable.module';
     BehaviorModule,
     AuditModule,
     TimetableModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

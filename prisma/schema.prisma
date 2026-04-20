@@ -244,6 +244,11 @@ model User {
   auditExports           AuditArchiveHistory[] @relation("AuditExportedBy")
   auditPurges            AuditArchiveHistory[] @relation("AuditPurgedBy")
   taughtTimetableBlocks  TimetableBlock[]   @relation("TimetableBlockTeacher")
+  billingChargesAsStudent  BillingCharge[]   @relation("BillingChargeStudent")
+  createdBillingCharges    BillingCharge[]   @relation("BillingChargeCreatedBy")
+  voidedBillingCharges     BillingCharge[]   @relation("BillingChargeVoidedBy")
+  billingPaymentsAsStudent BillingPayment[]  @relation("BillingPaymentStudent")
+  recordedBillingPayments  BillingPayment[]  @relation("BillingPaymentRecordedBy")
 
   @@unique([schoolId, studentNumber])
 }
@@ -277,6 +282,9 @@ model School {
   behaviorCategoryOptions BehaviorCategoryOption[]
   auditLogs              AuditLog[]
   timetableBlocks        TimetableBlock[]
+  billingCategories      BillingCategory[]
+  billingCharges         BillingCharge[]
+  billingPayments        BillingPayment[]
 }
 
 model GradeScale {
@@ -357,6 +365,8 @@ model SchoolYear {
   assessments        Assessment[]
   reRegistrationWindows ReRegistrationWindow[]
   timetableBlocks    TimetableBlock[]
+  billingCharges     BillingCharge[]
+  billingPayments    BillingPayment[]
 
   @@unique([schoolId, name])
 }
@@ -1069,4 +1079,123 @@ model AuditArchiveHistory {
   @@index([createdAt])
   @@index([action, createdAt])
   @@index([fromDate, toDate])
+}
+
+enum ChargeStatus {
+  PENDING
+  PAID
+  PARTIAL
+  WAIVED
+  CANCELLED
+  VOID
+}
+
+enum ChargeSourceType {
+  MANUAL
+  SYSTEM
+}
+
+model BillingCategory {
+  id          String    @id @default(cuid())
+  schoolId    String
+  name        String
+  description String?
+  isActive    Boolean   @default(true)
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  school  School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  charges BillingCharge[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId, isActive])
+}
+
+model BillingCharge {
+  id           String           @id @default(cuid())
+  schoolId     String
+  schoolYearId String?
+  studentId    String
+  categoryId   String
+  createdById  String
+  title        String
+  description  String?
+  amount       Decimal          @db.Decimal(12, 2)
+  amountPaid   Decimal          @default(0) @db.Decimal(12, 2)
+  amountDue    Decimal          @db.Decimal(12, 2)
+  status       ChargeStatus     @default(PENDING)
+  sourceType   ChargeSourceType @default(MANUAL)
+  issuedAt     DateTime         @default(now())
+  dueDate      DateTime?
+  voidedAt     DateTime?
+  voidReason   String?
+  voidedById   String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  school      School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolYear  SchoolYear?     @relation(fields: [schoolYearId], references: [id], onDelete: SetNull)
+  student     User            @relation("BillingChargeStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  createdBy   User            @relation("BillingChargeCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  voidedBy    User?           @relation("BillingChargeVoidedBy", fields: [voidedById], references: [id], onDelete: SetNull)
+  category    BillingCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  allocations BillingPaymentAllocation[]
+
+  @@index([schoolId, status])
+  @@index([schoolId, studentId])
+  @@index([schoolId, categoryId])
+  @@index([issuedAt])
+}
+
+enum PaymentMethod {
+  EFT
+  E_TRANSFER
+  CASH
+  DEBIT_CREDIT
+  CHEQUE
+}
+
+model BillingPayment {
+  id              String        @id @default(cuid())
+  schoolId        String
+  schoolYearId    String?
+  studentId       String
+  recordedById    String
+  paymentDate     DateTime
+  amount          Decimal       @db.Decimal(12, 2)
+  method          PaymentMethod
+  referenceNumber String?
+  notes           String?
+  receiptNumber   String
+  isVoided        Boolean       @default(false)
+  voidedAt        DateTime?
+  voidReason      String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  school       School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolYear   SchoolYear? @relation(fields: [schoolYearId], references: [id], onDelete: SetNull)
+  student      User        @relation("BillingPaymentStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  recordedBy   User        @relation("BillingPaymentRecordedBy", fields: [recordedById], references: [id], onDelete: Restrict)
+  allocations  BillingPaymentAllocation[]
+
+  @@unique([schoolId, receiptNumber])
+  @@index([schoolId, studentId])
+  @@index([schoolId, paymentDate])
+  @@index([isVoided])
+}
+
+model BillingPaymentAllocation {
+  id        String   @id @default(cuid())
+  paymentId String
+  chargeId  String
+  amount    Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+
+  payment BillingPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  charge  BillingCharge  @relation(fields: [chargeId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentId, chargeId])
+  @@index([chargeId])
 }

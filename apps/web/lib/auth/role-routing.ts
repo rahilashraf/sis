@@ -2,6 +2,25 @@ import type { UserRole } from "./types";
 
 const adminRoles: UserRole[] = ["OWNER", "SUPER_ADMIN", "ADMIN", "STAFF"];
 
+export type NavigationItem = {
+  href: string;
+  label: string;
+  children?: Array<{
+    href: string;
+    label: string;
+  }>;
+};
+
+const chargesNavigationChildren: NavigationItem["children"] = [
+  { href: "/admin/billing/charges", label: "All Charges" },
+  { href: "/admin/billing/charges/new", label: "New Charge" },
+  { href: "/admin/billing/charges/bulk", label: "Bulk Charges" },
+  { href: "/admin/billing/payments/new", label: "Record Payment" },
+  { href: "/admin/billing/payments/batch", label: "Batch Payments" },
+  { href: "/admin/billing/payments", label: "Payments" },
+  { href: "/admin/billing/categories", label: "Categories" },
+];
+
 export function getDefaultRouteForRole(role: UserRole) {
   if (adminRoles.includes(role)) {
     return "/admin";
@@ -24,7 +43,7 @@ export function getDefaultRouteForRole(role: UserRole) {
 
 export function getNavigationItems(role: UserRole) {
   const primaryRoute = getDefaultRouteForRole(role);
-  const items = [{ href: primaryRoute, label: "Dashboard" }];
+  const items: NavigationItem[] = [{ href: primaryRoute, label: "Dashboard" }];
 
   if (role === "OWNER" || role === "SUPER_ADMIN") {
     items.push(
@@ -35,6 +54,11 @@ export function getNavigationItems(role: UserRole) {
       { href: "/admin/gradebook", label: "Gradebook" },
       { href: "/admin/behavior", label: "Incident Reports" },
       { href: "/admin/forms", label: "Forms" },
+      {
+        href: "/admin/billing/charges",
+        label: "Charges",
+        children: chargesNavigationChildren,
+      },
       { href: "/admin/re-registration", label: "Re-registration" },
       { href: "/admin/schools", label: "Schools" },
       { href: "/admin/reporting-periods", label: "Reporting Periods" },
@@ -67,6 +91,11 @@ export function getNavigationItems(role: UserRole) {
       { href: "/admin/gradebook", label: "Gradebook" },
       { href: "/admin/behavior", label: "Incident Reports" },
       { href: "/admin/forms", label: "Forms" },
+      {
+        href: "/admin/billing/charges",
+        label: "Charges",
+        children: chargesNavigationChildren,
+      },
       { href: "/admin/re-registration", label: "Re-registration" },
       { href: "/admin/schools", label: "Schools" },
     );
@@ -82,6 +111,11 @@ export function getNavigationItems(role: UserRole) {
       { href: "/admin/gradebook", label: "Gradebook" },
       { href: "/admin/behavior", label: "Incident Reports" },
       { href: "/admin/forms", label: "Forms" },
+      {
+        href: "/admin/billing/charges",
+        label: "Charges",
+        children: chargesNavigationChildren,
+      },
     );
 
     return items;

@@ -1,0 +1,31 @@
+import { Transform } from 'class-transformer';
+import { IsOptional, IsString } from 'class-validator';
+
+function toTrimmedString(value: unknown) {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  return value.trim();
+}
+
+function toNullableTrimmedString(value: unknown) {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+export class UpdateBillingCategoryDto {
+  @Transform(({ value }) => toTrimmedString(value))
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @Transform(({ value }) => toNullableTrimmedString(value))
+  @IsOptional()
+  @IsString()
+  description?: string | null;
+}
