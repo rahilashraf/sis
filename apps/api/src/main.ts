@@ -37,8 +37,15 @@ async function bootstrap() {
   app.useGlobalInterceptors(new StripSensitiveFieldsInterceptor());
 
   const port = process.env.PORT || 3000;
+  console.log('API_BOOTSTRAP_LISTEN_START', {
+    port,
+    nodeEnv: process.env.NODE_ENV ?? 'development',
+  });
   await app.listen(port);
-  console.log(`API running on http://localhost:${port}`);
+  console.log('API_BOOTSTRAP_LISTEN_READY', {
+    port,
+    nodeEnv: process.env.NODE_ENV ?? 'development',
+  });
 }
 bootstrap().catch((err) => {
   console.error('Failed to start the application:', err);
