@@ -13,7 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field } from "@/components/ui/field";
+import { Field, CheckboxField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
@@ -47,6 +47,7 @@ type BulkChargeFormState = {
   studentIds: string[];
   classId: string;
   gradeLevel: string;
+  sendNotifications: boolean;
 };
 
 const emptyForm: BulkChargeFormState = {
@@ -62,6 +63,7 @@ const emptyForm: BulkChargeFormState = {
   studentIds: [],
   classId: "",
   gradeLevel: "",
+  sendNotifications: false,
 };
 
 type FieldErrors = Partial<
@@ -314,6 +316,7 @@ export function BillingChargeBulkForm() {
         studentIds: form.targetMode === "SELECTED" ? form.studentIds : undefined,
         classId: form.targetMode === "CLASS" ? form.classId : undefined,
         gradeLevel: form.targetMode === "GRADE" ? form.gradeLevel : undefined,
+        sendNotifications: form.sendNotifications,
       });
 
       setResult(response);
@@ -638,6 +641,16 @@ export function BillingChargeBulkForm() {
                 Target count: {previewTargetCount ?? "—"}
               </p>
             </div>
+
+            <CheckboxField
+              className="md:col-span-2"
+              id="bulk-charge-notify"
+              label="Notify parents for created charges"
+              checked={form.sendNotifications}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, sendNotifications: event.target.checked }))
+              }
+            />
 
             <div className="md:col-span-2 flex justify-end gap-2">
               <Button

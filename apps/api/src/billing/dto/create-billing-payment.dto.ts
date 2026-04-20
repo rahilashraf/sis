@@ -109,4 +109,11 @@ export class CreateBillingPaymentDto {
   @ValidateNested({ each: true })
   @Type(() => PaymentAllocationItemDto)
   allocations?: PaymentAllocationItemDto[];
+
+  /**
+   * If true, notify linked parents when the payment is recorded.
+   * Defaults to false (no notifications sent).
+   */
+  @IsOptional()
+  sendNotifications?: boolean;
 }

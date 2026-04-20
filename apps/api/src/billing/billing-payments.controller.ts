@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -37,5 +37,14 @@ export class BillingPaymentsController {
     @Body() dto: VoidBillingPaymentDto,
   ) {
     return this.service.voidPayment(req.user, id, dto);
+  }
+
+  @Get(':id/receipt')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  getReceiptData(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
+    return this.service.getReceiptData(req.user, id);
   }
 }

@@ -21,4 +21,14 @@ export class BillingStudentsController {
   ) {
     return this.service.getAccountSummary(req.user, studentId, query);
   }
+
+  @Get(':studentId/statement')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  getStatement(
+    @Req() req: AuthenticatedRequest,
+    @Param('studentId', NonEmptyStringPipe) studentId: string,
+    @Query() query: GetStudentAccountSummaryQueryDto,
+  ) {
+    return this.service.getStatement(req.user, studentId, query);
+  }
 }

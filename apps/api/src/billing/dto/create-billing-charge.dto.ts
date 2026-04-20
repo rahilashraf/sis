@@ -72,4 +72,11 @@ export class CreateBillingChargeDto {
   @IsOptional()
   @IsEnum(ChargeSourceType)
   sourceType?: ChargeSourceType;
+
+  /**
+   * If true, notify linked parents when the charge is created.
+   * Defaults to false (no notifications sent).
+   */
+  @IsOptional()
+  sendNotifications?: boolean;
 }

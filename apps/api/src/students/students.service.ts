@@ -104,6 +104,7 @@ const gradeLevelSummarySelect = Prisma.validator<Prisma.GradeLevelSelect>()({
 
 const studentProfileSelect = Prisma.validator<Prisma.UserSelect>()({
   id: true,
+  schoolId: true,
   username: true,
   email: true,
   firstName: true,
@@ -745,6 +746,12 @@ export class StudentsService {
       throw new ForbiddenException('You do not have student access');
     }
 
+    if (!data.returningNextYear && !data.nonReturningReason) {
+      throw new BadRequestException(
+        'nonReturningReason is required when returningNextYear is false',
+      );
+    }
+
     const beforeProfile = await this.findStudentProfile(studentId);
     const updateData: Prisma.UserUpdateInput = {};
 
@@ -849,25 +856,40 @@ export class StudentsService {
       updateData.emergencyContactRelationship = data.emergencyContactRelationship;
     }
 
-    if (Object.keys(updateData).length === 0) {
-      throw new BadRequestException('No valid fields provided for update');
-    }
+    if (Object.keys(updateData).length > 0) {
+      try {
+        await this.prisma.user.update({
+          where: { id: studentId },
+          data: updateData,
+          select: { id: true },
+        });
+      } catch (error) {
+        if (this.isMissingStudentProfileColumnError(error)) {
+          throw new ConflictException(
+            'Student profile migrations are required before saving profile changes. Apply the latest Prisma migrations and try again.',
+          );
+        }
 
-    try {
-      await this.prisma.user.update({
-        where: { id: studentId },
-        data: updateData,
-        select: { id: true },
-      });
-    } catch (error) {
-      if (this.isMissingStudentProfileColumnError(error)) {
-        throw new ConflictException(
-          'Student profile migrations are required before saving profile changes. Apply the latest Prisma migrations and try again.',
-        );
+        throw error;
       }
-
-      throw error;
     }
+
+    const submissionSchoolId =
+      this.getPrimaryStudentSchoolId(student) ?? beforeProfile.memberships[0]?.schoolId ?? null;
+
+    if (!submissionSchoolId) {
+      throw new BadRequestException('Student must have an active school membership');
+    }
+
+    await this.reRegistrationService.recordSubmission({
+      actorUserId: actor.id,
+      studentId,
+      schoolId: submissionSchoolId,
+      schoolYearId: options.schoolYearId?.trim() || null,
+      returningNextYear: data.returningNextYear,
+      nonReturningReason: data.nonReturningReason ?? null,
+      nonReturningComment: data.nonReturningComment ?? null,
+    });
 
     const afterProfile = await this.findStudentProfile(studentId);
     await this.auditService.log({
@@ -891,6 +913,8 @@ export class StudentsService {
         }) ?? undefined,
       metadataJson: {
         schoolYearId: options.schoolYearId ?? null,
+        returningNextYear: data.returningNextYear,
+        nonReturningReason: data.nonReturningReason ?? null,
       },
     });
 

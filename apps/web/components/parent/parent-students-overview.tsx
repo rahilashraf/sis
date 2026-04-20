@@ -232,6 +232,12 @@ export function ParentStudentsOverview() {
                   </Link>
                   <Link
                     className={buttonClassName({ variant: "secondary" })}
+                    href={`/parent/students/${selectedStudentId}/library`}
+                  >
+                    Library
+                  </Link>
+                  <Link
+                    className={buttonClassName({ variant: "secondary" })}
                     href={`/parent/students/${selectedStudentId}/timetable`}
                   >
                     Timetable
@@ -243,6 +249,13 @@ export function ParentStudentsOverview() {
                     Forms
                   </Link>
                   {reRegistrationStatus?.isOpen ? (
+                    <Link
+                      className={buttonClassName({ variant: "secondary" })}
+                      href={`/parent/students/${selectedStudentId}/re-registration`}
+                    >
+                      Re-registration
+                    </Link>
+                  ) : reRegistrationStatus?.status === "UPCOMING" ? (
                     <Link
                       className={buttonClassName({ variant: "secondary" })}
                       href={`/parent/students/${selectedStudentId}/re-registration`}
@@ -261,8 +274,63 @@ export function ParentStudentsOverview() {
             </CardContent>
           </Card>
 
-          {reRegistrationStatus && !reRegistrationStatus.isOpen && reRegistrationStatus.status !== "NOT_CONFIGURED" ? (
-            <Notice tone="info">Re-registration is currently closed.</Notice>
+          {selectedStudentId && reRegistrationStatus?.isOpen ? (
+            <Card className="border-emerald-200 bg-emerald-50/70">
+              <CardContent className="grid gap-4 pt-6 md:grid-cols-[1fr_auto] md:items-center">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                    Re-registration is now open
+                  </p>
+                  <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+                    {selectedLink?.student.firstName} {selectedLink?.student.lastName} is ready for next-year confirmation.
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                    Complete the re-registration form while the window is open
+                    {reRegistrationStatus.window?.closesAt
+                      ? ` — closes ${new Date(reRegistrationStatus.window.closesAt).toLocaleDateString("en-CA", { year: "numeric", month: "long", day: "numeric" })}`
+                      : ""}
+                    .
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 md:justify-end">
+                  <Link
+                    className={buttonClassName({ variant: "primary" })}
+                    href={`/parent/students/${selectedStudentId}/re-registration`}
+                  >
+                    Complete re-registration
+                  </Link>
+                  <Link
+                    className={buttonClassName({ variant: "secondary" })}
+                    href={`/parent/forms?studentId=${encodeURIComponent(selectedStudentId)}`}
+                  >
+                    Review forms
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          ) : selectedStudentId && reRegistrationStatus?.status === "UPCOMING" ? (
+            <Card className="border-blue-200 bg-blue-50/60">
+              <CardContent className="pt-6">
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">
+                  Re-registration upcoming
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">
+                  Re-registration opens on{" "}
+                  {reRegistrationStatus.window?.opensAt
+                    ? new Date(reRegistrationStatus.window.opensAt).toLocaleDateString("en-CA", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })
+                    : "a future date"}.
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {reRegistrationStatus?.status === "CLOSED" ? (
+            <Notice tone="info">This re-registration window has closed.</Notice>
           ) : null}
 
           {selectedLink ? (

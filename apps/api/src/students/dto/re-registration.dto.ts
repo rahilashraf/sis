@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
-import { StudentGender } from '@prisma/client';
+import { ReRegistrationNonReturnReason, StudentGender } from '@prisma/client';
 import {
+  IsBoolean,
   IsDateString,
   IsEmail,
   IsEnum,
@@ -18,6 +19,19 @@ function toNullableTrimmedString(value: unknown) {
 }
 
 export class ReRegistrationDto {
+  @IsBoolean()
+  returningNextYear!: boolean;
+
+  @Transform(({ value }) => toNullableTrimmedString(value))
+  @IsOptional()
+  @IsEnum(ReRegistrationNonReturnReason)
+  nonReturningReason?: ReRegistrationNonReturnReason | null;
+
+  @Transform(({ value }) => toNullableTrimmedString(value))
+  @IsOptional()
+  @IsString()
+  nonReturningComment?: string | null;
+
   @Transform(({ value }) => toNullableTrimmedString(value))
   @IsOptional()
   @IsDateString()

@@ -13,7 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field } from "@/components/ui/field";
+import { Field, CheckboxField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
@@ -77,6 +77,7 @@ type FormState = {
   method: PaymentMethod;
   referenceNumber: string;
   notes: string;
+  sendNotifications: boolean;
 };
 
 type FieldErrors = Partial<Record<keyof FormState | "allocations", string>>;
@@ -154,6 +155,7 @@ export function BillingPaymentCreateForm() {
     method: "CASH",
     referenceNumber: "",
     notes: "",
+    sendNotifications: false,
   });
 
   const [schools, setSchools] = useState<School[]>([]);
@@ -353,6 +355,7 @@ export function BillingPaymentCreateForm() {
         referenceNumber: form.referenceNumber.trim() || null,
         notes: form.notes.trim() || null,
         allocations,
+        sendNotifications: form.sendNotifications,
       });
 
       if (form.studentId) {
@@ -725,6 +728,15 @@ export function BillingPaymentCreateForm() {
             )}
           </CardContent>
         </Card>
+
+        <CheckboxField
+          id="payment-notify"
+          label="Notify parents when payment is recorded"
+          checked={form.sendNotifications}
+          onChange={(event) =>
+            setForm((current) => ({ ...current, sendNotifications: event.target.checked }))
+          }
+        />
 
         {/* ── Actions ── */}
         <div className="flex justify-end gap-2">

@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field } from "@/components/ui/field";
+import { Field, CheckboxField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
@@ -105,6 +105,7 @@ export function BillingPaymentsBatchForm() {
   const [rows, setRows] = useState<BatchPaymentRow[]>([makeRow(0)]);
   const [schools, setSchools] = useState<School[]>([]);
   const [students, setStudents] = useState<ManagedUser[]>([]);
+  const [sendNotifications, setSendNotifications] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -232,7 +233,11 @@ export function BillingPaymentsBatchForm() {
     setIsSubmitting(true);
 
     try {
-      const response = await createBatchBillingPayments({ schoolId, entries });
+      const response = await createBatchBillingPayments({
+        schoolId,
+        entries,
+        sendNotifications,
+      });
       setResult(response);
     } catch (submitError) {
       setError(
@@ -453,6 +458,13 @@ export function BillingPaymentsBatchForm() {
                 {isSubmitting ? "Processing..." : "Submit batch"}
               </Button>
             </div>
+
+            <CheckboxField
+              id="batch-notify"
+              label="Notify parents for successful payments"
+              checked={sendNotifications}
+              onChange={(event) => setSendNotifications(event.target.checked)}
+            />
           </form>
         </CardContent>
       </Card>

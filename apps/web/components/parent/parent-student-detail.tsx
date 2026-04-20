@@ -142,7 +142,7 @@ export function ParentStudentDetail({ studentId }: { studentId: string }) {
         />
       ) : null}
 
-      {student ? <StudentProfileOverview student={student} /> : null}
+      {student ? <StudentProfileOverview showInternalIds={false} student={student} /> : null}
 
       {student ? (
         <Card>
@@ -161,6 +161,12 @@ export function ParentStudentDetail({ studentId }: { studentId: string }) {
               href={`/parent/students/${encodeURIComponent(studentId)}/billing`}
             >
               Billing
+            </Link>
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href={`/parent/students/${encodeURIComponent(studentId)}/library`}
+            >
+              Library
             </Link>
             <Link
               className={buttonClassName({ variant: "secondary" })}

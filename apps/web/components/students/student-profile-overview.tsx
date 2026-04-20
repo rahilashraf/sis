@@ -45,11 +45,13 @@ function formatGenderLabel(value: StudentProfile["gender"]) {
 type StudentProfileOverviewProps = {
   student: StudentProfile;
   showSensitiveHealthInfo?: boolean;
+  showInternalIds?: boolean;
 };
 
 export function StudentProfileOverview({
   student,
   showSensitiveHealthInfo = false,
+  showInternalIds = true,
 }: StudentProfileOverviewProps) {
   const schoolLabel = student.memberships.length
     ? student.memberships.map((membership) => membership.school.name).join(", ")
@@ -127,7 +129,7 @@ export function StudentProfileOverview({
             <DetailItem label="Student number" value={getDisplayText(student.studentNumber)} />
             <DetailItem label="OEN" value={getDisplayText(student.oen)} />
             <DetailItem label="Gender" value={formatGenderLabel(student.gender)} />
-            <DetailItem label="System ID" value={student.id} />
+            {showInternalIds ? <DetailItem label="System ID" value={student.id} /> : null}
             <DetailItem
               label="Created"
               value={formatDateTimeLabel(student.createdAt)}

@@ -1,5 +1,5 @@
-import { DashboardPlaceholder } from "@/components/dashboard/dashboard-placeholder";
+import { StudentDashboard } from "@/components/students/student-dashboard";
 
 export default function StudentPage() {
-  return <DashboardPlaceholder title="Student Dashboard" roleLabel="STUDENT" />;
+  return <StudentDashboard />;
 }

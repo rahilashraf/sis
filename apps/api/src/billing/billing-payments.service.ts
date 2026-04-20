@@ -4,9 +4,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AuditLogSeverity, ChargeStatus, PaymentMethod, Prisma } from '@prisma/client';
+import {
+  AuditLogSeverity,
+  ChargeStatus,
+  PaymentMethod,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import type { AuthenticatedUser } from '../common/auth/auth-user';
 import {
   ensureUserHasSchoolAccess,
@@ -90,7 +96,45 @@ export class BillingPaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
+
+  private async notifyLinkedParentsForPaymentEvent(input: {
+    schoolId: string;
+    studentId: string;
+    paymentId: string;
+    type: 'BILLING_PAYMENT_RECORDED' | 'BILLING_PAYMENT_VOIDED';
+    message: string;
+    shouldNotify?: boolean;
+  }) {
+    // Skip notification if shouldNotify is explicitly false
+    if (input.shouldNotify === false) {
+      return;
+    }
+
+    const links = await this.prisma.studentParentLink.findMany({
+      where: { studentId: input.studentId },
+      select: { parentId: true },
+    });
+
+    const parentIds = [...new Set(links.map((link) => link.parentId))];
+
+    if (parentIds.length === 0) {
+      return;
+    }
+
+    await this.notificationsService.createMany(
+      parentIds.map((parentId) => ({
+        schoolId: input.schoolId,
+        recipientUserId: parentId,
+        type: input.type,
+        title: input.message,
+        message: input.message,
+        entityType: 'BillingPayment',
+        entityId: input.paymentId,
+      })),
+    );
+  }
 
   private ensureCanCreate(actor: AuthenticatedUser) {
     const allowed = ['OWNER', 'SUPER_ADMIN', 'ADMIN'];
@@ -264,6 +308,17 @@ export class BillingPaymentsService {
       targetDisplay: `${student.firstName} ${student.lastName}`,
     });
 
+    const studentName = `${student.firstName} ${student.lastName}`.trim() || 'student';
+
+    await this.notifyLinkedParentsForPaymentEvent({
+      schoolId: dto.schoolId,
+      studentId: dto.studentId,
+      paymentId: payment.id,
+      type: 'BILLING_PAYMENT_RECORDED',
+      message: `Payment recorded for ${studentName}`,
+      shouldNotify: dto.sendNotifications ?? false,
+    });
+
     return payment;
   }
 
@@ -313,6 +368,7 @@ export class BillingPaymentsService {
           referenceNumber: entry.referenceNumber,
           notes: entry.notes,
           allocations: entry.allocations,
+          sendNotifications: dto.sendNotifications ?? false,
         });
 
         results.push({
@@ -606,6 +662,162 @@ export class BillingPaymentsService {
       },
     });
 
+    await this.notifyLinkedParentsForPaymentEvent({
+      schoolId: payment.schoolId,
+      studentId: payment.studentId,
+      paymentId,
+      type: 'BILLING_PAYMENT_VOIDED',
+      message: `Payment reversed for ${studentName}`,
+      shouldNotify: data.sendNotifications ?? false,
+    });
+
     return result;
+  }
+
+  async getReceiptData(actor: AuthenticatedUser, paymentId: string) {
+    this.ensureCanVoid(actor);
+
+    const payment = await this.prisma.billingPayment.findUnique({
+      where: { id: paymentId },
+      select: {
+        id: true,
+        schoolId: true,
+        receiptNumber: true,
+        paymentDate: true,
+        amount: true,
+        method: true,
+        referenceNumber: true,
+        notes: true,
+        isVoided: true,
+        voidedAt: true,
+        voidReason: true,
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+          },
+        },
+        recordedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        allocations: {
+          select: {
+            id: true,
+            chargeId: true,
+            amount: true,
+            charge: {
+              select: {
+                id: true,
+                title: true,
+                amount: true,
+              },
+            },
+          },
+        },
+        school: {
+          select: {
+            id: true,
+            name: true,
+            shortName: true,
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.schoolId) {
+      ensureUserHasSchoolAccess(actor, payment.schoolId);
+    }
+
+    return payment;
+  }
+
+  async getReceiptDataForParent(actor: AuthenticatedUser, paymentId: string) {
+    if (actor.role !== 'PARENT') {
+      throw new ForbiddenException('Only parents can access this endpoint');
+    }
+
+    const payment = await this.prisma.billingPayment.findUnique({
+      where: { id: paymentId },
+      select: {
+        id: true,
+        schoolId: true,
+        studentId: true,
+        receiptNumber: true,
+        paymentDate: true,
+        amount: true,
+        method: true,
+        referenceNumber: true,
+        notes: true,
+        isVoided: true,
+        voidedAt: true,
+        voidReason: true,
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+          },
+        },
+        recordedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        allocations: {
+          select: {
+            id: true,
+            chargeId: true,
+            amount: true,
+            charge: {
+              select: {
+                id: true,
+                title: true,
+                amount: true,
+              },
+            },
+          },
+        },
+        school: {
+          select: {
+            id: true,
+            name: true,
+            shortName: true,
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    // Verify parent is linked to the student
+    const link = await this.prisma.studentParentLink.findUnique({
+      where: {
+        parentId_studentId: {
+          parentId: actor.id,
+          studentId: payment.studentId,
+        },
+      },
+    });
+
+    if (!link) {
+      throw new ForbiddenException('You are not linked to this student');
+    }
+
+    return payment;
   }
 }

@@ -1,18 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button, buttonClassName } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
-import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { normalizeDateOnlyPayload } from "@/lib/date";
+import type { ReRegistrationWindowStatusForStudent } from "@/lib/api/re-registration";
 import {
   getStudentById,
   reRegisterStudent,
@@ -21,6 +19,9 @@ import {
 } from "@/lib/api/students";
 
 type FormState = {
+  returningIntent: "" | "YES" | "NO";
+  nonReturningReason: string;
+  nonReturningComment: string;
   dateOfBirth: string;
   gender: string;
   studentEmail: string;
@@ -48,6 +49,15 @@ type FormState = {
   emergencyContactRelationship: string;
 };
 
+const NON_RETURNING_REASON_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "MOVING", label: "Moving" },
+  { value: "TRANSFERRING_SCHOOLS", label: "Transferring schools" },
+  { value: "HOMESCHOOLING", label: "Homeschooling" },
+  { value: "GRADUATING", label: "Graduating" },
+  { value: "FINANCIAL", label: "Financial reasons" },
+  { value: "OTHER", label: "Other" },
+];
+
 function toDateInputValue(value: string | null) {
   return normalizeDateOnlyPayload(value);
 }
@@ -59,6 +69,9 @@ function normalizeText(value: string) {
 
 function buildForm(student: StudentProfile): FormState {
   return {
+    returningIntent: "",
+    nonReturningReason: "",
+    nonReturningComment: "",
     dateOfBirth: toDateInputValue(student.dateOfBirth),
     gender: student.gender ?? "",
     studentEmail: student.studentEmail ?? "",
@@ -87,8 +100,20 @@ function buildForm(student: StudentProfile): FormState {
   };
 }
 
-function buildPayload(original: StudentProfile, form: FormState): ReRegistrationInput {
-  const payload: ReRegistrationInput = {};
+function buildPayload(
+  original: StudentProfile,
+  form: FormState,
+  intent: {
+    returningNextYear: boolean;
+    nonReturningReason: ReRegistrationInput["nonReturningReason"];
+    nonReturningComment: string | null;
+  },
+): ReRegistrationInput {
+  const payload: ReRegistrationInput = {
+    returningNextYear: intent.returningNextYear,
+    nonReturningReason: intent.nonReturningReason,
+    nonReturningComment: intent.nonReturningComment,
+  };
 
   if (form.dateOfBirth !== toDateInputValue(original.dateOfBirth)) {
     payload.dateOfBirth = form.dateOfBirth || null;
@@ -204,9 +229,11 @@ function buildPayload(original: StudentProfile, form: FormState): ReRegistration
 export function ParentReRegistrationForm({
   studentId,
   schoolYearId,
+  windowStatus,
 }: {
   studentId: string;
   schoolYearId?: string | null;
+  windowStatus?: ReRegistrationWindowStatusForStudent | null;
 }) {
   const [student, setStudent] = useState<StudentProfile | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
@@ -214,6 +241,10 @@ export function ParentReRegistrationForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [submittedState, setSubmittedState] = useState<{
+    submittedAt: string;
+    canEdit: boolean;
+  } | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -222,19 +253,38 @@ export function ParentReRegistrationForm({
 
       try {
         const response = await getStudentById(studentId);
+        const existingSubmission = windowStatus?.existingSubmission ?? null;
         setStudent(response);
-        setForm(buildForm(response));
+        setForm({
+          ...buildForm(response),
+          returningIntent: existingSubmission
+            ? existingSubmission.returningNextYear
+              ? "YES"
+              : "NO"
+            : "",
+          nonReturningReason: existingSubmission?.nonReturningReason ?? "",
+          nonReturningComment: existingSubmission?.nonReturningComment ?? "",
+        });
+        setSubmittedState(
+          existingSubmission
+            ? {
+                submittedAt: existingSubmission.submittedAt,
+                canEdit: windowStatus?.canEdit ?? false,
+              }
+            : null,
+        );
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Unable to load student.");
         setStudent(null);
         setForm(null);
+        setSubmittedState(null);
       } finally {
         setIsLoading(false);
       }
     }
 
     void load();
-  }, [studentId]);
+  }, [studentId, windowStatus]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -248,16 +298,46 @@ export function ParentReRegistrationForm({
     setSuccessMessage(null);
 
     try {
-      const payload = buildPayload(student, form);
-      if (Object.keys(payload).length === 0) {
-        setSuccessMessage("No changes to submit.");
-        return;
+      if (!form.returningIntent) {
+        throw new Error("Please select whether the student is returning next year.");
       }
+
+      const returningNextYear = form.returningIntent === "YES";
+      const nonReturningReason =
+        returningNextYear || !form.nonReturningReason
+          ? null
+          : (form.nonReturningReason as ReRegistrationInput["nonReturningReason"]);
+
+      if (!returningNextYear && !nonReturningReason) {
+        throw new Error("Please select a reason for not returning.");
+      }
+
+      const nonReturningComment =
+        returningNextYear ? null : normalizeText(form.nonReturningComment);
+
+      const payload = buildPayload(student, form, {
+        returningNextYear,
+        nonReturningReason,
+        nonReturningComment,
+      });
 
       const updated = await reRegisterStudent(studentId, payload, { schoolYearId: schoolYearId ?? null });
       setStudent(updated);
-      setForm(buildForm(updated));
-      setSuccessMessage("Re-registration updates saved.");
+      setForm((current) =>
+        current
+          ? {
+              ...buildForm(updated),
+              returningIntent: returningNextYear ? "YES" : "NO",
+              nonReturningReason: nonReturningReason ?? "",
+              nonReturningComment: nonReturningComment ?? "",
+            }
+          : current,
+      );
+      setSubmittedState({
+        submittedAt: new Date().toISOString(),
+        canEdit: true,
+      });
+      setSuccessMessage("Re-registration submitted.");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to submit re-registration.");
     } finally {
@@ -265,38 +345,32 @@ export function ParentReRegistrationForm({
     }
   }
 
+  const isReadOnly = submittedState ? !submittedState.canEdit : false;
+
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Re-registration"
-        description="Update returning-student information without creating a duplicate record."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              className={buttonClassName({ variant: "secondary" })}
-              href={`/parent?studentId=${encodeURIComponent(studentId)}`}
-            >
-              Back to portal
-            </Link>
-            <Link
-              className={buttonClassName({ variant: "secondary" })}
-              href={`/parent/students/${studentId}`}
-            >
-              Student profile
-            </Link>
-          </div>
-        }
-        meta={
-          student ? (
-            <Badge variant="neutral">
-              {student.firstName} {student.lastName}
-            </Badge>
-          ) : null
-        }
-      />
-
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {successMessage ? <Notice tone="success">{successMessage}</Notice> : null}
+      {submittedState ? (
+        <Notice tone="success" title="Re-registration submitted">
+          <p>
+            Submitted on{" "}
+            {new Date(submittedState.submittedAt).toLocaleString("en-CA", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+            .
+          </p>
+          <p>
+            {submittedState.canEdit
+              ? "You can review and update the information below while the window is open."
+              : "This submission is locked. You can review the saved information below."}
+          </p>
+        </Notice>
+      ) : null}
 
       {isLoading ? (
         <Card>
@@ -315,6 +389,84 @@ export function ParentReRegistrationForm({
 
       {student && form ? (
         <form className="space-y-6" onSubmit={handleSubmit}>
+          <fieldset className="space-y-6" disabled={isSubmitting || isReadOnly}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Returning next year</CardTitle>
+              <CardDescription>
+                This intent is required for re-registration submission tracking.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+              <Field htmlFor="rr-returning-intent" label="Will this student return next year?">
+                <Select
+                  id="rr-returning-intent"
+                  onChange={(event) =>
+                    setForm((current) =>
+                      current
+                        ? {
+                            ...current,
+                            returningIntent: event.target.value as FormState["returningIntent"],
+                            nonReturningReason:
+                              event.target.value === "NO" ? current.nonReturningReason : "",
+                            nonReturningComment:
+                              event.target.value === "NO" ? current.nonReturningComment : "",
+                          }
+                        : current,
+                    )
+                  }
+                  required
+                  value={form.returningIntent}
+                >
+                  <option value="">Select an option</option>
+                  <option value="YES">Yes</option>
+                  <option value="NO">No</option>
+                </Select>
+              </Field>
+
+              {form.returningIntent === "NO" ? (
+                <Field htmlFor="rr-non-returning-reason" label="Reason for not returning">
+                  <Select
+                    id="rr-non-returning-reason"
+                    onChange={(event) =>
+                      setForm((current) =>
+                        current ? { ...current, nonReturningReason: event.target.value } : current,
+                      )
+                    }
+                    required
+                    value={form.nonReturningReason}
+                  >
+                    <option value="">Select a reason</option>
+                    {NON_RETURNING_REASON_OPTIONS.map((reason) => (
+                      <option key={reason.value} value={reason.value}>
+                        {reason.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              ) : null}
+
+              {form.returningIntent === "NO" ? (
+                <div className="md:col-span-2">
+                  <Field htmlFor="rr-non-returning-comment" label="Additional comments (optional)">
+                    <Textarea
+                      id="rr-non-returning-comment"
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? { ...current, nonReturningComment: event.target.value }
+                            : current,
+                        )
+                      }
+                      rows={3}
+                      value={form.nonReturningComment}
+                    />
+                  </Field>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Student info</CardTitle>
@@ -548,10 +700,13 @@ export function ParentReRegistrationForm({
           </Card>
 
           <div className="flex justify-end">
-            <Button disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Submitting..." : "Submit updates"}
-            </Button>
+            {!isReadOnly ? (
+              <Button disabled={isSubmitting} type="submit">
+                {isSubmitting ? "Submitting..." : "Submit updates"}
+              </Button>
+            ) : null}
           </div>
+          </fieldset>
         </form>
       ) : null}
     </div>

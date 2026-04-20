@@ -14,6 +14,8 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Field, CheckboxField } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -302,6 +304,8 @@ export function StudentBillingAccount({ studentId }: { studentId: string }) {
 
   // Void payment state
   const [voidTarget, setVoidTarget] = useState<AccountSummaryPayment | null>(null);
+  const [voidReason, setVoidReason] = useState("");
+  const [voidNotifyParents, setVoidNotifyParents] = useState(false);
   const [isVoiding, setIsVoiding] = useState(false);
   const [voidError, setVoidError] = useState<string | null>(null);
   const [voidSuccessMessage, setVoidSuccessMessage] = useState<string | null>(null);
@@ -345,27 +349,20 @@ export function StudentBillingAccount({ studentId }: { studentId: string }) {
   async function handleConfirmVoidPayment() {
     if (!voidTarget) return;
 
-    const reason = window.prompt(
-      "Enter an optional void reason (or leave blank and click OK):",
-    );
-
-    if (reason === null) {
-      // User cancelled the prompt
-      setVoidTarget(null);
-      return;
-    }
-
     setIsVoiding(true);
     setVoidError(null);
 
     try {
       await voidBillingPayment(voidTarget.id, {
-        voidReason: reason.trim() || null,
+        voidReason: voidReason.trim() || null,
+        sendNotifications: voidNotifyParents,
       });
       setVoidSuccessMessage(
         `Payment ${voidTarget.receiptNumber} has been voided and charges updated.`,
       );
       setVoidTarget(null);
+      setVoidReason("");
+      setVoidNotifyParents(false);
       setRefreshNonce((n) => n + 1);
     } catch (err) {
       setVoidError(err instanceof Error ? err.message : "Unable to void payment.");
@@ -534,12 +531,70 @@ export function StudentBillingAccount({ studentId }: { studentId: string }) {
         </CardContent>
       </Card>
 
+      {voidTarget ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Void payment?</CardTitle>
+            <CardDescription>
+              This will reverse payment {voidTarget.receiptNumber} and recalculate all affected charge balances. This cannot be undone.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {voidError ? (
+              <Notice tone="danger">{voidError}</Notice>
+            ) : null}
+
+            <Field htmlFor="void-reason" label="Void reason (optional)">
+              <Input
+                id="void-reason"
+                placeholder="Enter reason for voiding this payment"
+                value={voidReason}
+                onChange={(event) => setVoidReason(event.target.value)}
+                disabled={isVoiding}
+              />
+            </Field>
+
+            <CheckboxField
+              id="void-notify"
+              label="Notify parents about payment reversal"
+              checked={voidNotifyParents}
+              onChange={(event) => setVoidNotifyParents(event.target.checked)}
+              disabled={isVoiding}
+            />
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                onClick={() => {
+                  setVoidTarget(null);
+                  setVoidReason("");
+                  setVoidNotifyParents(false);
+                  setVoidError(null);
+                }}
+                type="button"
+                variant="secondary"
+                disabled={isVoiding}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmVoidPayment}
+                type="button"
+                variant="danger"
+                disabled={isVoiding}
+              >
+                {isVoiding ? "Voiding..." : "Void payment"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <ConfirmDialog
         confirmLabel="Void payment"
         confirmVariant="danger"
         description={`This will reverse payment ${voidTarget?.receiptNumber ?? ""} and recalculate all affected charge balances. This cannot be undone.`}
         errorMessage={voidError}
-        isOpen={voidTarget !== null}
+        isOpen={false}
         isPending={isVoiding}
         onCancel={() => {
           setVoidTarget(null);

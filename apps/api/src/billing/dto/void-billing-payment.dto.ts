@@ -15,4 +15,11 @@ export class VoidBillingPaymentDto {
   @IsOptional()
   @IsString()
   voidReason?: string | null;
+
+  /**
+   * If true, notify linked parents when the payment is voided/reversed.
+   * Defaults to false (no notifications sent).
+   */
+  @IsOptional()
+  sendNotifications?: boolean;
 }

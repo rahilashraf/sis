@@ -13,7 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field } from "@/components/ui/field";
+import { Field, CheckboxField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
@@ -40,6 +40,7 @@ type CreateChargeFormState = {
   amount: string;
   dueDate: string;
   sourceType: "MANUAL" | "SYSTEM";
+  sendNotifications: boolean;
 };
 
 const emptyForm: CreateChargeFormState = {
@@ -52,6 +53,7 @@ const emptyForm: CreateChargeFormState = {
   amount: "",
   dueDate: "",
   sourceType: "MANUAL",
+  sendNotifications: false,
 };
 
 type FieldErrors = Partial<Record<keyof CreateChargeFormState, string>>;
@@ -251,6 +253,7 @@ export function BillingChargeCreateForm() {
         amount: form.amount.trim(),
         dueDate: form.dueDate || undefined,
         sourceType: form.sourceType,
+        sendNotifications: form.sendNotifications,
       });
 
       router.push("/admin/billing/charges?created=1");
@@ -475,6 +478,16 @@ export function BillingChargeCreateForm() {
                 value={form.description}
               />
             </Field>
+
+            <CheckboxField
+              className="md:col-span-2"
+              id="create-charge-notify"
+              label="Notify parents when charge is created"
+              checked={form.sendNotifications}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, sendNotifications: event.target.checked }))
+              }
+            />
 
             <div className="md:col-span-2 flex justify-end gap-2">
               <Link

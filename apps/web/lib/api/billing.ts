@@ -1,3 +1,5 @@
+import { getStoredSessionSnapshot } from "../auth/storage";
+import { apiConfig } from "./config";
 import { apiFetch } from "./client";
 
 export type BillingChargeStatus =
@@ -71,6 +73,7 @@ export type CreateBillingChargeInput = {
   amount: string;
   dueDate?: string | null;
   sourceType?: "MANUAL" | "SYSTEM";
+  sendNotifications?: boolean;
 };
 
 export type BulkChargeTargetMode = "SELECTED" | "CLASS" | "GRADE";
@@ -88,6 +91,7 @@ export type CreateBulkBillingChargeInput = {
   studentIds?: string[];
   classId?: string;
   gradeLevel?: string;
+  sendNotifications?: boolean;
 };
 
 export type BulkBillingChargeResult = {
@@ -454,6 +458,7 @@ export type CreateBillingPaymentInput = {
   referenceNumber?: string | null;
   notes?: string | null;
   allocations?: Array<{ chargeId: string; amount: string }>;
+  sendNotifications?: boolean;
 };
 
 export type BatchBillingPaymentEntryInput = {
@@ -470,6 +475,7 @@ export type BatchBillingPaymentEntryInput = {
 export type CreateBatchBillingPaymentsInput = {
   schoolId: string;
   entries: BatchBillingPaymentEntryInput[];
+  sendNotifications?: boolean;
 };
 
 export type BatchBillingPaymentResultRow = {
@@ -505,6 +511,7 @@ export function createBatchBillingPayments(input: CreateBatchBillingPaymentsInpu
 
 export type VoidBillingPaymentInput = {
   voidReason?: string | null;
+  sendNotifications?: boolean;
 };
 
 export function voidBillingPayment(
@@ -538,4 +545,469 @@ export function getStudentAccountSummary(
   return apiFetch<StudentAccountSummary>(
     `/billing/students/${studentId}/account-summary${query.size ? `?${query.toString()}` : ""}`,
   ).then(normalizeStudentAccountSummary);
+}
+
+export type BillingOverdueRow = {
+  studentId: string;
+  studentName: string;
+  schoolId: string;
+  totalOverdue: string;
+  overdueChargeCount: number;
+  oldestDueDate: string;
+  latestDueDate: string | null;
+  email: string | null;
+  classInfo: {
+    id: string;
+    name: string;
+  } | null;
+};
+
+export type BillingOverdueSummary = {
+  totalOverdueStudents: number;
+  totalOverdueBalance: string;
+  totalOverdueCharges: number;
+};
+
+export type BillingOverdueResponse = {
+  items: BillingOverdueRow[];
+  page: number;
+  limit: number;
+  total: number;
+  summary: BillingOverdueSummary;
+  sorting: string;
+};
+
+function normalizeBillingOverdueResponse(
+  response: BillingOverdueResponse,
+): BillingOverdueResponse {
+  return {
+    ...response,
+    items: response.items.map((row) => ({
+      ...row,
+      totalOverdue: normalizeBillingMoneyValue(row.totalOverdue),
+    })),
+    summary: {
+      ...response.summary,
+      totalOverdueBalance: normalizeBillingMoneyValue(
+        response.summary.totalOverdueBalance,
+      ),
+    },
+  };
+}
+
+export function listBillingOverdue(options?: {
+  schoolId?: string;
+  search?: string;
+  minAmount?: string;
+  classId?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const query = new URLSearchParams();
+
+  if (options?.schoolId) {
+    query.set('schoolId', options.schoolId);
+  }
+
+  if (options?.search) {
+    query.set('search', options.search);
+  }
+
+  if (options?.minAmount) {
+    query.set('minAmount', options.minAmount);
+  }
+
+  if (options?.classId) {
+    query.set('classId', options.classId);
+  }
+
+  if (options?.page) {
+    query.set('page', String(options.page));
+  }
+
+  if (options?.limit) {
+    query.set('limit', String(options.limit));
+  }
+
+  return apiFetch<BillingOverdueResponse>(
+    `/billing/overdue${query.size ? `?${query.toString()}` : ''}`,
+  ).then(normalizeBillingOverdueResponse);
+}
+
+async function apiFetchBlob(path: string): Promise<Blob> {
+  const session = getStoredSessionSnapshot();
+  const headers: Record<string, string> = {};
+
+  if (session?.accessToken) {
+    headers.Authorization = `Bearer ${session.accessToken}`;
+  }
+
+  const url = `${apiConfig.baseUrl}${path}`;
+  const response = await fetch(url, { headers });
+
+  if (response.status === 401) {
+    throw new Error("Unauthorized");
+  }
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Request failed");
+  }
+
+  return response.blob();
+}
+
+export type BillingPaymentsReportRow = {
+  paymentDate: string;
+  receiptNumber: string;
+  studentName: string;
+  amount: string;
+  method: string;
+  referenceNumber: string | null;
+  status: string;
+};
+
+export type BillingPaymentsReport = {
+  items: BillingPaymentsReportRow[];
+  totals: {
+    count: number;
+    totalAmount: string;
+  };
+};
+
+export type BillingChargesReportRow = {
+  issuedAt: string;
+  dueDate: string | null;
+  studentName: string;
+  title: string;
+  category: string;
+  amount: string;
+  amountPaid: string;
+  amountDue: string;
+  status: string;
+};
+
+export type BillingChargesReport = {
+  items: BillingChargesReportRow[];
+  totals: {
+    count: number;
+    totalAmount: string;
+    totalDue: string;
+  };
+};
+
+export type BillingOutstandingReportRow = {
+  schoolId: string;
+  studentId: string;
+  studentName: string;
+  totalOutstanding: string;
+  totalOverdue: string;
+  overdueChargeCount: number;
+};
+
+export type BillingOutstandingReport = {
+  items: BillingOutstandingReportRow[];
+  totals: {
+    studentCount: number;
+    totalOutstanding: string;
+    totalOverdue: string;
+  };
+};
+
+export type BillingSummaryReport = {
+  totalChargesIssued: string;
+  totalPaymentsReceived: string;
+  totalVoidedPayments: string;
+  currentOutstanding: string;
+  currentOverdue: string;
+};
+
+function normalizePaymentsReport(report: BillingPaymentsReport): BillingPaymentsReport {
+  return {
+    ...report,
+    items: report.items.map((item) => ({
+      ...item,
+      amount: normalizeBillingMoneyValue(item.amount),
+    })),
+    totals: {
+      ...report.totals,
+      totalAmount: normalizeBillingMoneyValue(report.totals.totalAmount),
+    },
+  };
+}
+
+function normalizeChargesReport(report: BillingChargesReport): BillingChargesReport {
+  return {
+    ...report,
+    items: report.items.map((item) => ({
+      ...item,
+      amount: normalizeBillingMoneyValue(item.amount),
+      amountPaid: normalizeBillingMoneyValue(item.amountPaid),
+      amountDue: normalizeBillingMoneyValue(item.amountDue),
+    })),
+    totals: {
+      ...report.totals,
+      totalAmount: normalizeBillingMoneyValue(report.totals.totalAmount),
+      totalDue: normalizeBillingMoneyValue(report.totals.totalDue),
+    },
+  };
+}
+
+function normalizeOutstandingReport(
+  report: BillingOutstandingReport,
+): BillingOutstandingReport {
+  return {
+    ...report,
+    items: report.items.map((item) => ({
+      ...item,
+      totalOutstanding: normalizeBillingMoneyValue(item.totalOutstanding),
+      totalOverdue: normalizeBillingMoneyValue(item.totalOverdue),
+    })),
+    totals: {
+      ...report.totals,
+      totalOutstanding: normalizeBillingMoneyValue(report.totals.totalOutstanding),
+      totalOverdue: normalizeBillingMoneyValue(report.totals.totalOverdue),
+    },
+  };
+}
+
+function normalizeSummaryReport(report: BillingSummaryReport): BillingSummaryReport {
+  return {
+    totalChargesIssued: normalizeBillingMoneyValue(report.totalChargesIssued),
+    totalPaymentsReceived: normalizeBillingMoneyValue(report.totalPaymentsReceived),
+    totalVoidedPayments: normalizeBillingMoneyValue(report.totalVoidedPayments),
+    currentOutstanding: normalizeBillingMoneyValue(report.currentOutstanding),
+    currentOverdue: normalizeBillingMoneyValue(report.currentOverdue),
+  };
+}
+
+export function getBillingPaymentsReport(options?: {
+  schoolId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  method?: string;
+  studentId?: string;
+  includeVoided?: boolean;
+}) {
+  const query = new URLSearchParams();
+
+  if (options?.schoolId) query.set("schoolId", options.schoolId);
+  if (options?.dateFrom) query.set("dateFrom", options.dateFrom);
+  if (options?.dateTo) query.set("dateTo", options.dateTo);
+  if (options?.method) query.set("method", options.method);
+  if (options?.studentId) query.set("studentId", options.studentId);
+  if (options?.includeVoided) query.set("includeVoided", "true");
+
+  return apiFetch<BillingPaymentsReport>(
+    `/billing/reports/payments${query.size ? `?${query.toString()}` : ""}`,
+  ).then(normalizePaymentsReport);
+}
+
+export function exportBillingPaymentsReportCsv(options?: {
+  schoolId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  method?: string;
+  studentId?: string;
+  includeVoided?: boolean;
+}) {
+  const query = new URLSearchParams();
+  query.set("format", "csv");
+
+  if (options?.schoolId) query.set("schoolId", options.schoolId);
+  if (options?.dateFrom) query.set("dateFrom", options.dateFrom);
+  if (options?.dateTo) query.set("dateTo", options.dateTo);
+  if (options?.method) query.set("method", options.method);
+  if (options?.studentId) query.set("studentId", options.studentId);
+  if (options?.includeVoided) query.set("includeVoided", "true");
+
+  return apiFetchBlob(`/billing/reports/payments?${query.toString()}`);
+}
+
+export function getBillingChargesReport(options?: {
+  schoolId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  categoryId?: string;
+  status?: string;
+  studentId?: string;
+}) {
+  const query = new URLSearchParams();
+
+  if (options?.schoolId) query.set("schoolId", options.schoolId);
+  if (options?.dateFrom) query.set("dateFrom", options.dateFrom);
+  if (options?.dateTo) query.set("dateTo", options.dateTo);
+  if (options?.categoryId) query.set("categoryId", options.categoryId);
+  if (options?.status) query.set("status", options.status);
+  if (options?.studentId) query.set("studentId", options.studentId);
+
+  return apiFetch<BillingChargesReport>(
+    `/billing/reports/charges${query.size ? `?${query.toString()}` : ""}`,
+  ).then(normalizeChargesReport);
+}
+
+export function exportBillingChargesReportCsv(options?: {
+  schoolId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  categoryId?: string;
+  status?: string;
+  studentId?: string;
+}) {
+  const query = new URLSearchParams();
+  query.set("format", "csv");
+
+  if (options?.schoolId) query.set("schoolId", options.schoolId);
+  if (options?.dateFrom) query.set("dateFrom", options.dateFrom);
+  if (options?.dateTo) query.set("dateTo", options.dateTo);
+  if (options?.categoryId) query.set("categoryId", options.categoryId);
+  if (options?.status) query.set("status", options.status);
+  if (options?.studentId) query.set("studentId", options.studentId);
+
+  return apiFetchBlob(`/billing/reports/charges?${query.toString()}`);
+}
+
+export function getBillingOutstandingReport(options?: {
+  schoolId?: string;
+  minBalance?: string;
+}) {
+  const query = new URLSearchParams();
+
+  if (options?.schoolId) query.set("schoolId", options.schoolId);
+  if (options?.minBalance) query.set("minBalance", options.minBalance);
+
+  return apiFetch<BillingOutstandingReport>(
+    `/billing/reports/outstanding${query.size ? `?${query.toString()}` : ""}`,
+  ).then(normalizeOutstandingReport);
+}
+
+export function exportBillingOutstandingReportCsv(options?: {
+  schoolId?: string;
+  minBalance?: string;
+}) {
+  const query = new URLSearchParams();
+  query.set("format", "csv");
+
+  if (options?.schoolId) query.set("schoolId", options.schoolId);
+  if (options?.minBalance) query.set("minBalance", options.minBalance);
+
+  return apiFetchBlob(`/billing/reports/outstanding?${query.toString()}`);
+}
+
+export function getBillingSummaryReport(options?: {
+  schoolId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  const query = new URLSearchParams();
+
+  if (options?.schoolId) query.set("schoolId", options.schoolId);
+  if (options?.dateFrom) query.set("dateFrom", options.dateFrom);
+  if (options?.dateTo) query.set("dateTo", options.dateTo);
+
+  return apiFetch<BillingSummaryReport>(
+    `/billing/reports/summary${query.size ? `?${query.toString()}` : ""}`,
+  ).then(normalizeSummaryReport);
+}
+
+export function exportBillingSummaryReportCsv(options?: {
+  schoolId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  const query = new URLSearchParams();
+  query.set("format", "csv");
+
+  if (options?.schoolId) query.set("schoolId", options.schoolId);
+  if (options?.dateFrom) query.set("dateFrom", options.dateFrom);
+  if (options?.dateTo) query.set("dateTo", options.dateTo);
+
+  return apiFetchBlob(`/billing/reports/summary?${query.toString()}`);
+}
+
+export type PaymentReceipt = {
+  id: string;
+  schoolId: string | null;
+  receiptNumber: string | null;
+  paymentDate: string;
+  amount: string;
+  method: PaymentMethod;
+  referenceNumber: string | null;
+  notes: string | null;
+  isVoided: boolean;
+  voidedAt: string | null;
+  voidReason: string | null;
+  student: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+  };
+  recordedBy: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  } | null;
+  allocations: Array<{
+    id: string;
+    chargeId: string;
+    amount: string;
+    charge: {
+      id: string;
+      title: string;
+      amount: string;
+    };
+  }>;
+  school: {
+    id: string;
+    name: string;
+    shortName: string | null;
+  } | null;
+};
+
+export function getPaymentReceipt(paymentId: string): Promise<PaymentReceipt> {
+  return apiFetch(`/billing/payments/${paymentId}/receipt`);
+}
+
+export function getParentPaymentReceipt(paymentId: string): Promise<PaymentReceipt> {
+  return apiFetch(`/billing/parent/payments/${paymentId}/receipt`);
+}
+
+export type StudentStatement = {
+  student: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+    email: string | null;
+  };
+  school: {
+    id: string;
+    name: string;
+    shortName: string | null;
+  } | null;
+  generatedAt: string;
+  currentBalance: string;
+  overdueBalance: string;
+  allCharges: BillingCharge[];
+  allPayments: AccountSummaryPayment[];
+};
+
+export function getStudentStatement(
+  studentId: string,
+  options?: { schoolId?: string },
+): Promise<StudentStatement> {
+  const query = new URLSearchParams();
+
+  if (options?.schoolId) {
+    query.set("schoolId", options.schoolId);
+  }
+
+  return apiFetch(
+    `/billing/students/${studentId}/statement${query.size ? `?${query.toString()}` : ""}`,
+  );
+}
+
+export function getParentStudentStatement(studentId: string): Promise<StudentStatement> {
+  return apiFetch(`/billing/parent/students/${studentId}/statement`);
 }

@@ -4,10 +4,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AuditLogSeverity, ChargeSourceType, ChargeStatus, Prisma } from '@prisma/client';
+import {
+  AuditLogSeverity,
+  ChargeSourceType,
+  ChargeStatus,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { buildAuditDiff } from '../audit/audit-diff.util';
+import { NotificationsService } from '../notifications/notifications.service';
 import type { AuthenticatedUser } from '../common/auth/auth-user';
 import {
   ensureUserHasSchoolAccess,
@@ -93,7 +99,44 @@ export class BillingChargesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
+
+  private async notifyLinkedParentsForChargeCreated(input: {
+    schoolId: string;
+    studentId: string;
+    studentName: string;
+    chargeId?: string;
+    shouldNotify?: boolean;
+  }) {
+    // Skip notification if shouldNotify is explicitly false
+    if (input.shouldNotify === false) {
+      return;
+    }
+
+    const links = await this.prisma.studentParentLink.findMany({
+      where: { studentId: input.studentId },
+      select: { parentId: true },
+    });
+
+    const parentIds = [...new Set(links.map((link) => link.parentId))];
+
+    if (parentIds.length === 0) {
+      return;
+    }
+
+    await this.notificationsService.createMany(
+      parentIds.map((parentId) => ({
+        schoolId: input.schoolId,
+        recipientUserId: parentId,
+        type: 'BILLING_CHARGE_CREATED',
+        title: `New charge posted for ${input.studentName}`,
+        message: `New charge posted for ${input.studentName}`,
+        entityType: 'BillingCharge',
+        entityId: input.chargeId ?? null,
+      })),
+    );
+  }
 
   private ensureCanCreate(actor: AuthenticatedUser) {
     const allowed = ['OWNER', 'SUPER_ADMIN', 'ADMIN'];
@@ -296,6 +339,14 @@ export class BillingChargesService {
         categoryName: category.name,
         studentId: data.studentId,
       },
+    });
+
+    await this.notifyLinkedParentsForChargeCreated({
+      schoolId,
+      studentId: charge.studentId,
+      studentName,
+      chargeId: charge.id,
+      shouldNotify: data.sendNotifications ?? false,
     });
 
     return charge;
@@ -677,8 +728,10 @@ export class BillingChargesService {
     // ── Create charges in a transaction ───────────────────────────────────
     const issuedAt = new Date();
 
+    let createdCharges: Array<{ id: string; studentId: string }> = [];
+
     if (toCreate.length > 0) {
-      await this.prisma.$transaction(
+      createdCharges = await this.prisma.$transaction(
         toCreate.map((studentId) =>
           this.prisma.billingCharge.create({
             data: {
@@ -697,7 +750,7 @@ export class BillingChargesService {
               issuedAt,
               dueDate: parsedDueDate,
             },
-            select: { id: true },
+            select: { id: true, studentId: true },
           }),
         ),
       );
@@ -722,6 +775,43 @@ export class BillingChargesService {
         amount: data.amount,
       },
     });
+
+    if (createdCharges.length > 0) {
+      const createdByStudentId = new Map(
+        createdCharges.map((charge) => [charge.studentId, charge.id]),
+      );
+
+      const parentLinks = await this.prisma.studentParentLink.findMany({
+        where: { studentId: { in: toCreate } },
+        select: { parentId: true, studentId: true },
+      });
+
+      const inputs = new Map<string, Parameters<NotificationsService['createMany']>[0][number]>();
+
+      for (const link of parentLinks) {
+        const student = studentMap.get(link.studentId);
+        if (!student) {
+          continue;
+        }
+
+        const studentName = `${student.firstName} ${student.lastName}`.trim() || 'student';
+        const key = `${link.parentId}::${link.studentId}`;
+
+        inputs.set(key, {
+          schoolId,
+          recipientUserId: link.parentId,
+          type: 'BILLING_CHARGE_CREATED',
+          title: `New charge posted for ${studentName}`,
+          message: `New charge posted for ${studentName}`,
+          entityType: 'BillingCharge',
+          entityId: createdByStudentId.get(link.studentId) ?? null,
+        });
+      }
+
+      if (data.sendNotifications ?? false) {
+        await this.notificationsService.createMany([...inputs.values()]);
+      }
+    }
 
     return {
       totalTargeted: candidateStudentIds.length,

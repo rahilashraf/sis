@@ -96,7 +96,18 @@ export type UpdateStudentInput = {
 export type ReRegistrationInput = Omit<
   UpdateStudentInput,
   "gradeLevelId" | "studentNumber" | "oen"
->;
+> & {
+  returningNextYear: boolean;
+  nonReturningReason?:
+    | "MOVING"
+    | "TRANSFERRING_SCHOOLS"
+    | "HOMESCHOOLING"
+    | "GRADUATING"
+    | "FINANCIAL"
+    | "OTHER"
+    | null;
+  nonReturningComment?: string | null;
+};
 
 function normalizeStudentProfile(student: Partial<StudentProfile>): StudentProfile {
   const dateOfBirth = normalizeDateOnlyPayload(student.dateOfBirth);

@@ -100,4 +100,11 @@ export class CreateBatchBillingPaymentsDto {
   @ValidateNested({ each: true })
   @Type(() => BatchBillingPaymentEntryDto)
   entries: BatchBillingPaymentEntryDto[];
+
+  /**
+   * If true, notify linked parents for each successful batch payment.
+   * Defaults to false (no notifications sent).
+   */
+  @IsOptional()
+  sendNotifications?: boolean;
 }

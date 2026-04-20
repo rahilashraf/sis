@@ -98,4 +98,11 @@ export class BulkCreateBillingChargeDto {
   @Transform(({ value }) => toTrimmedString(value))
   @IsString()
   gradeLevel?: string;
+
+  /**
+   * If true, notify linked parents for each created charge.
+   * Defaults to false (no notifications sent).
+   */
+  @IsOptional()
+  sendNotifications?: boolean;
 }

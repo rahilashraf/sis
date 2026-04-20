@@ -25,6 +25,8 @@ import { BehaviorModule } from './behavior/behavior.module';
 import { AuditModule } from './audit/audit.module';
 import { TimetableModule } from './timetable/timetable.module';
 import { BillingModule } from './billing/billing.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { LibraryModule } from './library/library.module';
 
 @Module({
   imports: [
@@ -54,6 +56,8 @@ import { BillingModule } from './billing/billing.module';
     AuditModule,
     TimetableModule,
     BillingModule,
+    NotificationsModule,
+    LibraryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

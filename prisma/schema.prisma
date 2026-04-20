@@ -169,6 +169,29 @@ enum AuditArchiveAction {
   RETENTION_PURGE
 }
 
+enum ReRegistrationNonReturnReason {
+  MOVING
+  TRANSFERRING_SCHOOLS
+  HOMESCHOOLING
+  GRADUATING
+  FINANCIAL
+  OTHER
+}
+
+enum LibraryItemStatus {
+  AVAILABLE
+  CHECKED_OUT
+  LOST
+  ARCHIVED
+}
+
+enum LibraryLoanStatus {
+  ACTIVE
+  RETURNED
+  LOST
+  OVERDUE
+}
+
 model User {
   id           String   @id @default(cuid())
   schoolId     String?
@@ -249,6 +272,12 @@ model User {
   voidedBillingCharges     BillingCharge[]   @relation("BillingChargeVoidedBy")
   billingPaymentsAsStudent BillingPayment[]  @relation("BillingPaymentStudent")
   recordedBillingPayments  BillingPayment[]  @relation("BillingPaymentRecordedBy")
+  notifications            Notification[]
+  reRegistrationSubmissionsAsStudent ReRegistrationSubmission[] @relation("ReRegistrationSubmissionStudent")
+  reRegistrationSubmissionsSubmitted ReRegistrationSubmission[] @relation("ReRegistrationSubmissionSubmittedBy")
+  libraryLoansAsStudent    LibraryLoan[] @relation("LibraryLoanStudent")
+  libraryLoansCheckedOut   LibraryLoan[] @relation("LibraryLoanCheckedOutBy")
+  libraryLoansReceived     LibraryLoan[] @relation("LibraryLoanReceivedBy")
 
   @@unique([schoolId, studentNumber])
 }
@@ -285,6 +314,9 @@ model School {
   billingCategories      BillingCategory[]
   billingCharges         BillingCharge[]
   billingPayments        BillingPayment[]
+  notifications          Notification[]
+  libraryItems           LibraryItem[]
+  libraryLoans           LibraryLoan[]
 }
 
 model GradeScale {
@@ -1024,9 +1056,78 @@ model ReRegistrationWindow {
 
   school     School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   schoolYear SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+  submissions ReRegistrationSubmission[]
 
   @@index([schoolId, schoolYearId, isActive])
   @@index([opensAt, closesAt])
+}
+
+model ReRegistrationSubmission {
+  id                String                       @id @default(cuid())
+  windowId          String
+  studentId         String
+  submittedByUserId String?
+  returningNextYear Boolean
+  nonReturningReason ReRegistrationNonReturnReason?
+  nonReturningComment String?
+  submittedAt       DateTime                     @default(now())
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+
+  window      ReRegistrationWindow @relation(fields: [windowId], references: [id], onDelete: Cascade)
+  student     User                 @relation("ReRegistrationSubmissionStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  submittedBy User?                @relation("ReRegistrationSubmissionSubmittedBy", fields: [submittedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([windowId, studentId])
+  @@index([windowId, submittedAt])
+  @@index([studentId, submittedAt])
+}
+
+model LibraryItem {
+  id              String            @id @default(cuid())
+  schoolId        String
+  title           String
+  author          String?
+  isbn            String?
+  barcode         String?
+  category        String?
+  status          LibraryItemStatus @default(AVAILABLE)
+  totalCopies     Int               @default(1)
+  availableCopies Int               @default(1)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  school School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  loans  LibraryLoan[]
+
+  @@unique([schoolId, barcode])
+  @@index([schoolId, status])
+  @@index([schoolId, category])
+}
+
+model LibraryLoan {
+  id                 String            @id @default(cuid())
+  schoolId           String
+  itemId             String
+  studentId          String
+  checkedOutByUserId String
+  checkoutDate       DateTime          @default(now())
+  dueDate            DateTime
+  returnedAt         DateTime?
+  receivedByUserId   String?
+  status             LibraryLoanStatus @default(ACTIVE)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  school       School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  item         LibraryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  student      User        @relation("LibraryLoanStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  checkedOutBy User        @relation("LibraryLoanCheckedOutBy", fields: [checkedOutByUserId], references: [id], onDelete: Restrict)
+  receivedBy   User?       @relation("LibraryLoanReceivedBy", fields: [receivedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, status, dueDate])
+  @@index([studentId, status, dueDate])
+  @@index([itemId, status])
 }
 
 model AuditLog {
@@ -1154,6 +1255,39 @@ enum PaymentMethod {
   CASH
   DEBIT_CREDIT
   CHEQUE
+}
+
+enum NotificationType {
+  BILLING_CHARGE_CREATED
+  BILLING_PAYMENT_RECORDED
+  BILLING_PAYMENT_VOIDED
+  FORM_ASSIGNED
+  FORM_SUBMITTED
+  REREGISTRATION_OPENED
+  ATTENDANCE_MARKED
+  INCIDENT_CREATED
+  SYSTEM_ANNOUNCEMENT
+}
+
+model Notification {
+  id              String           @id @default(cuid())
+  schoolId        String?
+  recipientUserId String
+  type            NotificationType
+  title           String
+  message         String
+  entityType      String?
+  entityId        String?
+  isRead          Boolean          @default(false)
+  readAt          DateTime?
+  createdAt       DateTime         @default(now())
+
+  school        School? @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  recipientUser User    @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  @@index([recipientUserId, createdAt(sort: Desc)])
+  @@index([recipientUserId, isRead])
+  @@index([schoolId, createdAt(sort: Desc)])
 }
 
 model BillingPayment {
