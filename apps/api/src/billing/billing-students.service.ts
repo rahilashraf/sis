@@ -46,6 +46,14 @@ const accountSummaryChargeSelect = Prisma.validator<Prisma.BillingChargeSelect>(
       isActive: true,
     },
   },
+  libraryFine: {
+    select: {
+      id: true,
+      reason: true,
+      status: true,
+      assessedAt: true,
+    },
+  },
 });
 
 const recentPaymentSelect = Prisma.validator<Prisma.BillingPaymentSelect>()({

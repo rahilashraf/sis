@@ -53,9 +53,39 @@ export type SafeUser = Prisma.UserGetPayload<{
 
 type SensitiveRecord = Record<string, unknown>;
 
+function isPrismaDecimal(value: unknown): value is Prisma.Decimal {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  if (value instanceof Prisma.Decimal) {
+    return true;
+  }
+
+  const record = value as {
+    constructor?: { name?: string };
+    toFixed?: unknown;
+    toString?: unknown;
+  };
+
+  if (
+    typeof record.toFixed !== 'function' ||
+    typeof record.toString !== 'function'
+  ) {
+    return false;
+  }
+
+  const constructorName = record.constructor?.name ?? '';
+  return constructorName.startsWith('Decimal');
+}
+
 function stripPasswordHash(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map((entry) => stripPasswordHash(entry));
+  }
+
+  if (isPrismaDecimal(value)) {
+    return value.toString();
   }
 
   if (value instanceof Date) {

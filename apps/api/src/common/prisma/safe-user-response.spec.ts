@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { sanitizeResponse } from './safe-user-response';
 
 describe('sanitizeResponse', () => {
@@ -25,5 +26,23 @@ describe('sanitizeResponse', () => {
     });
     expect(sanitized.startDate).toBeInstanceOf(Date);
     expect(sanitized.endDate).toBeInstanceOf(Date);
+  });
+
+  it('serializes Prisma Decimal values to strings', () => {
+    const sanitized = sanitizeResponse({
+      id: 'uniform-1',
+      price: new Prisma.Decimal('24.50'),
+      nested: {
+        amount: new Prisma.Decimal('12.00'),
+      },
+    });
+
+    expect(sanitized).toEqual({
+      id: 'uniform-1',
+      price: '24.5',
+      nested: {
+        amount: '12',
+      },
+    });
   });
 });

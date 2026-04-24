@@ -216,3 +216,44 @@ export function deleteStudentParentLink(linkId: string) {
 export function listParentStudents(parentId: string) {
   return apiFetch<ParentStudentLink[]>(`/parents/${parentId}/students`);
 }
+
+let parentStudentsCache:
+  | {
+      expiresAt: number;
+      data: ParentStudentLink[];
+    }
+  | null = null;
+let parentStudentsInFlight: Promise<ParentStudentLink[]> | null = null;
+
+export function clearParentStudentsCache() {
+  parentStudentsCache = null;
+  parentStudentsInFlight = null;
+}
+
+export async function listMyParentStudents(options?: { forceRefresh?: boolean }) {
+  const forceRefresh = options?.forceRefresh ?? false;
+  const now = Date.now();
+
+  if (!forceRefresh && parentStudentsCache && parentStudentsCache.expiresAt > now) {
+    return parentStudentsCache.data;
+  }
+
+  if (!forceRefresh && parentStudentsInFlight) {
+    return parentStudentsInFlight;
+  }
+
+  const request = apiFetch<ParentStudentLink[]>("/parents/me/students")
+    .then((response) => {
+      parentStudentsCache = {
+        data: response,
+        expiresAt: Date.now() + 60_000,
+      };
+      return response;
+    })
+    .finally(() => {
+      parentStudentsInFlight = null;
+    });
+
+  parentStudentsInFlight = request;
+  return request;
+}

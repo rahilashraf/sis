@@ -396,7 +396,10 @@ export function BillingChargesManagement() {
                         </td>
                         <td className="px-4 py-4 text-slate-700">{charge.category.name}</td>
                         <td className="px-4 py-4 text-slate-700">
-                          <p className="font-medium text-slate-900">{charge.title}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium text-slate-900">{charge.title}</p>
+                            {charge.libraryFine ? <Badge variant="primary">Library fine</Badge> : null}
+                          </div>
                           {charge.schoolYear ? (
                             <p className="mt-1 text-xs text-slate-500">{charge.schoolYear.name}</p>
                           ) : null}

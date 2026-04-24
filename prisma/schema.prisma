@@ -192,6 +192,40 @@ enum LibraryLoanStatus {
   OVERDUE
 }
 
+enum LibraryFineReason {
+  LATE
+  LOST
+  UNCLAIMED_HOLD
+  MANUAL
+}
+
+enum LibraryFineStatus {
+  OPEN
+  WAIVED
+  PAID
+  VOID
+}
+
+enum LibraryLateFineFrequency {
+  PER_DAY
+  FLAT
+}
+
+enum UniformOrderStatus {
+  PENDING
+  APPROVED
+  PREPARING
+  READY_FOR_PICKUP
+  COMPLETED
+  CANCELLED
+}
+
+enum InterviewSlotStatus {
+  AVAILABLE
+  BOOKED
+  CANCELLED
+}
+
 model User {
   id           String   @id @default(cuid())
   schoolId     String?
@@ -278,6 +312,13 @@ model User {
   libraryLoansAsStudent    LibraryLoan[] @relation("LibraryLoanStudent")
   libraryLoansCheckedOut   LibraryLoan[] @relation("LibraryLoanCheckedOutBy")
   libraryLoansReceived     LibraryLoan[] @relation("LibraryLoanReceivedBy")
+  libraryFinesAsStudent    LibraryFine[] @relation("LibraryFineStudent")
+  waivedLibraryFines       LibraryFine[] @relation("LibraryFineWaivedBy")
+  uniformOrdersAsParent    UniformOrder[] @relation("UniformOrderParent")
+  uniformOrdersAsStudent   UniformOrder[] @relation("UniformOrderStudent")
+  interviewSlotsAsTeacher  InterviewSlot[] @relation("InterviewSlotTeacher")
+  bookedInterviewSlotsAsParent InterviewSlot[] @relation("InterviewSlotBookedParent")
+  bookedInterviewSlotsAsStudent InterviewSlot[] @relation("InterviewSlotBookedStudent")
 
   @@unique([schoolId, studentNumber])
 }
@@ -317,6 +358,12 @@ model School {
   notifications          Notification[]
   libraryItems           LibraryItem[]
   libraryLoans           LibraryLoan[]
+  libraryFineSettings    LibraryFineSettings?
+  libraryFines           LibraryFine[]
+  uniformItems           UniformItem[]
+  uniformOrders          UniformOrder[]
+  interviewEvents        InterviewEvent[]
+  interviewSlots         InterviewSlot[]
 }
 
 model GradeScale {
@@ -653,6 +700,7 @@ model Class {
   assessmentCategories AssessmentCategory[]
   gradeOverrides GradeOverride[]
   timetableBlockLinks TimetableBlockClass[]
+  interviewSlots InterviewSlot[]
 
   attendanceSessionClasses AttendanceSessionClass[]
 
@@ -1099,6 +1147,7 @@ model LibraryItem {
 
   school School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   loans  LibraryLoan[]
+  fines  LibraryFine[] @relation("LibraryFineItem")
 
   @@unique([schoolId, barcode])
   @@index([schoolId, status])
@@ -1124,10 +1173,60 @@ model LibraryLoan {
   student      User        @relation("LibraryLoanStudent", fields: [studentId], references: [id], onDelete: Cascade)
   checkedOutBy User        @relation("LibraryLoanCheckedOutBy", fields: [checkedOutByUserId], references: [id], onDelete: Restrict)
   receivedBy   User?       @relation("LibraryLoanReceivedBy", fields: [receivedByUserId], references: [id], onDelete: SetNull)
+  fines        LibraryFine[] @relation("LibraryFineLoan")
 
   @@index([schoolId, status, dueDate])
   @@index([studentId, status, dueDate])
   @@index([itemId, status])
+}
+
+model LibraryFineSettings {
+  id                      String                   @id @default(cuid())
+  schoolId                String                   @unique
+  lateFineAmount          Decimal                  @default(0) @db.Decimal(12, 2)
+  lostItemFineAmount      Decimal                  @default(0) @db.Decimal(12, 2)
+  unclaimedHoldFineAmount Decimal                  @default(0) @db.Decimal(12, 2)
+  lateFineGraceDays       Int                      @default(0)
+  lateFineFrequency       LibraryLateFineFrequency @default(PER_DAY)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+}
+
+model LibraryFine {
+  id             String            @id @default(cuid())
+  schoolId       String
+  studentId      String
+  libraryItemId  String?
+  checkoutId     String?
+  holdReference  String?
+  reason         LibraryFineReason
+  status         LibraryFineStatus @default(OPEN)
+  amount         Decimal           @db.Decimal(12, 2)
+  description    String?
+  assessedAt     DateTime          @default(now())
+  waivedAt       DateTime?
+  waivedById     String?
+  billingChargeId String?          @unique
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student      User         @relation("LibraryFineStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  libraryItem  LibraryItem? @relation("LibraryFineItem", fields: [libraryItemId], references: [id], onDelete: SetNull)
+  checkout     LibraryLoan? @relation("LibraryFineLoan", fields: [checkoutId], references: [id], onDelete: SetNull)
+  waivedBy     User?        @relation("LibraryFineWaivedBy", fields: [waivedById], references: [id], onDelete: SetNull)
+  billingCharge BillingCharge? @relation(fields: [billingChargeId], references: [id], onDelete: SetNull)
+
+  @@unique([checkoutId, reason])
+  @@unique([schoolId, holdReference, reason])
+  @@index([schoolId, status, assessedAt])
+  @@index([studentId, status, assessedAt])
+  @@index([libraryItemId])
+  @@index([checkoutId])
 }
 
 model AuditLog {
@@ -1242,6 +1341,7 @@ model BillingCharge {
   voidedBy    User?           @relation("BillingChargeVoidedBy", fields: [voidedById], references: [id], onDelete: SetNull)
   category    BillingCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   allocations BillingPaymentAllocation[]
+  libraryFine LibraryFine?
 
   @@index([schoolId, status])
   @@index([schoolId, studentId])
@@ -1332,4 +1432,126 @@ model BillingPaymentAllocation {
 
   @@unique([paymentId, chargeId])
   @@index([chargeId])
+}
+
+model UniformItem {
+  id              String   @id @default(cuid())
+  schoolId        String
+  name            String
+  description     String?
+  category        String?
+  sku             String?
+  price           Decimal  @db.Decimal(12, 2)
+  availableSizes  String[] @default([])
+  availableColors String[] @default([])
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  school     School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  orderItems UniformOrderItem[]
+
+  @@unique([schoolId, sku])
+  @@index([schoolId, isActive, sortOrder, name])
+  @@index([schoolId, category, isActive])
+}
+
+model UniformOrder {
+  id            String            @id @default(cuid())
+  schoolId      String
+  parentId      String
+  studentId     String
+  status        UniformOrderStatus @default(PENDING)
+  notes         String?
+  internalNotes String?
+  totalAmount   Decimal           @db.Decimal(12, 2)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  school  School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  parent  User   @relation("UniformOrderParent", fields: [parentId], references: [id], onDelete: Restrict)
+  student User   @relation("UniformOrderStudent", fields: [studentId], references: [id], onDelete: Restrict)
+
+  items UniformOrderItem[]
+
+  @@index([schoolId, status, createdAt])
+  @@index([parentId, createdAt])
+  @@index([studentId, createdAt])
+}
+
+model UniformOrderItem {
+  id              String   @id @default(cuid())
+  orderId         String
+  uniformItemId   String
+  itemNameSnapshot String
+  itemSkuSnapshot String?
+  selectedSize    String?
+  selectedColor   String?
+  unitPrice       Decimal  @db.Decimal(12, 2)
+  quantity        Int
+  lineTotal       Decimal  @db.Decimal(12, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  order      UniformOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  uniformItem UniformItem @relation(fields: [uniformItemId], references: [id], onDelete: Restrict)
+
+  @@index([orderId, createdAt])
+  @@index([uniformItemId])
+}
+
+model InterviewEvent {
+  id              String   @id @default(cuid())
+  schoolId        String
+  title           String
+  description     String?
+  bookingOpensAt  DateTime?
+  bookingClosesAt DateTime?
+  startsAt        DateTime
+  endsAt          DateTime
+  isPublished     Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  slots  InterviewSlot[]
+
+  @@index([schoolId, isActive, isPublished, startsAt, endsAt])
+  @@index([schoolId, bookingOpensAt, bookingClosesAt])
+}
+
+model InterviewSlot {
+  id               String             @id @default(cuid())
+  interviewEventId String
+  schoolId         String
+  teacherId        String
+  classId          String?
+  startTime        DateTime
+  endTime          DateTime
+  location         String?
+  meetingMode      String?
+  notes            String?
+  status           InterviewSlotStatus @default(AVAILABLE)
+  bookedParentId   String?
+  bookedStudentId  String?
+  bookedAt         DateTime?
+  bookingNotes     String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  interviewEvent InterviewEvent @relation(fields: [interviewEventId], references: [id], onDelete: Cascade)
+  school         School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacher        User           @relation("InterviewSlotTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  class          Class?         @relation(fields: [classId], references: [id], onDelete: SetNull)
+  bookedParent   User?          @relation("InterviewSlotBookedParent", fields: [bookedParentId], references: [id], onDelete: SetNull)
+  bookedStudent  User?          @relation("InterviewSlotBookedStudent", fields: [bookedStudentId], references: [id], onDelete: SetNull)
+
+  @@unique([interviewEventId, teacherId, startTime, endTime])
+  @@index([interviewEventId, startTime, endTime])
+  @@index([schoolId, teacherId, startTime])
+  @@index([teacherId, status, startTime])
+  @@index([bookedParentId, startTime])
+  @@index([bookedStudentId, startTime])
 }

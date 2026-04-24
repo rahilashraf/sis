@@ -23,7 +23,7 @@ import {
   type ParentFormState,
   type ParentFormSummary,
 } from "@/lib/api/forms";
-import { listParentStudents, type ParentStudentLink } from "@/lib/api/students";
+import { listMyParentStudents, type ParentStudentLink } from "@/lib/api/students";
 import { formatDateLabel } from "@/lib/utils";
 
 function formatParentFormState(state: ParentFormState) {
@@ -70,7 +70,7 @@ export function ParentFormsOverview() {
       setError(null);
 
       try {
-        const response = await listParentStudents(session.user.id);
+        const response = await listMyParentStudents();
         setLinks(response);
         const requestedStudentId = searchParams.get("studentId") ?? "";
         const defaultStudentId =

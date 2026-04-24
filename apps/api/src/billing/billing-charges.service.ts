@@ -92,6 +92,14 @@ const chargeSelect = Prisma.validator<Prisma.BillingChargeSelect>()({
       role: true,
     },
   },
+  libraryFine: {
+    select: {
+      id: true,
+      reason: true,
+      status: true,
+      assessedAt: true,
+    },
+  },
 });
 
 @Injectable()

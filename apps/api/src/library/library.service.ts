@@ -6,6 +6,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ChargeSourceType,
+  ChargeStatus,
+  LibraryFineReason,
+  LibraryFineStatus,
+  LibraryLateFineFrequency,
   LibraryItemStatus,
   LibraryLoanStatus,
   NotificationType,
@@ -18,6 +23,7 @@ import {
   getAccessibleSchoolIds,
   isBypassRole,
 } from '../common/access/school-access.util';
+import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CheckoutLibraryLoanDto } from './dto/checkout-library-loan.dto';
@@ -25,8 +31,16 @@ import { CreateLibraryItemDto } from './dto/create-library-item.dto';
 import { ListLibraryItemsQueryDto } from './dto/list-library-items-query.dto';
 import { ListLibraryLoansQueryDto } from './dto/list-library-loans-query.dto';
 import { ListLibraryOverdueQueryDto } from './dto/list-library-overdue-query.dto';
+import { GetLibraryFineSettingsQueryDto } from './dto/get-library-fine-settings-query.dto';
+import { ListLibraryFinesQueryDto } from './dto/list-library-fines-query.dto';
+import { UpsertLibraryFineSettingsDto } from './dto/upsert-library-fine-settings.dto';
+import { CreateManualLibraryFineDto } from './dto/create-manual-library-fine.dto';
+import { WaiveLibraryFineDto } from './dto/waive-library-fine.dto';
+import { AssessLibraryOverdueFinesDto } from './dto/assess-library-overdue-fines.dto';
+import { AssessUnclaimedHoldFineDto } from './dto/assess-unclaimed-hold-fine.dto';
 import { ReturnLibraryLoanDto } from './dto/return-library-loan.dto';
 import { UpdateLibraryItemDto } from './dto/update-library-item.dto';
+import { MarkLibraryLoanLostDto } from './dto/mark-library-loan-lost.dto';
 
 const LIBRARY_MANAGE_ROLES: UserRole[] = [
   UserRole.OWNER,
@@ -34,6 +48,8 @@ const LIBRARY_MANAGE_ROLES: UserRole[] = [
   UserRole.ADMIN,
   UserRole.STAFF,
 ];
+
+const LIBRARY_FINE_POLICY_ROLES: UserRole[] = [UserRole.OWNER, UserRole.SUPER_ADMIN];
 
 const libraryItemSelect = Prisma.validator<Prisma.LibraryItemSelect>()({
   id: true,
@@ -117,6 +133,101 @@ const libraryLoanSelect = Prisma.validator<Prisma.LibraryLoanSelect>()({
 
 type LoanRecord = Prisma.LibraryLoanGetPayload<{ select: typeof libraryLoanSelect }>;
 
+const libraryFineSettingsSelect =
+  Prisma.validator<Prisma.LibraryFineSettingsSelect>()({
+    id: true,
+    schoolId: true,
+    lateFineAmount: true,
+    lostItemFineAmount: true,
+    unclaimedHoldFineAmount: true,
+    lateFineGraceDays: true,
+    lateFineFrequency: true,
+    createdAt: true,
+    updatedAt: true,
+    school: {
+      select: {
+        id: true,
+        name: true,
+        shortName: true,
+      },
+    },
+  });
+
+const libraryFineSelect = Prisma.validator<Prisma.LibraryFineSelect>()({
+  id: true,
+  schoolId: true,
+  studentId: true,
+  libraryItemId: true,
+  checkoutId: true,
+  holdReference: true,
+  reason: true,
+  status: true,
+  amount: true,
+  description: true,
+  assessedAt: true,
+  waivedAt: true,
+  waivedById: true,
+  billingChargeId: true,
+  createdAt: true,
+  updatedAt: true,
+  school: {
+    select: {
+      id: true,
+      name: true,
+      shortName: true,
+    },
+  },
+  student: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      username: true,
+      email: true,
+    },
+  },
+  libraryItem: {
+    select: {
+      id: true,
+      title: true,
+      barcode: true,
+      category: true,
+    },
+  },
+  checkout: {
+    select: {
+      id: true,
+      dueDate: true,
+      checkoutDate: true,
+      status: true,
+    },
+  },
+  waivedBy: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      username: true,
+    },
+  },
+  billingCharge: {
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      amount: true,
+      amountPaid: true,
+      amountDue: true,
+      category: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  },
+});
+
 @Injectable()
 export class LibraryService {
   constructor(
@@ -127,6 +238,12 @@ export class LibraryService {
   private ensureCanManage(actor: AuthenticatedUser) {
     if (!LIBRARY_MANAGE_ROLES.includes(actor.role)) {
       throw new ForbiddenException('You do not have permission to manage library data');
+    }
+  }
+
+  private ensureCanManageFinePolicy(actor: AuthenticatedUser) {
+    if (!LIBRARY_FINE_POLICY_ROLES.includes(actor.role)) {
+      throw new ForbiddenException('You do not have permission to manage library fine settings');
     }
   }
 
@@ -170,6 +287,17 @@ export class LibraryService {
     return parsed;
   }
 
+  private parseMoneyOrThrow(value: string, fieldName: string) {
+    const normalized = value.trim();
+    if (!/^\d+(\.\d{1,2})?$/.test(normalized)) {
+      throw new BadRequestException(
+        `${fieldName} must be a positive number with at most 2 decimal places`,
+      );
+    }
+
+    return new Prisma.Decimal(normalized);
+  }
+
   private startOfToday() {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -182,6 +310,19 @@ export class LibraryService {
   }) {
     if (input.status === LibraryItemStatus.LOST || input.status === LibraryItemStatus.ARCHIVED) {
       return input.status;
+    }
+
+    return input.availableCopies > 0
+      ? LibraryItemStatus.AVAILABLE
+      : LibraryItemStatus.CHECKED_OUT;
+  }
+
+  private normalizeFoundItemStatus(input: {
+    status: LibraryItemStatus;
+    availableCopies: number;
+  }) {
+    if (input.status === LibraryItemStatus.ARCHIVED) {
+      return LibraryItemStatus.ARCHIVED;
     }
 
     return input.availableCopies > 0
@@ -214,6 +355,600 @@ export class LibraryService {
     };
   }
 
+  private getFineStatusFromCharge(input: {
+    currentStatus: LibraryFineStatus;
+    chargeStatus: ChargeStatus | null | undefined;
+  }) {
+    if (!input.chargeStatus) {
+      return input.currentStatus;
+    }
+
+    if (input.chargeStatus === ChargeStatus.PAID) {
+      return LibraryFineStatus.PAID;
+    }
+
+    if (input.chargeStatus === ChargeStatus.VOID) {
+      return LibraryFineStatus.VOID;
+    }
+
+    if (input.chargeStatus === ChargeStatus.WAIVED) {
+      return LibraryFineStatus.WAIVED;
+    }
+
+    return input.currentStatus;
+  }
+
+  private mapFineRecord(
+    fine: Prisma.LibraryFineGetPayload<{ select: typeof libraryFineSelect }>,
+  ) {
+    const effectiveStatus = this.getFineStatusFromCharge({
+      currentStatus: fine.status,
+      chargeStatus: fine.billingCharge?.status,
+    });
+
+    return {
+      ...fine,
+      status: effectiveStatus,
+    };
+  }
+
+  private async getFineSettingsOrCreate(schoolId: string) {
+    return this.prisma.libraryFineSettings.upsert({
+      where: { schoolId },
+      create: {
+        schoolId,
+        lateFineAmount: new Prisma.Decimal(0),
+        lostItemFineAmount: new Prisma.Decimal(0),
+        unclaimedHoldFineAmount: new Prisma.Decimal(0),
+        lateFineGraceDays: 0,
+        lateFineFrequency: LibraryLateFineFrequency.PER_DAY,
+      },
+      update: {},
+      select: libraryFineSettingsSelect,
+    });
+  }
+
+  private async ensureLibraryFineCategory(schoolId: string) {
+    return this.prisma.billingCategory.upsert({
+      where: {
+        schoolId_name: {
+          schoolId,
+          name: 'Library Fines',
+        },
+      },
+      create: {
+        schoolId,
+        name: 'Library Fines',
+        description: 'System category for library fines',
+        isActive: true,
+      },
+      update: {
+        isActive: true,
+        archivedAt: null,
+      },
+      select: {
+        id: true,
+        schoolId: true,
+        name: true,
+      },
+    });
+  }
+
+  private buildLibraryFineChargeTitle(reason: LibraryFineReason) {
+    if (reason === LibraryFineReason.LATE) {
+      return 'Library fine - overdue item';
+    }
+
+    if (reason === LibraryFineReason.LOST) {
+      return 'Library fine - lost item';
+    }
+
+    if (reason === LibraryFineReason.UNCLAIMED_HOLD) {
+      return 'Library fine - unclaimed hold';
+    }
+
+    return 'Library fine - manual';
+  }
+
+  private async createFineWithCharge(input: {
+    actor: AuthenticatedUser;
+    schoolId: string;
+    studentId: string;
+    reason: LibraryFineReason;
+    amount: Prisma.Decimal;
+    description?: string | null;
+    libraryItemId?: string | null;
+    checkoutId?: string | null;
+    holdReference?: string | null;
+    dueDate?: Date | null;
+  }) {
+    if (input.amount.lte(0)) {
+      throw new BadRequestException('Fine amount must be greater than zero');
+    }
+
+    const category = await this.ensureLibraryFineCategory(input.schoolId);
+    const chargeTitle = this.buildLibraryFineChargeTitle(input.reason);
+
+    try {
+      const fine = await this.prisma.$transaction(async (tx) => {
+        const charge = await tx.billingCharge.create({
+          data: {
+            schoolId: input.schoolId,
+            schoolYearId: null,
+            studentId: input.studentId,
+            categoryId: category.id,
+            createdById: input.actor.id,
+            title: chargeTitle,
+            description: input.description ?? null,
+            amount: input.amount,
+            amountPaid: new Prisma.Decimal(0),
+            amountDue: input.amount,
+            status: ChargeStatus.PENDING,
+            sourceType: ChargeSourceType.SYSTEM,
+            issuedAt: new Date(),
+            dueDate: input.dueDate ?? null,
+          },
+          select: { id: true },
+        });
+
+        return tx.libraryFine.create({
+          data: {
+            schoolId: input.schoolId,
+            studentId: input.studentId,
+            libraryItemId: input.libraryItemId ?? null,
+            checkoutId: input.checkoutId ?? null,
+            holdReference: input.holdReference ?? null,
+            reason: input.reason,
+            status: LibraryFineStatus.OPEN,
+            amount: input.amount,
+            description: input.description ?? null,
+            assessedAt: new Date(),
+            billingChargeId: charge.id,
+          },
+          select: libraryFineSelect,
+        });
+      });
+
+      return this.mapFineRecord(fine);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('A matching library fine already exists');
+      }
+
+      throw error;
+    }
+  }
+
+  private resolveFineAmountFromSettings(input: {
+    settings: Prisma.LibraryFineSettingsGetPayload<{ select: typeof libraryFineSettingsSelect }>;
+    reason: LibraryFineReason;
+    daysOverdue?: number;
+  }) {
+    if (input.reason === LibraryFineReason.LATE) {
+      const dailyAmount = new Prisma.Decimal(input.settings.lateFineAmount);
+      const days = input.daysOverdue ?? 1;
+
+      if (input.settings.lateFineFrequency === LibraryLateFineFrequency.FLAT) {
+        return dailyAmount;
+      }
+
+      return dailyAmount.mul(days);
+    }
+
+    if (input.reason === LibraryFineReason.LOST) {
+      return new Prisma.Decimal(input.settings.lostItemFineAmount);
+    }
+
+    if (input.reason === LibraryFineReason.UNCLAIMED_HOLD) {
+      return new Prisma.Decimal(input.settings.unclaimedHoldFineAmount);
+    }
+
+    return new Prisma.Decimal(0);
+  }
+
+  private parseOptionalDate(value?: string | null) {
+    if (!value) {
+      return null;
+    }
+
+    return this.parseDateOrThrow(value, 'dueDate');
+  }
+
+  async getFineSettings(actor: AuthenticatedUser, schoolId: string) {
+    this.ensureCanManage(actor);
+    this.ensureCanAccessSchool(actor, schoolId);
+
+    return this.getFineSettingsOrCreate(schoolId);
+  }
+
+  async upsertFineSettings(
+    actor: AuthenticatedUser,
+    body: UpsertLibraryFineSettingsDto,
+  ) {
+    this.ensureCanManageFinePolicy(actor);
+    this.ensureCanAccessSchool(actor, body.schoolId);
+
+    return this.prisma.libraryFineSettings.upsert({
+      where: { schoolId: body.schoolId },
+      create: {
+        schoolId: body.schoolId,
+        lateFineAmount: this.parseMoneyOrThrow(body.lateFineAmount, 'lateFineAmount'),
+        lostItemFineAmount: this.parseMoneyOrThrow(
+          body.lostItemFineAmount,
+          'lostItemFineAmount',
+        ),
+        unclaimedHoldFineAmount: this.parseMoneyOrThrow(
+          body.unclaimedHoldFineAmount,
+          'unclaimedHoldFineAmount',
+        ),
+        lateFineGraceDays: body.lateFineGraceDays,
+        lateFineFrequency: body.lateFineFrequency,
+      },
+      update: {
+        lateFineAmount: this.parseMoneyOrThrow(body.lateFineAmount, 'lateFineAmount'),
+        lostItemFineAmount: this.parseMoneyOrThrow(
+          body.lostItemFineAmount,
+          'lostItemFineAmount',
+        ),
+        unclaimedHoldFineAmount: this.parseMoneyOrThrow(
+          body.unclaimedHoldFineAmount,
+          'unclaimedHoldFineAmount',
+        ),
+        lateFineGraceDays: body.lateFineGraceDays,
+        lateFineFrequency: body.lateFineFrequency,
+      },
+      select: libraryFineSettingsSelect,
+    });
+  }
+
+  async listFines(actor: AuthenticatedUser, query: ListLibraryFinesQueryDto) {
+    this.ensureCanManage(actor);
+
+    const scopeSchoolIds = this.buildScopeSchoolIds(actor, query.schoolId);
+
+    const fines = await this.prisma.libraryFine.findMany({
+      where: {
+        ...(scopeSchoolIds ? { schoolId: { in: scopeSchoolIds } } : {}),
+        ...(query.studentId ? { studentId: query.studentId } : {}),
+        ...(query.reason ? { reason: query.reason } : {}),
+      },
+      orderBy: [{ assessedAt: 'desc' }, { createdAt: 'desc' }],
+      select: libraryFineSelect,
+    });
+
+    const mapped = fines.map((fine) => this.mapFineRecord(fine));
+    return query.status
+      ? mapped.filter((fine) => fine.status === query.status)
+      : mapped;
+  }
+
+  async createManualFine(actor: AuthenticatedUser, body: CreateManualLibraryFineDto) {
+    this.ensureCanManage(actor);
+    this.ensureCanAccessSchool(actor, body.schoolId);
+
+    const reason = body.reason ?? LibraryFineReason.MANUAL;
+    const student = await this.ensureStudentInSchoolOrThrow(
+      body.studentId,
+      body.schoolId,
+    );
+
+    let checkout: { id: string; schoolId: string; studentId: string; itemId: string } | null =
+      null;
+    if (body.checkoutId) {
+      checkout = await this.prisma.libraryLoan.findUnique({
+        where: { id: body.checkoutId },
+        select: {
+          id: true,
+          schoolId: true,
+          studentId: true,
+          itemId: true,
+        },
+      });
+
+      if (!checkout || checkout.schoolId !== body.schoolId) {
+        throw new NotFoundException('Library checkout not found in this school');
+      }
+
+      if (checkout.studentId !== student.id) {
+        throw new BadRequestException('checkoutId does not belong to the selected student');
+      }
+    }
+
+    if ((reason === LibraryFineReason.LATE || reason === LibraryFineReason.LOST) && !body.checkoutId) {
+      throw new BadRequestException('checkoutId is required for LATE and LOST fines');
+    }
+
+    if (reason === LibraryFineReason.UNCLAIMED_HOLD && !body.holdReference) {
+      throw new BadRequestException('holdReference is required for UNCLAIMED_HOLD fines');
+    }
+
+    let libraryItemId = body.libraryItemId ?? checkout?.itemId ?? null;
+    if (libraryItemId) {
+      const item = await this.prisma.libraryItem.findFirst({
+        where: {
+          id: libraryItemId,
+          schoolId: body.schoolId,
+        },
+        select: { id: true },
+      });
+
+      if (!item) {
+        throw new NotFoundException('Library item not found in this school');
+      }
+
+      libraryItemId = item.id;
+    }
+
+    let amount: Prisma.Decimal;
+    if (body.amount) {
+      amount = this.parseMoneyOrThrow(body.amount, 'amount');
+    } else {
+      const settings = await this.getFineSettingsOrCreate(body.schoolId);
+      amount = this.resolveFineAmountFromSettings({
+        settings,
+        reason,
+      });
+    }
+
+    if (amount.lte(0)) {
+      throw new BadRequestException('Fine amount must be configured and greater than zero');
+    }
+
+    return this.createFineWithCharge({
+      actor,
+      schoolId: body.schoolId,
+      studentId: student.id,
+      reason,
+      amount,
+      description: body.description ?? null,
+      libraryItemId,
+      checkoutId: checkout?.id ?? null,
+      holdReference: body.holdReference ?? null,
+      dueDate: this.parseOptionalDate(body.dueDate),
+    });
+  }
+
+  async waiveFine(actor: AuthenticatedUser, fineId: string, body: WaiveLibraryFineDto) {
+    this.ensureCanManage(actor);
+
+    const fine = await this.prisma.libraryFine.findUnique({
+      where: { id: fineId },
+      select: {
+        id: true,
+        schoolId: true,
+        status: true,
+        billingChargeId: true,
+        billingCharge: {
+          select: {
+            id: true,
+            status: true,
+            amountPaid: true,
+          },
+        },
+      },
+    });
+
+    if (!fine) {
+      throw new NotFoundException('Library fine not found');
+    }
+
+    this.ensureCanAccessSchool(actor, fine.schoolId);
+
+    if (fine.status !== LibraryFineStatus.OPEN) {
+      throw new BadRequestException('Only OPEN fines can be waived');
+    }
+
+    if (
+      fine.billingCharge &&
+      new Prisma.Decimal(fine.billingCharge.amountPaid).greaterThan(0)
+    ) {
+      throw new BadRequestException(
+        'Cannot waive a fine with recorded payments. Reverse payments first.',
+      );
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (fine.billingChargeId) {
+        await tx.billingCharge.update({
+          where: { id: fine.billingChargeId },
+          data: {
+            status: ChargeStatus.WAIVED,
+            amountDue: new Prisma.Decimal(0),
+            ...(body.reason
+              ? {
+                  description: body.reason,
+                }
+              : {}),
+          },
+        });
+      }
+
+      return tx.libraryFine.update({
+        where: { id: fine.id },
+        data: {
+          status: LibraryFineStatus.WAIVED,
+          waivedAt: new Date(),
+          waivedById: actor.id,
+        },
+        select: libraryFineSelect,
+      });
+    });
+
+    return this.mapFineRecord(updated);
+  }
+
+  async assessOverdueFines(actor: AuthenticatedUser, body: AssessLibraryOverdueFinesDto) {
+    this.ensureCanManage(actor);
+
+    if (!body.schoolId) {
+      throw new BadRequestException('schoolId is required');
+    }
+
+    this.ensureCanAccessSchool(actor, body.schoolId);
+
+    const settings = await this.getFineSettingsOrCreate(body.schoolId);
+    const dailyFineAmount = new Prisma.Decimal(settings.lateFineAmount);
+
+    if (dailyFineAmount.lte(0)) {
+      throw new BadRequestException(
+        'lateFineAmount must be configured greater than zero before assessing overdue fines',
+      );
+    }
+
+    const todayStart = this.startOfToday();
+    const overdueLoans = await this.prisma.libraryLoan.findMany({
+      where: {
+        schoolId: body.schoolId,
+        returnedAt: null,
+        dueDate: { lt: todayStart },
+        status: {
+          in: [LibraryLoanStatus.ACTIVE, LibraryLoanStatus.OVERDUE],
+        },
+        ...(body.studentId ? { studentId: body.studentId } : {}),
+      },
+      select: {
+        id: true,
+        schoolId: true,
+        studentId: true,
+        itemId: true,
+        dueDate: true,
+        item: {
+          select: {
+            title: true,
+          },
+        },
+      },
+      orderBy: [{ dueDate: 'asc' }],
+    });
+
+    let createdCount = 0;
+    let skippedCount = 0;
+    let duplicateCount = 0;
+
+    for (const loan of overdueLoans) {
+      const daysRaw = Math.floor(
+        (todayStart.getTime() - loan.dueDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      const billableDays = Math.max(0, daysRaw - settings.lateFineGraceDays);
+
+      if (billableDays <= 0) {
+        skippedCount += 1;
+        continue;
+      }
+
+      const existing = await this.prisma.libraryFine.findUnique({
+        where: {
+          checkoutId_reason: {
+            checkoutId: loan.id,
+            reason: LibraryFineReason.LATE,
+          },
+        },
+        select: { id: true },
+      });
+
+      if (existing) {
+        duplicateCount += 1;
+        continue;
+      }
+
+      const amount = this.resolveFineAmountFromSettings({
+        settings,
+        reason: LibraryFineReason.LATE,
+        daysOverdue: billableDays,
+      });
+
+      if (amount.lte(0)) {
+        skippedCount += 1;
+        continue;
+      }
+
+      try {
+        await this.createFineWithCharge({
+          actor,
+          schoolId: loan.schoolId,
+          studentId: loan.studentId,
+          reason: LibraryFineReason.LATE,
+          amount,
+          description: `Overdue by ${billableDays} day(s) for "${loan.item.title}"`,
+          libraryItemId: loan.itemId,
+          checkoutId: loan.id,
+        });
+        createdCount += 1;
+      } catch (error) {
+        if (
+          error instanceof ConflictException ||
+          (error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === 'P2002')
+        ) {
+          duplicateCount += 1;
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    return {
+      schoolId: body.schoolId,
+      evaluatedLoans: overdueLoans.length,
+      createdCount,
+      skippedCount,
+      duplicateCount,
+    };
+  }
+
+  async assessUnclaimedHoldFine(
+    actor: AuthenticatedUser,
+    body: AssessUnclaimedHoldFineDto,
+  ) {
+    this.ensureCanManage(actor);
+    this.ensureCanAccessSchool(actor, body.schoolId);
+
+    const student = await this.ensureStudentInSchoolOrThrow(
+      body.studentId,
+      body.schoolId,
+    );
+
+    if (body.libraryItemId) {
+      const item = await this.prisma.libraryItem.findFirst({
+        where: { id: body.libraryItemId, schoolId: body.schoolId },
+        select: { id: true },
+      });
+      if (!item) {
+        throw new NotFoundException('Library item not found in this school');
+      }
+    }
+
+    const settings = await this.getFineSettingsOrCreate(body.schoolId);
+    const amount = this.resolveFineAmountFromSettings({
+      settings,
+      reason: LibraryFineReason.UNCLAIMED_HOLD,
+    });
+
+    if (amount.lte(0)) {
+      throw new BadRequestException(
+        'unclaimedHoldFineAmount must be configured greater than zero',
+      );
+    }
+
+    return this.createFineWithCharge({
+      actor,
+      schoolId: body.schoolId,
+      studentId: student.id,
+      reason: LibraryFineReason.UNCLAIMED_HOLD,
+      amount,
+      description:
+        body.description ??
+        `Unclaimed hold reference ${body.holdReference}`,
+      libraryItemId: body.libraryItemId ?? null,
+      holdReference: body.holdReference,
+      dueDate: this.parseOptionalDate(body.dueDate),
+    });
+  }
+
   async listItems(actor: AuthenticatedUser, query: ListLibraryItemsQueryDto) {
     this.ensureCanManage(actor);
 
@@ -240,6 +975,23 @@ export class LibraryService {
       orderBy: [{ title: 'asc' }, { createdAt: 'desc' }],
       select: libraryItemSelect,
     });
+  }
+
+  async findItem(actor: AuthenticatedUser, id: string) {
+    this.ensureCanManage(actor);
+
+    const item = await this.prisma.libraryItem.findUnique({
+      where: { id },
+      select: libraryItemSelect,
+    });
+
+    if (!item) {
+      throw new NotFoundException('Library item not found');
+    }
+
+    this.ensureCanAccessSchool(actor, item.schoolId);
+
+    return item;
   }
 
   async createItem(actor: AuthenticatedUser, body: CreateLibraryItemDto) {
@@ -341,35 +1093,39 @@ export class LibraryService {
   }
 
   private async ensureStudentInSchoolOrThrow(studentId: string, schoolId: string) {
-    const student = await this.prisma.user.findFirst({
-      where: {
-        id: studentId,
-        role: UserRole.STUDENT,
-        isActive: true,
-        OR: [
-          { schoolId },
-          {
-            memberships: {
-              some: {
-                schoolId,
-                isActive: true,
-              },
-            },
-          },
-        ],
-      },
+    const student = await this.prisma.user.findUnique({
+      where: { id: studentId },
       select: {
         id: true,
+        role: true,
+        schoolId: true,
         firstName: true,
         lastName: true,
+        memberships: {
+          where: { isActive: true },
+          select: { schoolId: true },
+        },
       },
     });
 
-    if (!student) {
+    if (!student || student.role !== UserRole.STUDENT) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const studentSchoolIds = getAccessibleSchoolIdsWithLegacyFallback({
+      memberships: student.memberships,
+      legacySchoolId: student.schoolId,
+    });
+
+    if (!studentSchoolIds.includes(schoolId)) {
       throw new NotFoundException('Student not found in this school');
     }
 
-    return student;
+    return {
+      id: student.id,
+      firstName: student.firstName,
+      lastName: student.lastName,
+    };
   }
 
   private formatDueDateLabel(dueDate: Date) {
@@ -593,6 +1349,260 @@ export class LibraryService {
     });
 
     return this.mapLoanRecord(updatedLoan);
+  }
+
+  async markLoanLost(actor: AuthenticatedUser, loanId: string, body: MarkLibraryLoanLostDto) {
+    this.ensureCanManage(actor);
+
+    const existing = await this.prisma.libraryLoan.findUnique({
+      where: { id: loanId },
+      select: {
+        id: true,
+        schoolId: true,
+        itemId: true,
+        studentId: true,
+        dueDate: true,
+        status: true,
+        returnedAt: true,
+        item: {
+          select: {
+            title: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Library loan not found');
+    }
+
+    this.ensureCanAccessSchool(actor, existing.schoolId);
+
+    if (existing.returnedAt || existing.status === LibraryLoanStatus.RETURNED) {
+      throw new ConflictException('Returned loans cannot be marked as lost');
+    }
+
+    if (existing.status === LibraryLoanStatus.LOST) {
+      throw new ConflictException('This loan has already been marked as lost');
+    }
+
+    const updatedLoan = await this.prisma.$transaction(async (tx) => {
+      const loan = await tx.libraryLoan.update({
+        where: { id: existing.id },
+        data: {
+          status: LibraryLoanStatus.LOST,
+          receivedByUserId: actor.id,
+        },
+        select: libraryLoanSelect,
+      });
+
+      const item = await tx.libraryItem.findUnique({
+        where: { id: existing.itemId },
+        select: {
+          id: true,
+          totalCopies: true,
+          availableCopies: true,
+          status: true,
+        },
+      });
+
+      if (item) {
+        const nextTotalCopies = Math.max(0, item.totalCopies - 1);
+        const nextAvailableCopies = Math.min(item.availableCopies, nextTotalCopies);
+        const nextStatus =
+          nextTotalCopies === 0
+            ? LibraryItemStatus.LOST
+            : this.normalizeItemStatus({
+                status: item.status,
+                availableCopies: nextAvailableCopies,
+              });
+
+        await tx.libraryItem.update({
+          where: { id: item.id },
+          data: {
+            totalCopies: nextTotalCopies,
+            availableCopies: nextAvailableCopies,
+            status: nextStatus,
+          },
+        });
+      }
+
+      return loan;
+    });
+
+    const settings = await this.getFineSettingsOrCreate(existing.schoolId);
+    const amount = this.resolveFineAmountFromSettings({
+      settings,
+      reason: LibraryFineReason.LOST,
+    });
+
+    let fine = null as ReturnType<typeof this.mapFineRecord> | null;
+    let fineCreated = false;
+
+    if (amount.gt(0)) {
+      try {
+        fine = await this.createFineWithCharge({
+          actor,
+          schoolId: existing.schoolId,
+          studentId: existing.studentId,
+          reason: LibraryFineReason.LOST,
+          amount,
+          description:
+            body.description ??
+            `Lost library item "${existing.item.title}"`,
+          libraryItemId: existing.itemId,
+          checkoutId: existing.id,
+          dueDate: this.parseOptionalDate(body.dueDate) ?? existing.dueDate,
+        });
+        fineCreated = true;
+      } catch (error) {
+        if (error instanceof ConflictException) {
+          const existingFine = await this.prisma.libraryFine.findUnique({
+            where: {
+              checkoutId_reason: {
+                checkoutId: existing.id,
+                reason: LibraryFineReason.LOST,
+              },
+            },
+            select: libraryFineSelect,
+          });
+
+          fine = existingFine ? this.mapFineRecord(existingFine) : null;
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    return {
+      loan: this.mapLoanRecord(updatedLoan),
+      fine,
+      fineCreated,
+    };
+  }
+
+  async markLoanFound(actor: AuthenticatedUser, loanId: string) {
+    this.ensureCanManage(actor);
+
+    const existing = await this.prisma.libraryLoan.findUnique({
+      where: { id: loanId },
+      select: {
+        id: true,
+        schoolId: true,
+        itemId: true,
+        status: true,
+        returnedAt: true,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Library loan not found');
+    }
+
+    this.ensureCanAccessSchool(actor, existing.schoolId);
+
+    if (existing.status !== LibraryLoanStatus.LOST) {
+      throw new BadRequestException('Only LOST loans can be marked as found');
+    }
+
+    if (existing.returnedAt) {
+      throw new ConflictException('This lost loan has already been resolved');
+    }
+
+    const resolvedAt = new Date();
+    const result = await this.prisma.$transaction(async (tx) => {
+      const loan = await tx.libraryLoan.update({
+        where: { id: existing.id },
+        data: {
+          status: LibraryLoanStatus.RETURNED,
+          returnedAt: resolvedAt,
+          receivedByUserId: actor.id,
+        },
+        select: libraryLoanSelect,
+      });
+
+      const item = await tx.libraryItem.findUnique({
+        where: { id: existing.itemId },
+        select: {
+          id: true,
+          totalCopies: true,
+          availableCopies: true,
+          status: true,
+        },
+      });
+
+      if (item) {
+        const nextTotalCopies = item.totalCopies + 1;
+        const nextAvailableCopies = Math.min(nextTotalCopies, item.availableCopies + 1);
+        const nextStatus = this.normalizeFoundItemStatus({
+          status: item.status,
+          availableCopies: nextAvailableCopies,
+        });
+
+        await tx.libraryItem.update({
+          where: { id: item.id },
+          data: {
+            totalCopies: nextTotalCopies,
+            availableCopies: nextAvailableCopies,
+            status: nextStatus,
+          },
+        });
+      }
+
+      const lostFine = await tx.libraryFine.findUnique({
+        where: {
+          checkoutId_reason: {
+            checkoutId: existing.id,
+            reason: LibraryFineReason.LOST,
+          },
+        },
+        select: {
+          id: true,
+          status: true,
+          amount: true,
+          billingChargeId: true,
+          billingCharge: {
+            select: {
+              id: true,
+              status: true,
+              amountDue: true,
+              title: true,
+            },
+          },
+        },
+      });
+
+      return { loan, lostFine };
+    });
+
+    const lostFineStatus = result.lostFine
+      ? this.getFineStatusFromCharge({
+          currentStatus: result.lostFine.status,
+          chargeStatus: result.lostFine.billingCharge?.status,
+        })
+      : null;
+    const fineRequiresReview = lostFineStatus === LibraryFineStatus.OPEN;
+
+    return {
+      loan: this.mapLoanRecord(result.loan),
+      lostFine: result.lostFine
+        ? {
+            id: result.lostFine.id,
+            status: lostFineStatus,
+            amount: result.lostFine.amount.toString(),
+            billingChargeId: result.lostFine.billingChargeId,
+            billingCharge: result.lostFine.billingCharge
+              ? {
+                  id: result.lostFine.billingCharge.id,
+                  status: result.lostFine.billingCharge.status,
+                  amountDue: result.lostFine.billingCharge.amountDue.toString(),
+                  title: result.lostFine.billingCharge.title,
+                }
+              : null,
+          }
+        : null,
+      fineRequiresReview,
+    };
   }
 
   async listLoans(actor: AuthenticatedUser, query: ListLibraryLoansQueryDto) {

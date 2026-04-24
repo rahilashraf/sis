@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClassName } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
@@ -370,13 +371,21 @@ export function LibraryItemsManagement() {
                           <Badge variant={getStatusVariant(item.status)}>{statusLabel(item.status)}</Badge>
                         </td>
                         <td className="px-4 py-4">
-                          {item.status !== "ARCHIVED" ? (
-                            <Button size="sm" variant="secondary" onClick={() => void handleQuickArchive(item)}>
-                              Archive
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-slate-500">Archived</span>
-                          )}
+                          <div className="flex flex-wrap gap-2">
+                            <Link
+                              className={buttonClassName({ size: "sm", variant: "secondary" })}
+                              href={`/admin/library/items/${encodeURIComponent(item.id)}/edit`}
+                            >
+                              Edit
+                            </Link>
+                            {item.status !== "ARCHIVED" ? (
+                              <Button size="sm" variant="secondary" onClick={() => void handleQuickArchive(item)}>
+                                Archive
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-slate-500">Archived</span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}

@@ -16,11 +16,19 @@ import type { AuthenticatedRequest } from '../common/auth/auth-user';
 import { NonEmptyStringPipe } from '../common/pipes/non-empty-string.pipe';
 import { CheckoutLibraryLoanDto } from './dto/checkout-library-loan.dto';
 import { CreateLibraryItemDto } from './dto/create-library-item.dto';
+import { CreateManualLibraryFineDto } from './dto/create-manual-library-fine.dto';
+import { GetLibraryFineSettingsQueryDto } from './dto/get-library-fine-settings-query.dto';
+import { ListLibraryFinesQueryDto } from './dto/list-library-fines-query.dto';
 import { ListLibraryItemsQueryDto } from './dto/list-library-items-query.dto';
 import { ListLibraryLoansQueryDto } from './dto/list-library-loans-query.dto';
 import { ListLibraryOverdueQueryDto } from './dto/list-library-overdue-query.dto';
+import { AssessLibraryOverdueFinesDto } from './dto/assess-library-overdue-fines.dto';
+import { AssessUnclaimedHoldFineDto } from './dto/assess-unclaimed-hold-fine.dto';
+import { MarkLibraryLoanLostDto } from './dto/mark-library-loan-lost.dto';
 import { ReturnLibraryLoanDto } from './dto/return-library-loan.dto';
+import { UpsertLibraryFineSettingsDto } from './dto/upsert-library-fine-settings.dto';
 import { UpdateLibraryItemDto } from './dto/update-library-item.dto';
+import { WaiveLibraryFineDto } from './dto/waive-library-fine.dto';
 import { LibraryService } from './library.service';
 
 @Controller('library')
@@ -35,6 +43,15 @@ export class LibraryController {
     @Query() query: ListLibraryItemsQueryDto,
   ) {
     return this.service.listItems(req.user, query);
+  }
+
+  @Get('items/:id')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  findItem(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
+    return this.service.findItem(req.user, id);
   }
 
   @Post('items')
@@ -75,6 +92,25 @@ export class LibraryController {
     return this.service.returnLoan(req.user, id, body);
   }
 
+  @Post('loans/:id/mark-lost')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  markLoanLost(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+    @Body() body: MarkLibraryLoanLostDto,
+  ) {
+    return this.service.markLoanLost(req.user, id, body);
+  }
+
+  @Post('loans/:id/mark-found')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  markLoanFound(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
+    return this.service.markLoanFound(req.user, id);
+  }
+
   @Get('loans')
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
   listLoans(
@@ -100,5 +136,69 @@ export class LibraryController {
     @Param('studentId', NonEmptyStringPipe) studentId: string,
   ) {
     return this.service.listParentStudentLoans(req.user, studentId);
+  }
+
+  @Get('fine-settings')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  getFineSettings(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: GetLibraryFineSettingsQueryDto,
+  ) {
+    return this.service.getFineSettings(req.user, query.schoolId);
+  }
+
+  @Patch('fine-settings')
+  @Roles('OWNER', 'SUPER_ADMIN')
+  upsertFineSettings(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: UpsertLibraryFineSettingsDto,
+  ) {
+    return this.service.upsertFineSettings(req.user, body);
+  }
+
+  @Get('fines')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  listFines(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: ListLibraryFinesQueryDto,
+  ) {
+    return this.service.listFines(req.user, query);
+  }
+
+  @Post('fines/manual')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  createManualFine(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: CreateManualLibraryFineDto,
+  ) {
+    return this.service.createManualFine(req.user, body);
+  }
+
+  @Post('fines/:id/waive')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  waiveFine(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+    @Body() body: WaiveLibraryFineDto,
+  ) {
+    return this.service.waiveFine(req.user, id, body);
+  }
+
+  @Post('fines/assess-overdue')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  assessOverdueFines(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: AssessLibraryOverdueFinesDto,
+  ) {
+    return this.service.assessOverdueFines(req.user, body);
+  }
+
+  @Post('fines/assess-unclaimed-hold')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  assessUnclaimedHoldFine(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: AssessUnclaimedHoldFineDto,
+  ) {
+    return this.service.assessUnclaimedHoldFine(req.user, body);
   }
 }

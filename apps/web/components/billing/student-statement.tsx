@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -210,7 +211,12 @@ export function StudentStatementView({
                       key={charge.id}
                       className="border-b border-slate-100 hover:bg-slate-50 print:hover:bg-white"
                     >
-                      <td className="px-4 py-3 text-slate-900">{charge.title}</td>
+                      <td className="px-4 py-3 text-slate-900">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{charge.title}</span>
+                          {charge.libraryFine ? <Badge variant="primary">Library fine</Badge> : null}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-slate-600">
                         {charge.dueDate
                           ? formatDateTimeLabel(charge.dueDate, { month: "short", day: "numeric" })

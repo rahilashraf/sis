@@ -10,6 +10,9 @@ export type BillingChargeStatus =
   | "CANCELLED"
   | "VOID";
 
+export type LibraryFineReason = "LATE" | "LOST" | "UNCLAIMED_HOLD" | "MANUAL";
+export type LibraryFineStatus = "OPEN" | "WAIVED" | "PAID" | "VOID";
+
 export type BillingCategory = {
   id: string;
   schoolId: string;
@@ -61,6 +64,12 @@ export type BillingCharge = {
         isActive: boolean;
       }
     | null;
+  libraryFine: {
+    id: string;
+    reason: LibraryFineReason;
+    status: LibraryFineStatus;
+    assessedAt: string;
+  } | null;
 };
 
 export type CreateBillingChargeInput = {
@@ -279,6 +288,12 @@ export type AccountSummaryCharge = {
     startDate: string;
     endDate: string;
     isActive: boolean;
+  } | null;
+  libraryFine: {
+    id: string;
+    reason: LibraryFineReason;
+    status: LibraryFineStatus;
+    assessedAt: string;
   } | null;
 };
 

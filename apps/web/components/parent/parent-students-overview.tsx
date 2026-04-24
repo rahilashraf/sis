@@ -18,7 +18,7 @@ import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth/auth-context";
-import { listParentStudents, type ParentStudentLink } from "@/lib/api/students";
+import { listMyParentStudents, type ParentStudentLink } from "@/lib/api/students";
 import { getStudentAcademicOverview, type StudentAcademicOverview } from "@/lib/api/gradebook";
 import { getAttendanceStudentSummary, type AttendanceStudentSummary } from "@/lib/api/attendance";
 import { listSchoolYears } from "@/lib/api/schools";
@@ -55,7 +55,7 @@ export function ParentStudentsOverview() {
       setError(null);
 
       try {
-        const response = await listParentStudents(session.user.id);
+        const response = await listMyParentStudents();
         setLinks(response);
         const requestedStudentId = searchParams.get("studentId") ?? "";
         const defaultStudentId =
@@ -195,7 +195,7 @@ export function ParentStudentsOverview() {
       {!isLoading && links.length > 0 ? (
         <>
           <Card>
-            <CardContent className="grid gap-4 pt-6 md:grid-cols-[1fr_auto] md:items-end">
+            <CardContent className="space-y-4 pt-6">
               <Field htmlFor="parent-student-selector" label="Student">
                 <Select
                   id="parent-student-selector"
@@ -211,64 +211,93 @@ export function ParentStudentsOverview() {
               </Field>
 
               {selectedStudentId ? (
-                <div className="flex flex-wrap gap-2 md:justify-end">
-                  <Link
-                    className={buttonClassName({ variant: "secondary" })}
-                    href={`/parent/students/${selectedStudentId}`}
-                  >
-                    Student profile
-                  </Link>
-                  <Link
-                    className={buttonClassName({ variant: "secondary" })}
-                    href={`/parent/students/${selectedStudentId}/academics`}
-                  >
-                    Academics
-                  </Link>
-                  <Link
-                    className={buttonClassName({ variant: "secondary" })}
-                    href={`/parent/students/${selectedStudentId}/billing`}
-                  >
-                    Billing
-                  </Link>
-                  <Link
-                    className={buttonClassName({ variant: "secondary" })}
-                    href={`/parent/students/${selectedStudentId}/library`}
-                  >
-                    Library
-                  </Link>
-                  <Link
-                    className={buttonClassName({ variant: "secondary" })}
-                    href={`/parent/students/${selectedStudentId}/timetable`}
-                  >
-                    Timetable
-                  </Link>
-                  <Link
-                    className={buttonClassName({ variant: "secondary" })}
-                    href={`/parent/forms?studentId=${encodeURIComponent(selectedStudentId)}`}
-                  >
-                    Forms
-                  </Link>
-                  {reRegistrationStatus?.isOpen ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                     <Link
                       className={buttonClassName({ variant: "secondary" })}
-                      href={`/parent/students/${selectedStudentId}/re-registration`}
+                      href={`/parent/students/${selectedStudentId}`}
                     >
-                      Re-registration
+                      Student profile
                     </Link>
-                  ) : reRegistrationStatus?.status === "UPCOMING" ? (
                     <Link
                       className={buttonClassName({ variant: "secondary" })}
-                      href={`/parent/students/${selectedStudentId}/re-registration`}
+                      href={`/parent/students/${selectedStudentId}/academics`}
                     >
-                      Re-registration
+                      Academics
                     </Link>
-                  ) : reRegistrationStatus?.status === "CLOSED" ? (
-                    <span
-                      className={`${buttonClassName({ variant: "secondary" })} cursor-not-allowed opacity-60`}
+                    <Link
+                      className={buttonClassName({ variant: "secondary" })}
+                      href={`/parent/students/${selectedStudentId}/billing`}
                     >
-                      Re-registration closed
-                    </span>
-                  ) : null}
+                      Billing
+                    </Link>
+                    <Link
+                      className={buttonClassName({ variant: "secondary" })}
+                      href={`/parent/uniform`}
+                    >
+                      Uniform
+                    </Link>
+                    <Link
+                      className={buttonClassName({ variant: "secondary" })}
+                      href={`/parent/interviews?studentId=${encodeURIComponent(selectedStudentId)}`}
+                    >
+                      Interviews
+                    </Link>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                    <Link
+                      className={buttonClassName({ variant: "secondary" })}
+                      href="/parent/account"
+                    >
+                      My account
+                    </Link>
+                    <Link
+                      className={buttonClassName({ variant: "secondary" })}
+                      href={`/parent/students/${selectedStudentId}/library`}
+                    >
+                      Library
+                    </Link>
+                    <Link
+                      className={buttonClassName({ variant: "secondary" })}
+                      href={`/parent/students/${selectedStudentId}/timetable`}
+                    >
+                      Timetable
+                    </Link>
+                    <Link
+                      className={buttonClassName({ variant: "secondary" })}
+                      href={`/parent/forms?studentId=${encodeURIComponent(selectedStudentId)}`}
+                    >
+                      Forms
+                    </Link>
+                    {reRegistrationStatus?.isOpen ? (
+                      <Link
+                        className={buttonClassName({ variant: "secondary" })}
+                        href={`/parent/students/${selectedStudentId}/re-registration`}
+                      >
+                        Re-registration
+                      </Link>
+                    ) : reRegistrationStatus?.status === "UPCOMING" ? (
+                      <Link
+                        className={buttonClassName({ variant: "secondary" })}
+                        href={`/parent/students/${selectedStudentId}/re-registration`}
+                      >
+                        Re-registration
+                      </Link>
+                    ) : reRegistrationStatus?.status === "CLOSED" ? (
+                      <span
+                        className={`${buttonClassName({ variant: "secondary" })} cursor-not-allowed opacity-60`}
+                      >
+                        Re-registration closed
+                      </span>
+                    ) : (
+                      <span
+                        className={`${buttonClassName({ variant: "secondary" })} cursor-not-allowed opacity-60`}
+                      >
+                        Re-registration
+                      </span>
+                    )}
+                  </div>
                 </div>
               ) : null}
             </CardContent>

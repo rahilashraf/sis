@@ -530,19 +530,30 @@ export class ClassesService {
     }
   }
 
-  findAll(user: AuthenticatedUser, includeInactive = false) {
+  findAll(
+    user: AuthenticatedUser,
+    includeInactive = false,
+    requestedSchoolId?: string,
+  ) {
+    const schoolId = requestedSchoolId?.trim() || null;
     const accessibleSchoolIds = getAccessibleSchoolIds(user);
+
+    if (schoolId && !isBypassRole(user.role)) {
+      ensureUserHasSchoolAccess(user, schoolId);
+    }
 
     return this.prisma.class.findMany({
       where: {
         ...(includeInactive ? {} : { isActive: true }),
-        ...(isBypassRole(user.role)
-          ? {}
-          : {
+        ...(schoolId
+          ? { schoolId }
+          : isBypassRole(user.role)
+            ? {}
+            : {
               schoolId: {
                 in: accessibleSchoolIds,
               },
-            }),
+              }),
       },
       orderBy: { createdAt: 'desc' },
       select: this.buildClassSelect(false),

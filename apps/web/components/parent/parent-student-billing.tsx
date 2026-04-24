@@ -150,7 +150,10 @@ function OutstandingChargesTable({ charges }: { charges: AccountSummaryCharge[] 
           {charges.map((charge) => (
             <tr key={charge.id} className="hover:bg-slate-50">
               <td className="px-4 py-3 text-sm font-medium text-slate-900">
-                {charge.title}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>{charge.title}</span>
+                  {charge.libraryFine ? <Badge variant="primary">Library fine</Badge> : null}
+                </div>
               </td>
               <td className="px-4 py-3 text-sm text-slate-600">
                 {charge.category?.name ?? "—"}

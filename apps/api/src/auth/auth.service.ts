@@ -1,8 +1,15 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { safeUserSelect } from '../common/prisma/safe-user-response';
+import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -100,5 +107,121 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  async updateMyProfile(userId: string, data: UpdateMyProfileDto) {
+    const updateData: {
+      firstName?: string;
+      lastName?: string;
+    } = {};
+
+    if (data.firstName !== undefined) {
+      updateData.firstName = data.firstName;
+    }
+
+    if (data.lastName !== undefined) {
+      updateData.lastName = data.lastName;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      throw new BadRequestException('No valid profile fields provided');
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: safeUserSelect,
+    });
+  }
+
+  async changeMyPassword(userId: string, data: ChangePasswordDto) {
+    if (data.newPassword !== data.confirmPassword) {
+      throw new BadRequestException(
+        'New password and confirm password must match',
+      );
+    }
+
+    if (data.currentPassword === data.newPassword) {
+      throw new BadRequestException(
+        'New password must be different from current password',
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        isActive: true,
+        passwordHash: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('User account is inactive');
+    }
+
+    const passwordMatches = await bcrypt.compare(
+      data.currentPassword,
+      user.passwordHash,
+    );
+
+    if (!passwordMatches) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const passwordHash = await bcrypt.hash(data.newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Password changed successfully',
+      shouldReauthenticate: true,
+      sessionInvalidationSupported: false,
+    };
+  }
+
+  async getMySecurity(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        username: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const linkedChildrenCount = await this.prisma.studentParentLink.count({
+      where: {
+        parentId: userId,
+      },
+    });
+
+    return {
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      linkedChildrenCount,
+      mfaEnabled: false,
+      activeSessionsTracked: false,
+      lastPasswordChangeAt: null,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 }

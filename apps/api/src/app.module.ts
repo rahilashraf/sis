@@ -27,6 +27,8 @@ import { TimetableModule } from './timetable/timetable.module';
 import { BillingModule } from './billing/billing.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { LibraryModule } from './library/library.module';
+import { UniformModule } from './uniform/uniform.module';
+import { InterviewsModule } from './interviews/interviews.module';
 
 @Module({
   imports: [
@@ -58,6 +60,8 @@ import { LibraryModule } from './library/library.module';
     BillingModule,
     NotificationsModule,
     LibraryModule,
+    UniformModule,
+    InterviewsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

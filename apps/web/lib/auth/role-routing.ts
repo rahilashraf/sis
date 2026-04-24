@@ -21,6 +21,16 @@ const libraryNavigationChildren: NavigationItem["children"] = [
   { href: "/admin/library/items", label: "Items" },
   { href: "/admin/library/loans", label: "Loans" },
   { href: "/admin/library/overdue", label: "Overdue" },
+  { href: "/admin/library/fines", label: "Fines" },
+];
+
+const uniformNavigationChildren: NavigationItem["children"] = [
+  { href: "/admin/uniform/items", label: "Items" },
+  { href: "/admin/uniform/orders", label: "Orders" },
+];
+
+const interviewNavigationChildren: NavigationItem["children"] = [
+  { href: "/admin/interviews", label: "Events" },
 ];
 
 function buildAdminBaseItems(): NavigationItem[] {
@@ -39,6 +49,16 @@ function buildAdminBaseItems(): NavigationItem[] {
       href: "/admin/library/items",
       label: "Library",
       children: libraryNavigationChildren,
+    },
+    {
+      href: "/admin/uniform/items",
+      label: "Uniform",
+      children: uniformNavigationChildren,
+    },
+    {
+      href: "/admin/interviews",
+      label: "Interviews",
+      children: interviewNavigationChildren,
     },
     {
       href: "/admin/billing/charges",
@@ -205,6 +225,7 @@ export function getNavigationItems(role: UserRole) {
       { href: "/teacher/attendance", label: "Attendance" },
       { href: "/teacher/timetable", label: "Timetable" },
       { href: "/teacher/classes", label: "Classes" },
+      { href: "/teacher/interviews", label: "Interviews" },
       { href: "/teacher/gradebook", label: "Gradebook" },
       { href: "/teacher/behavior", label: "Incident Reports" },
     );
@@ -218,12 +239,19 @@ export function getNavigationItems(role: UserRole) {
       items.push({ href: "/teacher/attendance", label: "Attendance" });
     }
 
+    if (!items.some((item) => item.href === "/teacher/interviews")) {
+      items.push({ href: "/teacher/interviews", label: "Interviews" });
+    }
+
     items.push({ href: "/notifications", label: "Notifications" });
     return items;
   }
 
   if (role === "PARENT") {
     items.push(
+      { href: "/parent/account", label: "My Account" },
+      { href: "/parent/interviews", label: "Interviews" },
+      { href: "/parent/uniform", label: "Uniform" },
       { href: "/parent/forms", label: "Forms" },
       { href: "/notifications", label: "Notifications" },
     );
@@ -259,7 +287,11 @@ export function isPathAllowedForRole(role: UserRole, pathname: string) {
   }
 
   if (role === "SUPPLY_TEACHER") {
-    return pathname === "/teacher" || pathname.startsWith("/teacher/attendance");
+    return (
+      pathname === "/teacher" ||
+      pathname.startsWith("/teacher/attendance") ||
+      pathname.startsWith("/teacher/interviews")
+    );
   }
 
   if (role === "PARENT") {

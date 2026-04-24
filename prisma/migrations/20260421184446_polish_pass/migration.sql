@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "InterviewEvent_schoolId_isActive_isPublished_startsAt_endsAt_id" RENAME TO "InterviewEvent_schoolId_isActive_isPublished_startsAt_endsA_idx";

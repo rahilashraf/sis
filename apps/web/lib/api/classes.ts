@@ -76,11 +76,15 @@ export type UpdateClassInput = {
   isActive?: boolean;
 };
 
-export function listClasses(options?: { includeInactive?: boolean }) {
+export function listClasses(options?: { includeInactive?: boolean; schoolId?: string }) {
   const query = new URLSearchParams();
 
   if (options?.includeInactive) {
     query.set("includeInactive", "true");
+  }
+
+  if (options?.schoolId) {
+    query.set("schoolId", options.schoolId);
   }
 
   return apiFetch<SchoolClass[]>(`/classes${query.size ? `?${query.toString()}` : ""}`);

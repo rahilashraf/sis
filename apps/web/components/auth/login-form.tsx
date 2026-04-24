@@ -84,7 +84,7 @@ export function LoginForm() {
           AIOK EduSIS
         </h1>
         <p className="text-sm text-slate-600">
-          Sign in to access the student information system.
+          Sign in to access the system.
         </p>
       </div>
 
@@ -147,7 +147,7 @@ export function LoginForm() {
 
           {showWakeMessage ? (
             <p className="text-center text-sm text-slate-500">
-              Waking up the server. The first login may take a little longer.
+              Waking up the server. The first login may take upto two minutes.
             </p>
           ) : null}
         </div>

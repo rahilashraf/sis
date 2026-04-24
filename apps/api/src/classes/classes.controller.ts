@@ -46,8 +46,9 @@ export class ClassesController {
     @Req() req: AuthenticatedRequest,
     @Query('includeInactive', new DefaultValuePipe(false), ParseBoolPipe)
     includeInactive: boolean,
+    @Query('schoolId') schoolId?: string,
   ) {
-    return this.classesService.findAll(req.user, includeInactive);
+    return this.classesService.findAll(req.user, includeInactive, schoolId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

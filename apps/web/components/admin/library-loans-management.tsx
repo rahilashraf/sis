@@ -12,10 +12,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth/auth-context";
 import { getDefaultSchoolContextId } from "@/lib/auth/school-membership";
+import { listUsers, type ManagedUser } from "@/lib/api/users";
 import {
   checkoutLibraryLoan,
   listLibraryItems,
   listLibraryLoans,
+  markLibraryLoanFound,
+  markLibraryLoanLost,
   returnLibraryLoan,
   type LibraryItem,
   type LibraryLoan,
@@ -37,12 +40,46 @@ const emptyCheckoutForm: CheckoutForm = {
   dueDate: "",
 };
 
+function getStudentLabel(student: ManagedUser) {
+  const fullName = `${student.firstName} ${student.lastName}`.trim();
+  if (fullName) {
+    return fullName;
+  }
+
+  return student.username || student.email || student.id;
+}
+
+function userBelongsToSchool(user: ManagedUser, schoolId: string) {
+  if (!schoolId) {
+    return true;
+  }
+
+  if (user.schoolId === schoolId) {
+    return true;
+  }
+
+  return user.memberships.some((membership) => membership.schoolId === schoolId);
+}
+
+function getStudentOptionLabel(student: ManagedUser) {
+  const name = getStudentLabel(student);
+  if (!student.username || student.username === name) {
+    return name;
+  }
+
+  return `${name} (${student.username})`;
+}
+
 function getStatusVariant(status: LibraryLoan["status"]): "neutral" | "warning" | "success" | "danger" {
   if (status === "RETURNED") {
     return "success";
   }
 
   if (status === "OVERDUE") {
+    return "danger";
+  }
+
+  if (status === "LOST") {
     return "danger";
   }
 
@@ -58,6 +95,7 @@ export function LibraryLoansManagement() {
   const role = session?.user.role ?? "";
 
   const [schools, setSchools] = useState<School[]>([]);
+  const [students, setStudents] = useState<ManagedUser[]>([]);
   const [schoolId, setSchoolId] = useState("");
   const [activeOnly, setActiveOnly] = useState(true);
 
@@ -69,12 +107,18 @@ export function LibraryLoansManagement() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [returningLoanId, setReturningLoanId] = useState<string | null>(null);
+  const [markingLostLoanId, setMarkingLostLoanId] = useState<string | null>(null);
+  const [markingFoundLoanId, setMarkingFoundLoanId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const selectedSchool = useMemo(
     () => schools.find((school) => school.id === schoolId) ?? null,
     [schoolId, schools],
+  );
+  const filteredStudents = useMemo(
+    () => students.filter((student) => userBelongsToSchool(student, schoolId)),
+    [schoolId, students],
   );
 
   const selectableItems = useMemo(
@@ -92,8 +136,12 @@ export function LibraryLoansManagement() {
       setError(null);
 
       try {
-        const schoolList = await listSchools({ includeInactive: false });
+        const [schoolList, studentList] = await Promise.all([
+          listSchools({ includeInactive: false }),
+          listUsers({ role: "STUDENT" }),
+        ]);
         setSchools(schoolList);
+        setStudents(studentList);
 
         const defaultSchoolId = getDefaultSchoolContextId(session?.user) ?? schoolList[0]?.id ?? "";
         const resolved = schoolList.find((school) => school.id === defaultSchoolId)?.id ?? schoolList[0]?.id ?? "";
@@ -107,6 +155,23 @@ export function LibraryLoansManagement() {
 
     void loadInitial();
   }, [role, session?.user]);
+
+  useEffect(() => {
+    if (!schoolId) {
+      return;
+    }
+
+    const nextStudentId = filteredStudents[0]?.id ?? "";
+    if (
+      !filteredStudents.some((student) => student.id === checkoutForm.studentId) &&
+      checkoutForm.studentId !== nextStudentId
+    ) {
+      setCheckoutForm((current) => ({
+        ...current,
+        studentId: nextStudentId,
+      }));
+    }
+  }, [checkoutForm.studentId, filteredStudents, schoolId]);
 
   useEffect(() => {
     async function refreshData() {
@@ -166,7 +231,7 @@ export function LibraryLoansManagement() {
     }
 
     if (!checkoutForm.studentId.trim()) {
-      setError("Student ID is required for checkout.");
+      setError("Student is required for checkout.");
       return;
     }
 
@@ -183,7 +248,7 @@ export function LibraryLoansManagement() {
       await checkoutLibraryLoan({
         schoolId,
         itemId: checkoutForm.itemId,
-        studentId: checkoutForm.studentId.trim(),
+        studentId: checkoutForm.studentId,
         dueDate: new Date(`${checkoutForm.dueDate}T23:59:59`).toISOString(),
       });
 
@@ -210,6 +275,62 @@ export function LibraryLoansManagement() {
       setError(returnError instanceof Error ? returnError.message : "Unable to return loan.");
     } finally {
       setReturningLoanId(null);
+    }
+  }
+
+  async function handleMarkLost(loan: LibraryLoan) {
+    if (
+      !window.confirm(
+        `Mark "${loan.item.title}" as lost for ${loan.student.firstName} ${loan.student.lastName}?`,
+      )
+    ) {
+      return;
+    }
+
+    setMarkingLostLoanId(loan.id);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const result = await markLibraryLoanLost(loan.id);
+      setSuccessMessage(
+        result.fineCreated
+          ? "Loan marked as lost and library fine created."
+          : "Loan marked as lost.",
+      );
+      await refreshLoansAndItems();
+    } catch (markLostError) {
+      setError(markLostError instanceof Error ? markLostError.message : "Unable to mark loan as lost.");
+    } finally {
+      setMarkingLostLoanId(null);
+    }
+  }
+
+  async function handleMarkFound(loan: LibraryLoan) {
+    if (
+      !window.confirm(
+        `Mark "${loan.item.title}" as found for ${loan.student.firstName} ${loan.student.lastName}?`,
+      )
+    ) {
+      return;
+    }
+
+    setMarkingFoundLoanId(loan.id);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const result = await markLibraryLoanFound(loan.id);
+      setSuccessMessage(
+        result.fineRequiresReview
+          ? "Loan marked as found. Linked lost fine remains open; review it in Library Fines."
+          : "Loan marked as found.",
+      );
+      await refreshLoansAndItems();
+    } catch (markFoundError) {
+      setError(markFoundError instanceof Error ? markFoundError.message : "Unable to mark loan as found.");
+    } finally {
+      setMarkingFoundLoanId(null);
     }
   }
 
@@ -251,7 +372,18 @@ export function LibraryLoansManagement() {
         <CardContent>
           <form className="grid gap-4 md:grid-cols-4" onSubmit={handleCheckout}>
             <Field htmlFor="library-loans-school" label="School">
-              <Select id="library-loans-school" value={schoolId} onChange={(event) => setSchoolId(event.target.value)}>
+              <Select
+                id="library-loans-school"
+                value={schoolId}
+                onChange={(event) => {
+                  const nextSchoolId = event.target.value;
+                  setSchoolId(nextSchoolId);
+                  setCheckoutForm((current) => ({
+                    ...current,
+                    studentId: "",
+                  }));
+                }}
+              >
                 <option value="">Select school</option>
                 {schools.map((school) => (
                   <option key={school.id} value={school.id}>
@@ -276,13 +408,23 @@ export function LibraryLoansManagement() {
               </Select>
             </Field>
 
-            <Field htmlFor="library-loans-student" label="Student ID">
-              <Input
+            <Field htmlFor="library-loans-student" label="Student">
+              <Select
                 id="library-loans-student"
-                placeholder="Paste student ID"
                 value={checkoutForm.studentId}
                 onChange={(event) => setCheckoutForm((current) => ({ ...current, studentId: event.target.value }))}
-              />
+                disabled={!schoolId || filteredStudents.length === 0}
+              >
+                <option value="">Select student</option>
+                {filteredStudents.map((student) => (
+                  <option key={student.id} value={student.id}>
+                    {getStudentOptionLabel(student)}
+                  </option>
+                ))}
+              </Select>
+              {schoolId && filteredStudents.length === 0 ? (
+                <p className="mt-1 text-xs text-slate-500">No students found in the selected school.</p>
+              ) : null}
             </Field>
 
             <Field htmlFor="library-loans-due-date" label="Due date">
@@ -358,13 +500,40 @@ export function LibraryLoansManagement() {
                         </td>
                         <td className="px-4 py-4">
                           {loan.status === "ACTIVE" || loan.status === "OVERDUE" ? (
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                disabled={
+                                  returningLoanId === loan.id ||
+                                  markingLostLoanId === loan.id ||
+                                  markingFoundLoanId === loan.id
+                                }
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => void handleReturn(loan.id)}
+                              >
+                                {returningLoanId === loan.id ? "Returning..." : "Return"}
+                              </Button>
+                              <Button
+                                disabled={
+                                  returningLoanId === loan.id ||
+                                  markingLostLoanId === loan.id ||
+                                  markingFoundLoanId === loan.id
+                                }
+                                size="sm"
+                                variant="danger"
+                                onClick={() => void handleMarkLost(loan)}
+                              >
+                                {markingLostLoanId === loan.id ? "Updating..." : "Mark lost"}
+                              </Button>
+                            </div>
+                          ) : loan.status === "LOST" ? (
                             <Button
-                              disabled={returningLoanId === loan.id}
+                              disabled={markingFoundLoanId === loan.id || returningLoanId === loan.id}
                               size="sm"
                               variant="secondary"
-                              onClick={() => void handleReturn(loan.id)}
+                              onClick={() => void handleMarkFound(loan)}
                             >
-                              {returningLoanId === loan.id ? "Returning..." : "Return"}
+                              {markingFoundLoanId === loan.id ? "Updating..." : "Mark found"}
                             </Button>
                           ) : (
                             <span className="text-xs text-slate-500">Returned</span>
