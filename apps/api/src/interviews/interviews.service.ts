@@ -6,10 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AuditLogSeverity,
   InterviewSlotStatus,
   Prisma,
   UserRole,
 } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../common/auth/auth-user';
 import {
   ensureUserHasSchoolAccess,
@@ -19,6 +21,7 @@ import {
 import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { BulkGenerateInterviewSlotsDto } from './dto/bulk-generate-interview-slots.dto';
+import { AdminBookInterviewSlotDto } from './dto/admin-book-interview-slot.dto';
 import { BookInterviewSlotDto } from './dto/book-interview-slot.dto';
 import { CreateInterviewEventDto } from './dto/create-interview-event.dto';
 import { CreateInterviewSlotDto } from './dto/create-interview-slot.dto';
@@ -237,7 +240,10 @@ const interviewSlotTeacherSelect = Prisma.validator<Prisma.InterviewSlotSelect>(
 
 @Injectable()
 export class InterviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   private ensureCanManage(actor: AuthenticatedUser) {
     if (!INTERVIEW_MANAGE_ROLES.includes(actor.role)) {
@@ -552,6 +558,55 @@ export class InterviewsService {
         },
       },
     });
+  }
+
+  private async getParentStudentLinkOrThrow(parentId: string, studentId: string) {
+    const link = await this.prisma.studentParentLink.findUnique({
+      where: {
+        parentId_studentId: {
+          parentId,
+          studentId,
+        },
+      },
+      select: {
+        parent: {
+          select: {
+            id: true,
+            role: true,
+            schoolId: true,
+            memberships: {
+              where: {
+                isActive: true,
+              },
+              select: {
+                schoolId: true,
+              },
+            },
+          },
+        },
+        student: {
+          select: {
+            id: true,
+            role: true,
+            schoolId: true,
+            memberships: {
+              where: {
+                isActive: true,
+              },
+              select: {
+                schoolId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!link || link.parent.role !== UserRole.PARENT || link.student.role !== UserRole.STUDENT) {
+      throw new BadRequestException('Selected parent is not linked to the selected student');
+    }
+
+    return link;
   }
 
   private async ensureStudentCanBookTeacherSlot(
@@ -1349,6 +1404,183 @@ export class InterviewsService {
         select: interviewSlotParentSelect,
       });
     });
+  }
+
+  async bookSlotByAdmin(
+    actor: AuthenticatedUser,
+    slotId: string,
+    data: AdminBookInterviewSlotDto,
+  ) {
+    this.ensureCanManage(actor);
+
+    const link = await this.getParentStudentLinkOrThrow(
+      data.parentId.trim(),
+      data.studentId.trim(),
+    );
+    const studentSchoolIds = getAccessibleSchoolIdsWithLegacyFallback({
+      memberships: link.student.memberships,
+      legacySchoolId: link.student.schoolId,
+    });
+
+    const now = new Date();
+
+    const bookedSlot = await this.prisma.$transaction(async (tx) => {
+      const slot = await tx.interviewSlot.findUnique({
+        where: {
+          id: slotId,
+        },
+        select: {
+          id: true,
+          interviewEventId: true,
+          schoolId: true,
+          teacherId: true,
+          classId: true,
+          startTime: true,
+          endTime: true,
+          status: true,
+          bookedParentId: true,
+          bookedStudentId: true,
+          interviewEvent: {
+            select: {
+              id: true,
+              startsAt: true,
+              endsAt: true,
+              bookingOpensAt: true,
+              bookingClosesAt: true,
+              isPublished: true,
+              isActive: true,
+            },
+          },
+        },
+      });
+
+      if (!slot) {
+        throw new NotFoundException('Interview slot not found');
+      }
+
+      if (!isBypassRole(actor.role)) {
+        ensureUserHasSchoolAccess(actor, slot.schoolId);
+      }
+
+      if (!studentSchoolIds.includes(slot.schoolId)) {
+        throw new BadRequestException(
+          'Selected student is not in the same school as the interview slot',
+        );
+      }
+
+      if (!slot.interviewEvent.isActive || !slot.interviewEvent.isPublished) {
+        throw new BadRequestException('Interview event is not open for booking');
+      }
+
+      if (slot.startTime <= now) {
+        throw new BadRequestException('Past interview slots cannot be booked');
+      }
+
+      if (slot.interviewEvent.bookingOpensAt && now < slot.interviewEvent.bookingOpensAt) {
+        throw new BadRequestException('Booking has not opened for this interview event');
+      }
+
+      if (slot.interviewEvent.bookingClosesAt && now > slot.interviewEvent.bookingClosesAt) {
+        throw new BadRequestException('Booking is closed for this interview event');
+      }
+
+      if (
+        slot.status !== InterviewSlotStatus.AVAILABLE ||
+        slot.bookedParentId !== null ||
+        slot.bookedStudentId !== null
+      ) {
+        throw new ConflictException('Interview slot is no longer available');
+      }
+
+      await this.ensureStudentCanBookTeacherSlot(tx, {
+        studentId: link.student.id,
+        schoolId: slot.schoolId,
+        teacherId: slot.teacherId,
+        classId: slot.classId,
+      });
+
+      const existingEventBooking = await tx.interviewSlot.findFirst({
+        where: {
+          interviewEventId: slot.interviewEventId,
+          status: InterviewSlotStatus.BOOKED,
+          bookedStudentId: link.student.id,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (existingEventBooking) {
+        throw new ConflictException(
+          'Selected student already has an interview booking in this event',
+        );
+      }
+
+      const overlappingBooking = await tx.interviewSlot.findFirst({
+        where: {
+          status: InterviewSlotStatus.BOOKED,
+          bookedStudentId: link.student.id,
+          startTime: { lt: slot.endTime },
+          endTime: { gt: slot.startTime },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (overlappingBooking) {
+        throw new ConflictException(
+          'Selected student already has an overlapping interview booking',
+        );
+      }
+
+      const bookingResult = await tx.interviewSlot.updateMany({
+        where: {
+          id: slot.id,
+          status: InterviewSlotStatus.AVAILABLE,
+          bookedParentId: null,
+          bookedStudentId: null,
+        },
+        data: {
+          status: InterviewSlotStatus.BOOKED,
+          bookedParentId: link.parent.id,
+          bookedStudentId: link.student.id,
+          bookedAt: now,
+          bookingNotes: data.bookingNotes ?? null,
+        },
+      });
+
+      if (bookingResult.count !== 1) {
+        throw new ConflictException('Interview slot is no longer available');
+      }
+
+      return tx.interviewSlot.findUniqueOrThrow({
+        where: {
+          id: slot.id,
+        },
+        select: interviewSlotAdminSelect,
+      });
+    });
+
+    await this.auditService.log({
+      actor,
+      schoolId: bookedSlot.schoolId,
+      entityType: 'InterviewSlot',
+      entityId: bookedSlot.id,
+      action: 'ADMIN_BOOK_FOR_PARENT',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Booked interview slot ${bookedSlot.id} for parent ${bookedSlot.bookedParentId} and student ${bookedSlot.bookedStudentId}`,
+      targetDisplay: bookedSlot.interviewEvent.title,
+      metadataJson: {
+        interviewEventId: bookedSlot.interviewEventId,
+        slotId: bookedSlot.id,
+        teacherId: bookedSlot.teacherId,
+        studentId: bookedSlot.bookedStudentId,
+        parentId: bookedSlot.bookedParentId,
+      },
+    });
+
+    return bookedSlot;
   }
 
   async cancelBookingByParent(actor: AuthenticatedUser, slotId: string) {

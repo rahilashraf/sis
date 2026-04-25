@@ -37,7 +37,10 @@ type LineState = {
   selectedColor: string;
 };
 
-const parentEditableStatuses = new Set<UniformOrderStatus>(["PENDING", "APPROVED"]);
+const parentEditableStatuses = new Set<UniformOrderStatus>([
+  "PENDING",
+  "APPROVED",
+]);
 
 function normalizeQuantity(value: string) {
   const parsed = Number(value);
@@ -77,8 +80,12 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
   const [editError, setEditError] = useState<string | null>(null);
   const [editNotes, setEditNotes] = useState("");
   const [editableItems, setEditableItems] = useState<UniformItem[]>([]);
-  const [lineByItemId, setLineByItemId] = useState<Record<string, LineState>>({});
-  const [missingEditableItems, setMissingEditableItems] = useState<string[]>([]);
+  const [lineByItemId, setLineByItemId] = useState<Record<string, LineState>>(
+    {},
+  );
+  const [missingEditableItems, setMissingEditableItems] = useState<string[]>(
+    [],
+  );
 
   const isParentMutable = useMemo(() => {
     if (!order) {
@@ -105,7 +112,11 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
         setEditNotes(response.notes ?? "");
       } catch (loadError) {
         setOrder(null);
-        setError(loadError instanceof Error ? loadError.message : "Unable to load order.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load order.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -129,7 +140,9 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
 
       try {
         const availableItems = await listParentUniformItems(order.student.id);
-        const availableById = new Map(availableItems.map((entry) => [entry.id, entry]));
+        const availableById = new Map(
+          availableItems.map((entry) => [entry.id, entry]),
+        );
 
         const nextLines: Record<string, LineState> = {};
         for (const item of availableItems) {
@@ -238,7 +251,9 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
       setSuccessMessage("Order updated.");
     } catch (submitError) {
       setEditError(
-        submitError instanceof Error ? submitError.message : "Unable to update order.",
+        submitError instanceof Error
+          ? submitError.message
+          : "Unable to update order.",
       );
     } finally {
       setIsSubmittingEdit(false);
@@ -270,7 +285,9 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
       setSuccessMessage("Order cancelled.");
     } catch (cancelError) {
       setError(
-        cancelError instanceof Error ? cancelError.message : "Unable to cancel order.",
+        cancelError instanceof Error
+          ? cancelError.message
+          : "Unable to cancel order.",
       );
     } finally {
       setIsCancelling(false);
@@ -303,23 +320,36 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
         description="Review order details and current fulfillment status."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link className={buttonClassName({ variant: "secondary" })} href="/parent/uniform/orders">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/parent/uniform/orders"
+            >
               Back to order history
             </Link>
-            <Link className={buttonClassName({ variant: "secondary" })} href="/parent/uniform">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/parent/uniform"
+            >
               Place another order
             </Link>
             {isParentMutable ? (
               <>
                 <Button
-                  disabled={isLoadingEditData || missingEditableItems.length > 0}
+                  disabled={
+                    isLoadingEditData || missingEditableItems.length > 0
+                  }
                   onClick={() => setIsEditing((current) => !current)}
                   type="button"
                   variant="secondary"
                 >
                   {isEditing ? "Close edit" : "Edit order"}
                 </Button>
-                <Button disabled={isCancelling} onClick={() => void handleCancelOrder()} type="button" variant="danger">
+                <Button
+                  disabled={isCancelling}
+                  onClick={() => void handleCancelOrder()}
+                  type="button"
+                  variant="danger"
+                >
                   {isCancelling ? "Cancelling..." : "Cancel order"}
                 </Button>
               </>
@@ -345,7 +375,8 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
 
       {isParentMutable && missingEditableItems.length > 0 ? (
         <Notice tone="warning">
-          This order contains unavailable catalog items ({missingEditableItems.join(", ")}), so online editing is disabled.
+          This order contains unavailable catalog items (
+          {missingEditableItems.join(", ")}), so online editing is disabled.
           Contact the school office for adjustments.
         </Notice>
       ) : null}
@@ -353,25 +384,31 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
       <Card>
         <CardHeader>
           <CardTitle>Order summary</CardTitle>
-          <CardDescription>Submitted {formatDateTimeLabel(order.createdAt)}</CardDescription>
+          <CardDescription>
+            Submitted {formatDateTimeLabel(order.createdAt)}
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 text-sm text-slate-700 md:grid-cols-2">
           <p>
-            <span className="font-medium text-slate-900">School:</span> {order.school.name}
+            <span className="font-medium text-slate-900">School:</span>{" "}
+            {order.school.name}
           </p>
           <p>
             <span className="font-medium text-slate-900">Student:</span>{" "}
-            {`${order.student.firstName} ${order.student.lastName}`.trim() || order.student.username}
+            {`${order.student.firstName} ${order.student.lastName}`.trim() ||
+              order.student.username}
           </p>
           <p>
             <span className="font-medium text-slate-900">Status:</span>{" "}
             {formatUniformOrderStatusLabel(order.status)}
           </p>
           <p>
-            <span className="font-medium text-slate-900">Total:</span> {formatUniformMoney(order.totalAmount)}
+            <span className="font-medium text-slate-900">Total:</span>{" "}
+            {formatUniformMoney(order.totalAmount)}
           </p>
           <p className="md:col-span-2">
-            <span className="font-medium text-slate-900">Your notes:</span> {order.notes || "—"}
+            <span className="font-medium text-slate-900">Your notes:</span>{" "}
+            {order.notes || "—"}
           </p>
         </CardContent>
       </Card>
@@ -385,7 +422,10 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Field htmlFor="parent-uniform-edit-notes" label="Order notes (optional)">
+            <Field
+              htmlFor="parent-uniform-edit-notes"
+              label="Order notes (optional)"
+            >
               <Textarea
                 id="parent-uniform-edit-notes"
                 onChange={(event) => setEditNotes(event.target.value)}
@@ -395,7 +435,9 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
             </Field>
 
             {isLoadingEditData ? (
-              <p className="text-sm text-slate-500">Loading editable catalog...</p>
+              <p className="text-sm text-slate-500">
+                Loading editable catalog...
+              </p>
             ) : editableItems.length === 0 ? (
               <EmptyState
                 compact
@@ -412,18 +454,28 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
                   };
 
                   return (
-                    <div className="rounded-xl border border-slate-200 p-4" key={item.id}>
+                    <div
+                      className="rounded-xl border border-slate-200 p-4"
+                      key={item.id}
+                    >
                       <div className="grid gap-3 md:grid-cols-2">
                         <div>
-                          <p className="text-base font-semibold text-slate-900">{item.name}</p>
-                          <p className="mt-1 text-sm text-slate-600">{item.category || "Uniform item"}</p>
+                          <p className="text-base font-semibold text-slate-900">
+                            {item.name}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-600">
+                            {item.category || "Uniform item"}
+                          </p>
                           <p className="mt-2 text-sm font-medium text-slate-900">
                             {formatUniformMoney(item.price)}
                           </p>
                         </div>
 
                         <div className="grid gap-3 md:grid-cols-3">
-                          <Field htmlFor={`uniform-edit-item-qty-${item.id}`} label="Quantity">
+                          <Field
+                            htmlFor={`uniform-edit-item-qty-${item.id}`}
+                            label="Quantity"
+                          >
                             <Input
                               id={`uniform-edit-item-qty-${item.id}`}
                               inputMode="numeric"
@@ -442,7 +494,10 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
                             />
                           </Field>
 
-                          <Field htmlFor={`uniform-edit-item-size-${item.id}`} label="Size">
+                          <Field
+                            htmlFor={`uniform-edit-item-size-${item.id}`}
+                            label="Size"
+                          >
                             <Select
                               disabled={item.availableSizes.length === 0}
                               id={`uniform-edit-item-size-${item.id}`}
@@ -457,7 +512,11 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
                               }
                               value={line.selectedSize}
                             >
-                              <option value="">{item.availableSizes.length ? "Select size" : "N/A"}</option>
+                              <option value="">
+                                {item.availableSizes.length
+                                  ? "Select size"
+                                  : "N/A"}
+                              </option>
                               {item.availableSizes.map((size) => (
                                 <option key={size} value={size}>
                                   {size}
@@ -466,7 +525,10 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
                             </Select>
                           </Field>
 
-                          <Field htmlFor={`uniform-edit-item-color-${item.id}`} label="Color">
+                          <Field
+                            htmlFor={`uniform-edit-item-color-${item.id}`}
+                            label="Color"
+                          >
                             <Select
                               disabled={item.availableColors.length === 0}
                               id={`uniform-edit-item-color-${item.id}`}
@@ -481,7 +543,11 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
                               }
                               value={line.selectedColor}
                             >
-                              <option value="">{item.availableColors.length ? "Select color" : "N/A"}</option>
+                              <option value="">
+                                {item.availableColors.length
+                                  ? "Select color"
+                                  : "N/A"}
+                              </option>
                               {item.availableColors.map((color) => (
                                 <option key={color} value={color}>
                                   {color}
@@ -498,10 +564,18 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
             )}
 
             <div className="flex justify-end gap-2">
-              <Button onClick={() => setIsEditing(false)} type="button" variant="secondary">
+              <Button
+                onClick={() => setIsEditing(false)}
+                type="button"
+                variant="secondary"
+              >
                 Cancel
               </Button>
-              <Button disabled={isSubmittingEdit || isLoadingEditData} onClick={() => void handleSaveEdit()} type="button">
+              <Button
+                disabled={isSubmittingEdit || isLoadingEditData}
+                onClick={() => void handleSaveEdit()}
+                type="button"
+              >
                 {isSubmittingEdit ? "Saving..." : "Save changes"}
               </Button>
             </div>
@@ -520,27 +594,51 @@ export function ParentUniformOrderDetail({ orderId }: { orderId: string }) {
               <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                 <thead className="bg-slate-50/80">
                   <tr>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Item</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Size</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Color</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Unit</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Qty</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Line total</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Item
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Size
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Color
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Unit
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Qty
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Line total
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {order.items.map((line) => (
                     <tr className="align-top" key={line.id}>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-slate-900">{line.itemNameSnapshot}</p>
+                        <p className="font-medium text-slate-900">
+                          {line.itemNameSnapshot}
+                        </p>
                         <p className="mt-1 text-xs text-slate-500">
-                          {line.itemSkuSnapshot ? `SKU: ${line.itemSkuSnapshot}` : "No SKU"}
+                          {line.itemSkuSnapshot
+                            ? `SKU: ${line.itemSkuSnapshot}`
+                            : "No SKU"}
                         </p>
                       </td>
-                      <td className="px-4 py-3 text-slate-700">{line.selectedSize || "—"}</td>
-                      <td className="px-4 py-3 text-slate-700">{line.selectedColor || "—"}</td>
-                      <td className="px-4 py-3 text-slate-700">{formatUniformMoney(line.unitPrice)}</td>
-                      <td className="px-4 py-3 text-slate-700">{line.quantity}</td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {line.selectedSize || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {line.selectedColor || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {formatUniformMoney(line.unitPrice)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {line.quantity}
+                      </td>
                       <td className="px-4 py-3 font-medium text-slate-900">
                         {formatUniformMoney(line.lineTotal)}
                       </td>

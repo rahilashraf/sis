@@ -127,7 +127,11 @@ export function BillingChargeEditForm({ chargeId }: { chargeId: string }) {
         });
         setCategories(categoryResponse);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load charge.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load charge.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -192,7 +196,11 @@ export function BillingChargeEditForm({ chargeId }: { chargeId: string }) {
       await updateBillingCharge(charge.id, payload);
       router.push("/admin/billing/charges?edited=1");
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Unable to update charge.");
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Unable to update charge.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -238,7 +246,10 @@ export function BillingChargeEditForm({ chargeId }: { chargeId: string }) {
         title="Edit Billing Charge"
         description="Update category, title, description, due date, or amount."
         actions={
-          <Link className={buttonClassName({ variant: "secondary" })} href="/admin/billing/charges">
+          <Link
+            className={buttonClassName({ variant: "secondary" })}
+            href="/admin/billing/charges"
+          >
             Back to charges
           </Link>
         }
@@ -272,7 +283,9 @@ export function BillingChargeEditForm({ chargeId }: { chargeId: string }) {
                 id="edit-charge-category"
                 onChange={(event) =>
                   setForm((current) =>
-                    current ? { ...current, categoryId: event.target.value } : current,
+                    current
+                      ? { ...current, categoryId: event.target.value }
+                      : current,
                   )
                 }
                 value={form.categoryId}
@@ -285,7 +298,9 @@ export function BillingChargeEditForm({ chargeId }: { chargeId: string }) {
                 ))}
               </Select>
               {fieldErrors.categoryId ? (
-                <p className="mt-1 text-xs text-rose-600">{fieldErrors.categoryId}</p>
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.categoryId}
+                </p>
               ) : null}
             </Field>
 
@@ -296,13 +311,17 @@ export function BillingChargeEditForm({ chargeId }: { chargeId: string }) {
                 id="edit-charge-title"
                 onChange={(event) =>
                   setForm((current) =>
-                    current ? { ...current, title: event.target.value } : current,
+                    current
+                      ? { ...current, title: event.target.value }
+                      : current,
                   )
                 }
                 value={form.title}
               />
               {fieldErrors.title ? (
-                <p className="mt-1 text-xs text-rose-600">{fieldErrors.title}</p>
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.title}
+                </p>
               ) : null}
             </Field>
 
@@ -314,13 +333,17 @@ export function BillingChargeEditForm({ chargeId }: { chargeId: string }) {
                 inputMode="decimal"
                 onChange={(event) =>
                   setForm((current) =>
-                    current ? { ...current, amount: event.target.value } : current,
+                    current
+                      ? { ...current, amount: event.target.value }
+                      : current,
                   )
                 }
                 value={form.amount}
               />
               {fieldErrors.amount ? (
-                <p className="mt-1 text-xs text-rose-600">{fieldErrors.amount}</p>
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.amount}
+                </p>
               ) : null}
             </Field>
 
@@ -330,7 +353,9 @@ export function BillingChargeEditForm({ chargeId }: { chargeId: string }) {
                 id="edit-charge-due-date"
                 onChange={(event) =>
                   setForm((current) =>
-                    current ? { ...current, dueDate: event.target.value } : current,
+                    current
+                      ? { ...current, dueDate: event.target.value }
+                      : current,
                   )
                 }
                 type="date"
@@ -338,13 +363,19 @@ export function BillingChargeEditForm({ chargeId }: { chargeId: string }) {
               />
             </Field>
 
-            <Field className="md:col-span-2" htmlFor="edit-charge-description" label="Description (optional)">
+            <Field
+              className="md:col-span-2"
+              htmlFor="edit-charge-description"
+              label="Description (optional)"
+            >
               <Input
                 disabled={isFullyLocked}
                 id="edit-charge-description"
                 onChange={(event) =>
                   setForm((current) =>
-                    current ? { ...current, description: event.target.value } : current,
+                    current
+                      ? { ...current, description: event.target.value }
+                      : current,
                   )
                 }
                 value={form.description}
@@ -352,7 +383,10 @@ export function BillingChargeEditForm({ chargeId }: { chargeId: string }) {
             </Field>
 
             <div className="md:col-span-2 flex justify-end gap-2">
-              <Link className={buttonClassName({ variant: "secondary" })} href="/admin/billing/charges">
+              <Link
+                className={buttonClassName({ variant: "secondary" })}
+                href="/admin/billing/charges"
+              >
                 Cancel
               </Link>
               <Button disabled={isSubmitting || isFullyLocked} type="submit">

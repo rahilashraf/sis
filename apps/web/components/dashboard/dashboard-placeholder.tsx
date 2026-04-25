@@ -49,7 +49,8 @@ export function DashboardPlaceholder({
       <Card>
         <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Signed in as <span className="font-medium">{session?.user.role}</span>.
+          Signed in as <span className="font-medium">{session?.user.role}</span>
+          .
         </p>
         <p className="mt-1 text-sm text-slate-500">
           Placeholder workspace for {roleLabel.toLowerCase()} users.
@@ -62,7 +63,9 @@ export function DashboardPlaceholder({
         </h2>
 
         {isLoading ? (
-          <p className="mt-3 text-sm text-slate-500">Calling protected endpoint...</p>
+          <p className="mt-3 text-sm text-slate-500">
+            Calling protected endpoint...
+          </p>
         ) : null}
 
         {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}

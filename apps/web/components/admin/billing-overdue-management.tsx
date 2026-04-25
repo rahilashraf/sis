@@ -79,7 +79,9 @@ function getOverdueAgeVariant(oldestDueDate: string) {
     return "neutral" as const;
   }
 
-  const daysOverdue = Math.floor((Date.now() - dueTime) / (1000 * 60 * 60 * 24));
+  const daysOverdue = Math.floor(
+    (Date.now() - dueTime) / (1000 * 60 * 60 * 24),
+  );
 
   if (daysOverdue >= 60) {
     return "danger" as const;
@@ -120,7 +122,8 @@ export function BillingOverdueManagement() {
         const schoolList = await listSchools({ includeInactive: false });
         setSchools(schoolList);
 
-        const defaultSchoolId = getDefaultSchoolContextId(session?.user) ?? schoolList[0]?.id ?? "";
+        const defaultSchoolId =
+          getDefaultSchoolContextId(session?.user) ?? schoolList[0]?.id ?? "";
         const resolvedSchoolId =
           schoolList.find((school) => school.id === defaultSchoolId)?.id ??
           schoolList[0]?.id ??
@@ -202,7 +205,9 @@ export function BillingOverdueManagement() {
           </div>
         }
         meta={
-          <Badge variant="neutral">{selectedSchool?.name ?? "All schools"}</Badge>
+          <Badge variant="neutral">
+            {selectedSchool?.name ?? "All schools"}
+          </Badge>
         }
       />
 
@@ -216,7 +221,11 @@ export function BillingOverdueManagement() {
         <SummaryCard
           label="Total Overdue Balance"
           value={formatCurrency(data?.summary.totalOverdueBalance ?? "0")}
-          tone={isPositiveAmount(data?.summary.totalOverdueBalance) ? "danger" : undefined}
+          tone={
+            isPositiveAmount(data?.summary.totalOverdueBalance)
+              ? "danger"
+              : undefined
+          }
         />
         <SummaryCard
           label="Overdue Charges"
@@ -227,7 +236,9 @@ export function BillingOverdueManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Filters</CardTitle>
-          <CardDescription>Filter overdue rows by school, student, and balance.</CardDescription>
+          <CardDescription>
+            Filter overdue rows by school, student, and balance.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
           <Field htmlFor="overdue-school" label="School">
@@ -275,7 +286,9 @@ export function BillingOverdueManagement() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-sm text-slate-500">Loading overdue balances...</p>
+            <p className="text-sm text-slate-500">
+              Loading overdue balances...
+            </p>
           ) : rows.length === 0 ? (
             <EmptyState
               compact
@@ -288,21 +301,40 @@ export function BillingOverdueManagement() {
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                      <th className="px-4 py-3 font-semibold text-right text-slate-700">Overdue Amount</th>
-                      <th className="px-4 py-3 font-semibold text-right text-slate-700">Overdue Charges</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Oldest Due</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Student
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-right text-slate-700">
+                        Overdue Amount
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-right text-slate-700">
+                        Overdue Charges
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Oldest Due
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {rows.map((row) => (
-                      <tr key={`${row.schoolId}-${row.studentId}`} className="align-top hover:bg-slate-50">
+                      <tr
+                        key={`${row.schoolId}-${row.studentId}`}
+                        className="align-top hover:bg-slate-50"
+                      >
                         <td className="px-4 py-4">
-                          <p className="font-medium text-slate-900">{row.studentName}</p>
-                          <p className="mt-1 text-xs text-slate-500">{row.email ?? row.studentId}</p>
+                          <p className="font-medium text-slate-900">
+                            {row.studentName}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {row.email ?? row.studentId}
+                          </p>
                           {row.classInfo ? (
-                            <p className="mt-1 text-xs text-slate-500">Class: {row.classInfo.name}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Class: {row.classInfo.name}
+                            </p>
                           ) : null}
                         </td>
                         <td className="px-4 py-4 text-right font-semibold tabular-nums text-red-600">
@@ -314,19 +346,29 @@ export function BillingOverdueManagement() {
                         <td className="px-4 py-4 text-slate-700">
                           <div className="flex items-center gap-2">
                             <span>{formatDateLabel(row.oldestDueDate)}</span>
-                            <Badge variant={getOverdueAgeVariant(row.oldestDueDate)}>Overdue</Badge>
+                            <Badge
+                              variant={getOverdueAgeVariant(row.oldestDueDate)}
+                            >
+                              Overdue
+                            </Badge>
                           </div>
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex flex-wrap gap-2">
                             <Link
-                              className={buttonClassName({ size: "sm", variant: "secondary" })}
+                              className={buttonClassName({
+                                size: "sm",
+                                variant: "secondary",
+                              })}
                               href={`/admin/billing/students/${encodeURIComponent(row.studentId)}`}
                             >
                               View account
                             </Link>
                             <Link
-                              className={buttonClassName({ size: "sm", variant: "secondary" })}
+                              className={buttonClassName({
+                                size: "sm",
+                                variant: "secondary",
+                              })}
                               href={`/admin/billing/payments/new?studentId=${encodeURIComponent(row.studentId)}`}
                             >
                               Record payment

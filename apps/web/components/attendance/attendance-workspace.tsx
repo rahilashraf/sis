@@ -124,7 +124,9 @@ function buildSessionLabel(session: AttendanceSession) {
   }
 
   const candidateDates = [session.updatedAt, session.createdAt, session.date];
-  const scopeTypeLabel = formatRoleLabel(getDisplayText(session.scopeType, "Session"));
+  const scopeTypeLabel = formatRoleLabel(
+    getDisplayText(session.scopeType, "Session"),
+  );
 
   for (const candidateDate of candidateDates) {
     const formattedTime = formatTimeLabel(candidateDate, undefined, "");
@@ -210,7 +212,7 @@ function getClassOptionLabel(schoolClass: SchoolClass) {
   const className = getDisplayText(schoolClass.name);
   const subject = getDisplayText(schoolClass.subject, "");
 
-  return `${className}${subject ? ` • ${subject}` : ""}${schoolClass.isActive ? "" : " • Inactive"}`;
+  return `${className}${subject ? ` • ${subject}` : ""}${schoolClass.takesAttendance ? "" : " • Attendance disabled"}${schoolClass.isActive ? "" : " • Inactive"}`;
 }
 
 function getTakenByLabel(session: AttendanceSession) {
@@ -218,7 +220,11 @@ function getTakenByLabel(session: AttendanceSession) {
     return "Unknown";
   }
 
-  return getFullName(session.takenBy.firstName, session.takenBy.lastName, "Unknown");
+  return getFullName(
+    session.takenBy.firstName,
+    session.takenBy.lastName,
+    "Unknown",
+  );
 }
 
 function getSessionClassesLabel(session: AttendanceSession) {
@@ -235,12 +241,11 @@ function getDateWithOffset(days: number) {
   return getLocalDateInputValue(date);
 }
 
-export function AttendanceWorkspace({
-  mode,
-}: {
-  mode: "teacher" | "admin";
-}) {
-  const { selectedSchoolId: schoolContextId, setSelectedSchoolId: setSchoolContextId } = useAuth();
+export function AttendanceWorkspace({ mode }: { mode: "teacher" | "admin" }) {
+  const {
+    selectedSchoolId: schoolContextId,
+    setSelectedSchoolId: setSchoolContextId,
+  } = useAuth();
   const searchParams = useSearchParams();
   const requestedClassId = searchParams.get("classId") ?? "";
   const [classes, setClasses] = useState<SchoolClass[]>([]);
@@ -251,10 +256,14 @@ export function AttendanceWorkspace({
   const [rangeEndDate, setRangeEndDate] = useState(getLocalDateInputValue());
   const [students, setStudents] = useState<AttendanceStudent[]>([]);
   const [schoolSessions, setSchoolSessions] = useState<AttendanceSession[]>([]);
-  const [recordRange, setRecordRange] = useState<AttendanceClassRecordRange | null>(null);
-  const [classSummary, setClassSummary] = useState<AttendanceClassSummary | null>(null);
+  const [recordRange, setRecordRange] =
+    useState<AttendanceClassRecordRange | null>(null);
+  const [classSummary, setClassSummary] =
+    useState<AttendanceClassSummary | null>(null);
   const [statusRules, setStatusRules] = useState<AttendanceStatusRule[]>([]);
-  const [customStatuses, setCustomStatuses] = useState<AttendanceCustomStatus[]>([]);
+  const [customStatuses, setCustomStatuses] = useState<
+    AttendanceCustomStatus[]
+  >([]);
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [statusByStudentId, setStatusByStudentId] = useState<
     Record<string, AttendanceStatus>
@@ -262,20 +271,26 @@ export function AttendanceWorkspace({
   const [customStatusByStudentId, setCustomStatusByStudentId] = useState<
     Record<string, string>
   >({});
-  const [remarkByStudentId, setRemarkByStudentId] = useState<Record<string, string>>({});
+  const [remarkByStudentId, setRemarkByStudentId] = useState<
+    Record<string, string>
+  >({});
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [isLoadingRange, setIsLoadingRange] = useState(false);
   const [isLoadingClassSummary, setIsLoadingClassSummary] = useState(false);
   const [isLoadingStatusRules, setIsLoadingStatusRules] = useState(false);
   const [isLoadingCustomStatuses, setIsLoadingCustomStatuses] = useState(false);
-  const [savingRuleStatus, setSavingRuleStatus] = useState<AttendanceStatus | null>(null);
+  const [savingRuleStatus, setSavingRuleStatus] =
+    useState<AttendanceStatus | null>(null);
   const [isSavingCustomStatus, setIsSavingCustomStatus] = useState(false);
-  const [savingCustomStatusId, setSavingCustomStatusId] = useState<string | null>(null);
+  const [savingCustomStatusId, setSavingCustomStatusId] = useState<
+    string | null
+  >(null);
   const [createCustomStatusLabel, setCreateCustomStatusLabel] = useState("");
   const [createCustomStatusBehavior, setCreateCustomStatusBehavior] =
     useState<AttendanceStatusCountBehavior>("INFORMATIONAL");
-  const [createCustomStatusIsActive, setCreateCustomStatusIsActive] = useState(true);
+  const [createCustomStatusIsActive, setCreateCustomStatusIsActive] =
+    useState(true);
   const [customStatusDraftById, setCustomStatusDraftById] = useState<
     Record<
       string,
@@ -290,9 +305,13 @@ export function AttendanceWorkspace({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rangeError, setRangeError] = useState<string | null>(null);
-  const [classSummaryError, setClassSummaryError] = useState<string | null>(null);
+  const [classSummaryError, setClassSummaryError] = useState<string | null>(
+    null,
+  );
   const [statusRulesError, setStatusRulesError] = useState<string | null>(null);
-  const [customStatusesError, setCustomStatusesError] = useState<string | null>(null);
+  const [customStatusesError, setCustomStatusesError] = useState<string | null>(
+    null,
+  );
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const availableSchoolOptions = useMemo(() => {
@@ -314,17 +333,34 @@ export function AttendanceWorkspace({
     }
 
     return selectedSchoolId
-      ? classes.filter((schoolClass) => schoolClass.schoolId === selectedSchoolId)
+      ? classes.filter(
+          (schoolClass) => schoolClass.schoolId === selectedSchoolId,
+        )
       : classes;
   }, [classes, mode, selectedSchoolId]);
 
   const selectedClass = useMemo(
-    () => visibleClasses.find((schoolClass) => schoolClass.id === selectedClassId) ?? null,
+    () =>
+      visibleClasses.find(
+        (schoolClass) => schoolClass.id === selectedClassId,
+      ) ?? null,
     [selectedClassId, visibleClasses],
   );
 
+  const firstEnabledVisibleClassId = useMemo(
+    () =>
+      visibleClasses.find((schoolClass) => schoolClass.takesAttendance)?.id ??
+      "",
+    [visibleClasses],
+  );
+
+  const hasEnabledVisibleClasses = useMemo(
+    () => visibleClasses.some((schoolClass) => schoolClass.takesAttendance),
+    [visibleClasses],
+  );
+
   const effectiveSchoolId =
-    mode === "teacher" ? selectedClass?.schoolId ?? "" : selectedSchoolId;
+    mode === "teacher" ? (selectedClass?.schoolId ?? "") : selectedSchoolId;
 
   const matchingSessions = useMemo(() => {
     if (!selectedClassId) {
@@ -332,7 +368,9 @@ export function AttendanceWorkspace({
     }
 
     return schoolSessions.filter((session) =>
-      session.classes.some((sessionClass) => sessionClass.classId === selectedClassId),
+      session.classes.some(
+        (sessionClass) => sessionClass.classId === selectedClassId,
+      ),
     );
   }, [schoolSessions, selectedClassId]);
 
@@ -438,7 +476,8 @@ export function AttendanceWorkspace({
       const selectedCustomStatusId = customStatusByStudentId[student.id];
       if (selectedCustomStatusId) {
         const customBehavior =
-          customStatusById.get(selectedCustomStatusId)?.behavior ?? "INFORMATIONAL";
+          customStatusById.get(selectedCustomStatusId)?.behavior ??
+          "INFORMATIONAL";
 
         if (customBehavior === "PRESENT") {
           countAsPresent += 1;
@@ -458,7 +497,8 @@ export function AttendanceWorkspace({
 
       const status = statusByStudentId[student.id] ?? defaultAttendanceStatus;
       const behavior =
-        statusRuleByStatus.get(status)?.behavior ?? defaultBehaviorByStatus[status];
+        statusRuleByStatus.get(status)?.behavior ??
+        defaultBehaviorByStatus[status];
 
       if (behavior === "PRESENT") {
         countAsPresent += 1;
@@ -480,14 +520,28 @@ export function AttendanceWorkspace({
       return null;
     }
 
-    return Number((((countAsPresent + countAsLate) / denominator) * 100).toFixed(1));
-  }, [customStatusByStudentId, customStatusById, statusByStudentId, statusRuleByStatus, students]);
+    return Number(
+      (((countAsPresent + countAsLate) / denominator) * 100).toFixed(1),
+    );
+  }, [
+    customStatusByStudentId,
+    customStatusById,
+    statusByStudentId,
+    statusRuleByStatus,
+    students,
+  ]);
 
   const hasAnyClasses = classes.length > 0;
   const showNoAssignedClasses =
     !isLoading && mode === "teacher" && !hasAnyClasses && !error;
   const showNoAvailableClasses =
     !isLoading && mode === "admin" && !hasAnyClasses && !error;
+  const showNoAttendanceEnabledClasses =
+    !isLoading &&
+    !error &&
+    hasAnyClasses &&
+    !hasEnabledVisibleClasses &&
+    Boolean(visibleClasses.length);
 
   useEffect(() => {
     async function loadClasses() {
@@ -501,10 +555,17 @@ export function AttendanceWorkspace({
         setClasses(classResponse);
 
         const requested =
-          requestedClassId && classResponse.some((entry) => entry.id === requestedClassId)
+          requestedClassId &&
+          classResponse.some(
+            (entry) => entry.id === requestedClassId && entry.takesAttendance,
+          )
             ? requestedClassId
             : "";
-        const initialClassId = requested || classResponse[0]?.id || "";
+        const initialClassId =
+          requested ||
+          classResponse.find((entry) => entry.takesAttendance)?.id ||
+          classResponse[0]?.id ||
+          "";
         const contextSchoolId =
           mode === "admin" &&
           schoolContextId &&
@@ -513,7 +574,8 @@ export function AttendanceWorkspace({
             : "";
         const initialSchoolId =
           mode === "admin"
-            ? (classResponse.find((entry) => entry.id === initialClassId)?.schoolId ??
+            ? (classResponse.find((entry) => entry.id === initialClassId)
+                ?.schoolId ??
               contextSchoolId ??
               classResponse[0]?.schoolId ??
               "")
@@ -561,7 +623,7 @@ export function AttendanceWorkspace({
 
   useEffect(() => {
     if (!selectedClassId && visibleClasses[0]) {
-      setSelectedClassId(visibleClasses[0].id);
+      setSelectedClassId(firstEnabledVisibleClassId || visibleClasses[0].id);
       return;
     }
 
@@ -569,9 +631,11 @@ export function AttendanceWorkspace({
       selectedClassId &&
       !visibleClasses.some((schoolClass) => schoolClass.id === selectedClassId)
     ) {
-      setSelectedClassId(visibleClasses[0]?.id ?? "");
+      setSelectedClassId(
+        (firstEnabledVisibleClassId || visibleClasses[0]?.id) ?? "",
+      );
     }
-  }, [selectedClassId, visibleClasses]);
+  }, [firstEnabledVisibleClassId, selectedClassId, visibleClasses]);
 
   useEffect(() => {
     async function loadSessions() {
@@ -616,6 +680,11 @@ export function AttendanceWorkspace({
         return;
       }
 
+      if (selectedClass && !selectedClass.takesAttendance) {
+        setStudents([]);
+        return;
+      }
+
       setIsRefreshing(true);
       setError(null);
 
@@ -634,7 +703,7 @@ export function AttendanceWorkspace({
     }
 
     void loadStudents();
-  }, [mode, selectedClassId]);
+  }, [mode, selectedClass, selectedClassId]);
 
   useEffect(() => {
     if (matchingSessions.length === 0) {
@@ -772,6 +841,12 @@ export function AttendanceWorkspace({
       return;
     }
 
+    if (selectedClass && !selectedClass.takesAttendance) {
+      setRecordRange(null);
+      setRangeError(null);
+      return;
+    }
+
     setIsLoadingRange(true);
     setRangeError(null);
 
@@ -801,6 +876,12 @@ export function AttendanceWorkspace({
       return;
     }
 
+    if (selectedClass && !selectedClass.takesAttendance) {
+      setClassSummary(null);
+      setClassSummaryError(null);
+      return;
+    }
+
     setIsLoadingClassSummary(true);
     setClassSummaryError(null);
 
@@ -825,11 +906,11 @@ export function AttendanceWorkspace({
 
   useEffect(() => {
     void loadRangeRecords();
-  }, [selectedClassId, rangeStartDate, rangeEndDate]);
+  }, [selectedClass, selectedClassId, rangeStartDate, rangeEndDate]);
 
   useEffect(() => {
     void loadClassSummary();
-  }, [rangeEndDate, rangeStartDate, selectedClassId]);
+  }, [rangeEndDate, rangeStartDate, selectedClass, selectedClassId]);
 
   function handleMarkAllPresent() {
     setStatusByStudentId(buildDefaultStatuses(students));
@@ -1011,7 +1092,10 @@ export function AttendanceWorkspace({
 
   async function reloadCurrentState() {
     if (effectiveSchoolId && selectedDate) {
-      const sessionResponse = await getAttendanceSessions(effectiveSchoolId, selectedDate);
+      const sessionResponse = await getAttendanceSessions(
+        effectiveSchoolId,
+        selectedDate,
+      );
       setSchoolSessions(sessionResponse);
     }
 
@@ -1028,6 +1112,11 @@ export function AttendanceWorkspace({
     event.preventDefault();
 
     if (!selectedClass || students.length === 0) {
+      return;
+    }
+
+    if (!selectedClass.takesAttendance) {
+      setError("Attendance is not enabled for this class.");
       return;
     }
 
@@ -1111,16 +1200,23 @@ export function AttendanceWorkspace({
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {rangeError ? <Notice tone="danger">{rangeError}</Notice> : null}
-      {classSummaryError ? <Notice tone="danger">{classSummaryError}</Notice> : null}
-      {statusRulesError ? <Notice tone="danger">{statusRulesError}</Notice> : null}
-      {customStatusesError ? <Notice tone="danger">{customStatusesError}</Notice> : null}
+      {classSummaryError ? (
+        <Notice tone="danger">{classSummaryError}</Notice>
+      ) : null}
+      {statusRulesError ? (
+        <Notice tone="danger">{statusRulesError}</Notice>
+      ) : null}
+      {customStatusesError ? (
+        <Notice tone="danger">{customStatusesError}</Notice>
+      ) : null}
       {successMessage ? <Notice tone="success">{successMessage}</Notice> : null}
 
       <Card>
         <CardHeader>
           <CardTitle>Attendance Controls</CardTitle>
           <CardDescription>
-            Choose the school context, class roster, and attendance date before making updates.
+            Choose the school context, class roster, and attendance date before
+            making updates.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1150,7 +1246,11 @@ export function AttendanceWorkspace({
               >
                 <option value="">Select class</option>
                 {visibleClasses.map((schoolClass) => (
-                  <option key={schoolClass.id} value={schoolClass.id}>
+                  <option
+                    disabled={!schoolClass.takesAttendance}
+                    key={schoolClass.id}
+                    value={schoolClass.id}
+                  >
                     {getClassOptionLabel(schoolClass)}
                   </option>
                 ))}
@@ -1192,6 +1292,12 @@ export function AttendanceWorkspace({
           {isLoading || isRefreshing ? (
             <p className="text-sm text-slate-500">Loading attendance data...</p>
           ) : null}
+
+          {selectedClass && !selectedClass.takesAttendance ? (
+            <Notice tone="warning">
+              Attendance is not enabled for this class.
+            </Notice>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -1209,17 +1315,30 @@ export function AttendanceWorkspace({
         />
       ) : null}
 
-      {!showNoAssignedClasses && !showNoAvailableClasses ? (
+      {showNoAttendanceEnabledClasses ? (
+        <EmptyState
+          description="Classes are assigned, but attendance is currently disabled for all visible classes."
+          title="No attendance-enabled classes"
+        />
+      ) : null}
+
+      {!showNoAssignedClasses &&
+      !showNoAvailableClasses &&
+      !showNoAttendanceEnabledClasses ? (
         <>
           <Card>
             <CardHeader>
               <CardTitle>Summary Date Range</CardTitle>
               <CardDescription>
-                These dates affect summary cards only. Daily attendance entry still uses the single attendance date above.
+                These dates affect summary cards only. Daily attendance entry
+                still uses the single attendance date above.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-3">
-              <Field htmlFor="attendance-range-start" label="Summary start date">
+              <Field
+                htmlFor="attendance-range-start"
+                label="Summary start date"
+              >
                 <Input
                   id="attendance-range-start"
                   onChange={(event) => setRangeStartDate(event.target.value)}
@@ -1237,7 +1356,11 @@ export function AttendanceWorkspace({
               </Field>
               <div className="flex items-end">
                 <Button
-                  disabled={isLoadingRange || !selectedClassId}
+                  disabled={
+                    isLoadingRange ||
+                    !selectedClassId ||
+                    !selectedClass?.takesAttendance
+                  }
                   onClick={() => {
                     void loadRangeRecords();
                     void loadClassSummary();
@@ -1269,7 +1392,9 @@ export function AttendanceWorkspace({
                   Present
                 </p>
                 <p className="mt-2 text-sm font-medium text-slate-900">
-                  {isLoadingClassSummary ? "…" : classSummary?.presentCount ?? "—"}
+                  {isLoadingClassSummary
+                    ? "…"
+                    : (classSummary?.presentCount ?? "—")}
                 </p>
               </CardContent>
             </Card>
@@ -1280,7 +1405,9 @@ export function AttendanceWorkspace({
                   Late
                 </p>
                 <p className="mt-2 text-sm font-medium text-slate-900">
-                  {isLoadingClassSummary ? "…" : classSummary?.lateCount ?? "—"}
+                  {isLoadingClassSummary
+                    ? "…"
+                    : (classSummary?.lateCount ?? "—")}
                 </p>
               </CardContent>
             </Card>
@@ -1291,7 +1418,9 @@ export function AttendanceWorkspace({
                   Absent
                 </p>
                 <p className="mt-2 text-sm font-medium text-slate-900">
-                  {isLoadingClassSummary ? "…" : classSummary?.absentCount ?? "—"}
+                  {isLoadingClassSummary
+                    ? "…"
+                    : (classSummary?.absentCount ?? "—")}
                 </p>
               </CardContent>
             </Card>
@@ -1304,7 +1433,8 @@ export function AttendanceWorkspace({
                 <p className="mt-2 text-sm font-medium text-slate-900">
                   {isLoadingClassSummary
                     ? "…"
-                    : classSummary?.attendanceRate === null || classSummary?.attendanceRate === undefined
+                    : classSummary?.attendanceRate === null ||
+                        classSummary?.attendanceRate === undefined
                       ? attendanceRate === null
                         ? "—"
                         : `${attendanceRate}%`
@@ -1317,9 +1447,7 @@ export function AttendanceWorkspace({
           <Card>
             <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <CardTitle>
-                  Daily Attendance
-                </CardTitle>
+                <CardTitle>Daily Attendance</CardTitle>
                 <CardDescription>
                   {isLoadingSessions
                     ? "Checking for saved attendance before submission."
@@ -1330,7 +1458,8 @@ export function AttendanceWorkspace({
                 <div className="mt-4 flex flex-wrap gap-2">
                   {attendanceStatusOptions.map((status) => (
                     <Badge key={status} variant={getStatusBadgeVariant(status)}>
-                      {formatAttendanceStatusLabel(status)}: {rosterSummary[status]}
+                      {formatAttendanceStatusLabel(status)}:{" "}
+                      {rosterSummary[status]}
                     </Badge>
                   ))}
                   {customStatusSummary.map((status) => (
@@ -1355,6 +1484,7 @@ export function AttendanceWorkspace({
                     isSaving ||
                     isLoadingSessions ||
                     !selectedClass ||
+                    !selectedClass.takesAttendance ||
                     students.length === 0
                   }
                   form="attendance-form"
@@ -1363,13 +1493,17 @@ export function AttendanceWorkspace({
                   {isLoadingSessions
                     ? "Checking attendance..."
                     : isSaving
-                    ? "Submitting..."
-                    : "Submit attendance"}
+                      ? "Submitting..."
+                      : "Submit attendance"}
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
-              <form className="space-y-4" id="attendance-form" onSubmit={handleSubmit}>
+              <form
+                className="space-y-4"
+                id="attendance-form"
+                onSubmit={handleSubmit}
+              >
                 {students.length === 0 ? (
                   <EmptyState
                     compact
@@ -1404,18 +1538,27 @@ export function AttendanceWorkspace({
                         <tbody className="divide-y divide-slate-200 bg-white">
                           {students.map((student) => {
                             const status =
-                              statusByStudentId[student.id] ?? defaultAttendanceStatus;
+                              statusByStudentId[student.id] ??
+                              defaultAttendanceStatus;
                             const selectedCustomStatusId =
                               customStatusByStudentId[student.id] ?? "";
                             const statusOptionValue = selectedCustomStatusId
-                              ? buildCustomStatusOptionValue(selectedCustomStatusId)
+                              ? buildCustomStatusOptionValue(
+                                  selectedCustomStatusId,
+                                )
                               : buildBuiltInStatusOptionValue(status);
 
                             return (
-                              <tr className="align-top hover:bg-slate-50" key={student.id}>
+                              <tr
+                                className="align-top hover:bg-slate-50"
+                                key={student.id}
+                              >
                                 <td className="px-4 py-4">
                                   <p className="font-medium text-slate-900">
-                                    {getFullName(student.firstName, student.lastName)}
+                                    {getFullName(
+                                      student.firstName,
+                                      student.lastName,
+                                    )}
                                   </p>
                                   <p className="mt-1 text-sm text-slate-500">
                                     @{getDisplayText(student.username)}
@@ -1435,7 +1578,9 @@ export function AttendanceWorkspace({
                                     {attendanceStatusOptions.map((option) => (
                                       <option
                                         key={option}
-                                        value={buildBuiltInStatusOptionValue(option)}
+                                        value={buildBuiltInStatusOptionValue(
+                                          option,
+                                        )}
                                       >
                                         {formatAttendanceStatusLabel(option)}
                                       </option>
@@ -1444,7 +1589,8 @@ export function AttendanceWorkspace({
                                       .filter(
                                         (customStatus) =>
                                           customStatus.isActive ||
-                                          customStatus.id === selectedCustomStatusId,
+                                          customStatus.id ===
+                                            selectedCustomStatusId,
                                       )
                                       .map((customStatus) => (
                                         <option
@@ -1454,7 +1600,9 @@ export function AttendanceWorkspace({
                                           )}
                                         >
                                           {customStatus.label}
-                                          {customStatus.isActive ? "" : " (Inactive)"}
+                                          {customStatus.isActive
+                                            ? ""
+                                            : " (Inactive)"}
                                         </option>
                                       ))}
                                   </Select>
@@ -1489,12 +1637,15 @@ export function AttendanceWorkspace({
             <CardHeader>
               <CardTitle>Attendance Status Counting</CardTitle>
               <CardDescription>
-                Configure how each status contributes to attendance rate calculations.
+                Configure how each status contributes to attendance rate
+                calculations.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {isLoadingStatusRules ? (
-                <p className="text-sm text-slate-500">Loading status rules...</p>
+                <p className="text-sm text-slate-500">
+                  Loading status rules...
+                </p>
               ) : (
                 <div className="grid gap-3 md:grid-cols-2">
                   {attendanceStatusOptions.map((status) => {
@@ -1526,7 +1677,8 @@ export function AttendanceWorkspace({
                             onChange={(event) =>
                               void handleStatusRuleUpdate(
                                 status,
-                                event.target.value as AttendanceStatusCountBehavior,
+                                event.target
+                                  .value as AttendanceStatusCountBehavior,
                               )
                             }
                             value={currentBehavior}
@@ -1550,12 +1702,15 @@ export function AttendanceWorkspace({
             <CardHeader>
               <CardTitle>Custom Attendance Statuses</CardTitle>
               <CardDescription>
-                Add school-specific attendance labels and define how each one counts.
+                Add school-specific attendance labels and define how each one
+                counts.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {isLoadingCustomStatuses ? (
-                <p className="text-sm text-slate-500">Loading custom statuses...</p>
+                <p className="text-sm text-slate-500">
+                  Loading custom statuses...
+                </p>
               ) : null}
 
               {mode === "admin" ? (
@@ -1566,12 +1721,17 @@ export function AttendanceWorkspace({
                   <Field htmlFor="create-custom-status-label" label="Label">
                     <Input
                       id="create-custom-status-label"
-                      onChange={(event) => setCreateCustomStatusLabel(event.target.value)}
+                      onChange={(event) =>
+                        setCreateCustomStatusLabel(event.target.value)
+                      }
                       placeholder="Field Trip"
                       value={createCustomStatusLabel}
                     />
                   </Field>
-                  <Field htmlFor="create-custom-status-behavior" label="Count behavior">
+                  <Field
+                    htmlFor="create-custom-status-behavior"
+                    label="Count behavior"
+                  >
                     <Select
                       id="create-custom-status-behavior"
                       onChange={(event) =>
@@ -1598,7 +1758,11 @@ export function AttendanceWorkspace({
                     />
                   </div>
                   <div className="flex items-end justify-end">
-                    <Button disabled={isSavingCustomStatus} type="submit" variant="secondary">
+                    <Button
+                      disabled={isSavingCustomStatus}
+                      type="submit"
+                      variant="secondary"
+                    >
                       {isSavingCustomStatus ? "Saving..." : "Add custom status"}
                     </Button>
                   </div>
@@ -1625,7 +1789,10 @@ export function AttendanceWorkspace({
                         className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-[1.5fr_1fr_auto_auto]"
                         key={customStatus.id}
                       >
-                        <Field htmlFor={`custom-status-label-${customStatus.id}`} label="Label">
+                        <Field
+                          htmlFor={`custom-status-label-${customStatus.id}`}
+                          label="Label"
+                        >
                           <Input
                             disabled={mode !== "admin"}
                             id={`custom-status-label-${customStatus.id}`}
@@ -1653,8 +1820,8 @@ export function AttendanceWorkspace({
                                 ...current,
                                 [customStatus.id]: {
                                   ...draft,
-                                  behavior:
-                                    event.target.value as AttendanceStatusCountBehavior,
+                                  behavior: event.target
+                                    .value as AttendanceStatusCountBehavior,
                                 },
                               }))
                             }
@@ -1686,8 +1853,12 @@ export function AttendanceWorkspace({
                         <div className="flex items-end justify-end">
                           {mode === "admin" ? (
                             <Button
-                              disabled={savingCustomStatusId === customStatus.id}
-                              onClick={() => void handleSaveCustomStatus(customStatus.id)}
+                              disabled={
+                                savingCustomStatusId === customStatus.id
+                              }
+                              onClick={() =>
+                                void handleSaveCustomStatus(customStatus.id)
+                              }
                               type="button"
                               variant="secondary"
                             >
@@ -1713,17 +1884,29 @@ export function AttendanceWorkspace({
             <CardHeader>
               <CardTitle>Attendance Records By Date Range</CardTitle>
               <CardDescription>
-                Review saved attendance records for a selected class and date range.
+                Review saved attendance records for a selected class and date
+                range.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                 <p className="text-slate-600">
-                  Showing records from <span className="font-medium text-slate-900">{formatDateLabel(rangeStartDate)}</span> to{" "}
-                  <span className="font-medium text-slate-900">{formatDateLabel(rangeEndDate)}</span>.
+                  Showing records from{" "}
+                  <span className="font-medium text-slate-900">
+                    {formatDateLabel(rangeStartDate)}
+                  </span>{" "}
+                  to{" "}
+                  <span className="font-medium text-slate-900">
+                    {formatDateLabel(rangeEndDate)}
+                  </span>
+                  .
                 </p>
                 <Button
-                  disabled={isLoadingRange || !selectedClassId}
+                  disabled={
+                    isLoadingRange ||
+                    !selectedClassId ||
+                    !selectedClass?.takesAttendance
+                  }
                   onClick={() => {
                     void loadRangeRecords();
                     void loadClassSummary();
@@ -1736,24 +1919,41 @@ export function AttendanceWorkspace({
               </div>
 
               {isLoadingRange ? (
-                <p className="text-sm text-slate-500">Loading attendance records...</p>
+                <p className="text-sm text-slate-500">
+                  Loading attendance records...
+                </p>
               ) : recordRange ? (
                 <div className="overflow-hidden rounded-xl border border-slate-200">
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                       <thead className="bg-slate-50/80">
                         <tr>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Date</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Remark</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Taken by</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Updated</th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Date
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Student
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Status
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Remark
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Taken by
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Updated
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 bg-white">
                         {rangeRows.map((entry) => (
-                          <tr className="align-top hover:bg-slate-50" key={entry.record.id}>
+                          <tr
+                            className="align-top hover:bg-slate-50"
+                            key={entry.record.id}
+                          >
                             <td className="px-4 py-3 text-slate-700">
                               {formatDateLabel(entry.sessionDate)}
                             </td>
@@ -1764,9 +1964,15 @@ export function AttendanceWorkspace({
                               )}
                             </td>
                             <td className="px-4 py-3 text-slate-700">
-                              <Badge variant={getStatusBadgeVariant(entry.record.status)}>
+                              <Badge
+                                variant={getStatusBadgeVariant(
+                                  entry.record.status,
+                                )}
+                              >
                                 {entry.record.customStatus?.label ??
-                                  formatAttendanceStatusLabel(entry.record.status)}
+                                  formatAttendanceStatusLabel(
+                                    entry.record.status,
+                                  )}
                               </Badge>
                             </td>
                             <td className="px-4 py-3 text-slate-600">
@@ -1815,7 +2021,8 @@ export function AttendanceWorkspace({
             <CardHeader>
               <CardTitle>Saved Attendance For Date</CardTitle>
               <CardDescription>
-                Existing saved attendance for {formatDateLabel(selectedDate)} within the current school context.
+                Existing saved attendance for {formatDateLabel(selectedDate)}{" "}
+                within the current school context.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1824,16 +2031,29 @@ export function AttendanceWorkspace({
                   <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                     <thead className="bg-slate-50/80">
                       <tr>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Scope</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Classes</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Taken by</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Updated</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Records</th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Scope
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Classes
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Taken by
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Updated
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Records
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white">
                       {schoolSessions.map((session) => (
-                        <tr className="align-top hover:bg-slate-50" key={session.id}>
+                        <tr
+                          className="align-top hover:bg-slate-50"
+                          key={session.id}
+                        >
                           <td className="px-4 py-4 text-slate-900">
                             {buildSessionLabel(session)}
                           </td>

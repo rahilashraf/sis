@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { UsersService } from './users.service';
+import { AuditService } from '../audit/audit.service';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -21,6 +22,9 @@ describe('UsersService', () => {
       findUnique: jest.Mock;
     };
     $transaction: jest.Mock;
+  };
+  let auditService: {
+    log: jest.Mock;
   };
 
   beforeEach(() => {
@@ -49,7 +53,11 @@ describe('UsersService', () => {
     }),
     };
 
-    service = new UsersService(prisma as never);
+    auditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+    };
+
+    service = new UsersService(prisma as never, auditService as unknown as AuditService);
   });
 
   it('does not scope list queries for admins', async () => {

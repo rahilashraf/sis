@@ -2,7 +2,13 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -136,7 +142,10 @@ function buildPayload(
     payload.allergies = normalizeText(form.allergies);
   }
 
-  if (normalizeText(form.medicalConditions) !== (original.medicalConditions ?? null)) {
+  if (
+    normalizeText(form.medicalConditions) !==
+    (original.medicalConditions ?? null)
+  ) {
     payload.medicalConditions = normalizeText(form.medicalConditions);
   }
 
@@ -144,23 +153,35 @@ function buildPayload(
     payload.guardian1Name = normalizeText(form.guardian1Name);
   }
 
-  if (normalizeText(form.guardian1Email) !== (original.guardian1Email ?? null)) {
+  if (
+    normalizeText(form.guardian1Email) !== (original.guardian1Email ?? null)
+  ) {
     payload.guardian1Email = normalizeText(form.guardian1Email);
   }
 
-  if (normalizeText(form.guardian1Phone) !== (original.guardian1Phone ?? null)) {
+  if (
+    normalizeText(form.guardian1Phone) !== (original.guardian1Phone ?? null)
+  ) {
     payload.guardian1Phone = normalizeText(form.guardian1Phone);
   }
 
-  if (normalizeText(form.guardian1Address) !== (original.guardian1Address ?? null)) {
+  if (
+    normalizeText(form.guardian1Address) !== (original.guardian1Address ?? null)
+  ) {
     payload.guardian1Address = normalizeText(form.guardian1Address);
   }
 
-  if (normalizeText(form.guardian1Relationship) !== (original.guardian1Relationship ?? null)) {
+  if (
+    normalizeText(form.guardian1Relationship) !==
+    (original.guardian1Relationship ?? null)
+  ) {
     payload.guardian1Relationship = normalizeText(form.guardian1Relationship);
   }
 
-  if (normalizeText(form.guardian1WorkPhone) !== (original.guardian1WorkPhone ?? null)) {
+  if (
+    normalizeText(form.guardian1WorkPhone) !==
+    (original.guardian1WorkPhone ?? null)
+  ) {
     payload.guardian1WorkPhone = normalizeText(form.guardian1WorkPhone);
   }
 
@@ -168,23 +189,35 @@ function buildPayload(
     payload.guardian2Name = normalizeText(form.guardian2Name);
   }
 
-  if (normalizeText(form.guardian2Email) !== (original.guardian2Email ?? null)) {
+  if (
+    normalizeText(form.guardian2Email) !== (original.guardian2Email ?? null)
+  ) {
     payload.guardian2Email = normalizeText(form.guardian2Email);
   }
 
-  if (normalizeText(form.guardian2Phone) !== (original.guardian2Phone ?? null)) {
+  if (
+    normalizeText(form.guardian2Phone) !== (original.guardian2Phone ?? null)
+  ) {
     payload.guardian2Phone = normalizeText(form.guardian2Phone);
   }
 
-  if (normalizeText(form.guardian2Address) !== (original.guardian2Address ?? null)) {
+  if (
+    normalizeText(form.guardian2Address) !== (original.guardian2Address ?? null)
+  ) {
     payload.guardian2Address = normalizeText(form.guardian2Address);
   }
 
-  if (normalizeText(form.guardian2Relationship) !== (original.guardian2Relationship ?? null)) {
+  if (
+    normalizeText(form.guardian2Relationship) !==
+    (original.guardian2Relationship ?? null)
+  ) {
     payload.guardian2Relationship = normalizeText(form.guardian2Relationship);
   }
 
-  if (normalizeText(form.guardian2WorkPhone) !== (original.guardian2WorkPhone ?? null)) {
+  if (
+    normalizeText(form.guardian2WorkPhone) !==
+    (original.guardian2WorkPhone ?? null)
+  ) {
     payload.guardian2WorkPhone = normalizeText(form.guardian2WorkPhone);
   }
 
@@ -208,11 +241,17 @@ function buildPayload(
     payload.postalCode = normalizeText(form.postalCode);
   }
 
-  if (normalizeText(form.emergencyContactName) !== (original.emergencyContactName ?? null)) {
+  if (
+    normalizeText(form.emergencyContactName) !==
+    (original.emergencyContactName ?? null)
+  ) {
     payload.emergencyContactName = normalizeText(form.emergencyContactName);
   }
 
-  if (normalizeText(form.emergencyContactPhone) !== (original.emergencyContactPhone ?? null)) {
+  if (
+    normalizeText(form.emergencyContactPhone) !==
+    (original.emergencyContactPhone ?? null)
+  ) {
     payload.emergencyContactPhone = normalizeText(form.emergencyContactPhone);
   }
 
@@ -220,7 +259,9 @@ function buildPayload(
     normalizeText(form.emergencyContactRelationship) !==
     (original.emergencyContactRelationship ?? null)
   ) {
-    payload.emergencyContactRelationship = normalizeText(form.emergencyContactRelationship);
+    payload.emergencyContactRelationship = normalizeText(
+      form.emergencyContactRelationship,
+    );
   }
 
   return payload;
@@ -274,7 +315,11 @@ export function ParentReRegistrationForm({
             : null,
         );
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load student.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load student.",
+        );
         setStudent(null);
         setForm(null);
         setSubmittedState(null);
@@ -299,7 +344,9 @@ export function ParentReRegistrationForm({
 
     try {
       if (!form.returningIntent) {
-        throw new Error("Please select whether the student is returning next year.");
+        throw new Error(
+          "Please select whether the student is returning next year.",
+        );
       }
 
       const returningNextYear = form.returningIntent === "YES";
@@ -312,8 +359,9 @@ export function ParentReRegistrationForm({
         throw new Error("Please select a reason for not returning.");
       }
 
-      const nonReturningComment =
-        returningNextYear ? null : normalizeText(form.nonReturningComment);
+      const nonReturningComment = returningNextYear
+        ? null
+        : normalizeText(form.nonReturningComment);
 
       const payload = buildPayload(student, form, {
         returningNextYear,
@@ -321,7 +369,9 @@ export function ParentReRegistrationForm({
         nonReturningComment,
       });
 
-      const updated = await reRegisterStudent(studentId, payload, { schoolYearId: schoolYearId ?? null });
+      const updated = await reRegisterStudent(studentId, payload, {
+        schoolYearId: schoolYearId ?? null,
+      });
       setStudent(updated);
       setForm((current) =>
         current
@@ -339,7 +389,11 @@ export function ParentReRegistrationForm({
       });
       setSuccessMessage("Re-registration submitted.");
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Unable to submit re-registration.");
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Unable to submit re-registration.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -375,7 +429,9 @@ export function ParentReRegistrationForm({
       {isLoading ? (
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Loading re-registration form...</p>
+            <p className="text-sm text-slate-500">
+              Loading re-registration form...
+            </p>
           </CardContent>
         </Card>
       ) : null}
@@ -390,322 +446,544 @@ export function ParentReRegistrationForm({
       {student && form ? (
         <form className="space-y-6" onSubmit={handleSubmit}>
           <fieldset className="space-y-6" disabled={isSubmitting || isReadOnly}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Returning next year</CardTitle>
-              <CardDescription>
-                This intent is required for re-registration submission tracking.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <Field htmlFor="rr-returning-intent" label="Will this student return next year?">
-                <Select
-                  id="rr-returning-intent"
-                  onChange={(event) =>
-                    setForm((current) =>
-                      current
-                        ? {
-                            ...current,
-                            returningIntent: event.target.value as FormState["returningIntent"],
-                            nonReturningReason:
-                              event.target.value === "NO" ? current.nonReturningReason : "",
-                            nonReturningComment:
-                              event.target.value === "NO" ? current.nonReturningComment : "",
-                          }
-                        : current,
-                    )
-                  }
-                  required
-                  value={form.returningIntent}
+            <Card>
+              <CardHeader>
+                <CardTitle>Returning next year</CardTitle>
+                <CardDescription>
+                  This intent is required for re-registration submission
+                  tracking.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <Field
+                  htmlFor="rr-returning-intent"
+                  label="Will this student return next year?"
                 >
-                  <option value="">Select an option</option>
-                  <option value="YES">Yes</option>
-                  <option value="NO">No</option>
-                </Select>
-              </Field>
-
-              {form.returningIntent === "NO" ? (
-                <Field htmlFor="rr-non-returning-reason" label="Reason for not returning">
                   <Select
-                    id="rr-non-returning-reason"
+                    id="rr-returning-intent"
                     onChange={(event) =>
                       setForm((current) =>
-                        current ? { ...current, nonReturningReason: event.target.value } : current,
+                        current
+                          ? {
+                              ...current,
+                              returningIntent: event.target
+                                .value as FormState["returningIntent"],
+                              nonReturningReason:
+                                event.target.value === "NO"
+                                  ? current.nonReturningReason
+                                  : "",
+                              nonReturningComment:
+                                event.target.value === "NO"
+                                  ? current.nonReturningComment
+                                  : "",
+                            }
+                          : current,
                       )
                     }
                     required
-                    value={form.nonReturningReason}
+                    value={form.returningIntent}
                   >
-                    <option value="">Select a reason</option>
-                    {NON_RETURNING_REASON_OPTIONS.map((reason) => (
-                      <option key={reason.value} value={reason.value}>
-                        {reason.label}
-                      </option>
-                    ))}
+                    <option value="">Select an option</option>
+                    <option value="YES">Yes</option>
+                    <option value="NO">No</option>
                   </Select>
                 </Field>
-              ) : null}
 
-              {form.returningIntent === "NO" ? (
-                <div className="md:col-span-2">
-                  <Field htmlFor="rr-non-returning-comment" label="Additional comments (optional)">
-                    <Textarea
-                      id="rr-non-returning-comment"
+                {form.returningIntent === "NO" ? (
+                  <Field
+                    htmlFor="rr-non-returning-reason"
+                    label="Reason for not returning"
+                  >
+                    <Select
+                      id="rr-non-returning-reason"
                       onChange={(event) =>
                         setForm((current) =>
                           current
-                            ? { ...current, nonReturningComment: event.target.value }
+                            ? {
+                                ...current,
+                                nonReturningReason: event.target.value,
+                              }
                             : current,
                         )
                       }
-                      rows={3}
-                      value={form.nonReturningComment}
+                      required
+                      value={form.nonReturningReason}
+                    >
+                      <option value="">Select a reason</option>
+                      {NON_RETURNING_REASON_OPTIONS.map((reason) => (
+                        <option key={reason.value} value={reason.value}>
+                          {reason.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                ) : null}
+
+                {form.returningIntent === "NO" ? (
+                  <div className="md:col-span-2">
+                    <Field
+                      htmlFor="rr-non-returning-comment"
+                      label="Additional comments (optional)"
+                    >
+                      <Textarea
+                        id="rr-non-returning-comment"
+                        onChange={(event) =>
+                          setForm((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  nonReturningComment: event.target.value,
+                                }
+                              : current,
+                          )
+                        }
+                        rows={3}
+                        value={form.nonReturningComment}
+                      />
+                    </Field>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Student info</CardTitle>
+                <CardDescription>
+                  Basic demographic and contact updates.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-3">
+                <Field htmlFor="rr-dob" label="Date of birth">
+                  <Input
+                    id="rr-dob"
+                    onChange={(event) =>
+                      setForm((current) =>
+                        current
+                          ? { ...current, dateOfBirth: event.target.value }
+                          : current,
+                      )
+                    }
+                    type="date"
+                    value={form.dateOfBirth}
+                  />
+                </Field>
+
+                <Field htmlFor="rr-gender" label="Gender">
+                  <Select
+                    id="rr-gender"
+                    onChange={(event) =>
+                      setForm((current) =>
+                        current
+                          ? { ...current, gender: event.target.value }
+                          : current,
+                      )
+                    }
+                    value={form.gender}
+                  >
+                    <option value="">Not specified</option>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                  </Select>
+                </Field>
+
+                <Field htmlFor="rr-student-email" label="Student email">
+                  <Input
+                    id="rr-student-email"
+                    onChange={(event) =>
+                      setForm((current) =>
+                        current
+                          ? { ...current, studentEmail: event.target.value }
+                          : current,
+                      )
+                    }
+                    type="email"
+                    value={form.studentEmail}
+                  />
+                </Field>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Address</CardTitle>
+                <CardDescription>
+                  Primary home address for this student.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <Field htmlFor="rr-address1" label="Address line 1">
+                  <Input
+                    id="rr-address1"
+                    onChange={(event) =>
+                      setForm((current) =>
+                        current
+                          ? { ...current, addressLine1: event.target.value }
+                          : current,
+                      )
+                    }
+                    value={form.addressLine1}
+                  />
+                </Field>
+                <Field htmlFor="rr-address2" label="Address line 2">
+                  <Input
+                    id="rr-address2"
+                    onChange={(event) =>
+                      setForm((current) =>
+                        current
+                          ? { ...current, addressLine2: event.target.value }
+                          : current,
+                      )
+                    }
+                    value={form.addressLine2}
+                  />
+                </Field>
+                <Field htmlFor="rr-city" label="City">
+                  <Input
+                    id="rr-city"
+                    onChange={(event) =>
+                      setForm((current) =>
+                        current
+                          ? { ...current, city: event.target.value }
+                          : current,
+                      )
+                    }
+                    value={form.city}
+                  />
+                </Field>
+                <Field htmlFor="rr-province" label="Province/State">
+                  <Input
+                    id="rr-province"
+                    onChange={(event) =>
+                      setForm((current) =>
+                        current
+                          ? { ...current, province: event.target.value }
+                          : current,
+                      )
+                    }
+                    value={form.province}
+                  />
+                </Field>
+                <Field htmlFor="rr-postal" label="Postal code">
+                  <Input
+                    id="rr-postal"
+                    onChange={(event) =>
+                      setForm((current) =>
+                        current
+                          ? { ...current, postalCode: event.target.value }
+                          : current,
+                      )
+                    }
+                    value={form.postalCode}
+                  />
+                </Field>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Guardians</CardTitle>
+                <CardDescription>
+                  Update guardian contact information.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field htmlFor="rr-g1-name" label="Guardian 1 name">
+                    <Input
+                      id="rr-g1-name"
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? { ...current, guardian1Name: event.target.value }
+                            : current,
+                        )
+                      }
+                      value={form.guardian1Name}
+                    />
+                  </Field>
+                  <Field htmlFor="rr-g1-email" label="Guardian 1 email">
+                    <Input
+                      id="rr-g1-email"
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? { ...current, guardian1Email: event.target.value }
+                            : current,
+                        )
+                      }
+                      type="email"
+                      value={form.guardian1Email}
+                    />
+                  </Field>
+                  <Field htmlFor="rr-g1-phone" label="Guardian 1 phone">
+                    <Input
+                      id="rr-g1-phone"
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? { ...current, guardian1Phone: event.target.value }
+                            : current,
+                        )
+                      }
+                      value={form.guardian1Phone}
+                    />
+                  </Field>
+                  <Field htmlFor="rr-g1-work" label="Guardian 1 work phone">
+                    <Input
+                      id="rr-g1-work"
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                guardian1WorkPhone: event.target.value,
+                              }
+                            : current,
+                        )
+                      }
+                      value={form.guardian1WorkPhone}
+                    />
+                  </Field>
+                  <Field
+                    htmlFor="rr-g1-relationship"
+                    label="Guardian 1 relationship"
+                  >
+                    <Input
+                      id="rr-g1-relationship"
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                guardian1Relationship: event.target.value,
+                              }
+                            : current,
+                        )
+                      }
+                      value={form.guardian1Relationship}
+                    />
+                  </Field>
+                  <Field htmlFor="rr-g1-address" label="Guardian 1 address">
+                    <Input
+                      id="rr-g1-address"
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                guardian1Address: event.target.value,
+                              }
+                            : current,
+                        )
+                      }
+                      value={form.guardian1Address}
                     />
                   </Field>
                 </div>
-              ) : null}
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Student info</CardTitle>
-              <CardDescription>Basic demographic and contact updates.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-3">
-              <Field htmlFor="rr-dob" label="Date of birth">
-                <Input
-                  id="rr-dob"
-                  onChange={(event) => setForm((current) => (current ? { ...current, dateOfBirth: event.target.value } : current))}
-                  type="date"
-                  value={form.dateOfBirth}
-                />
-              </Field>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field htmlFor="rr-g2-name" label="Guardian 2 name">
+                    <Input
+                      id="rr-g2-name"
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? { ...current, guardian2Name: event.target.value }
+                            : current,
+                        )
+                      }
+                      value={form.guardian2Name}
+                    />
+                  </Field>
+                  <Field htmlFor="rr-g2-email" label="Guardian 2 email">
+                    <Input
+                      id="rr-g2-email"
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? { ...current, guardian2Email: event.target.value }
+                            : current,
+                        )
+                      }
+                      type="email"
+                      value={form.guardian2Email}
+                    />
+                  </Field>
+                  <Field htmlFor="rr-g2-phone" label="Guardian 2 phone">
+                    <Input
+                      id="rr-g2-phone"
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? { ...current, guardian2Phone: event.target.value }
+                            : current,
+                        )
+                      }
+                      value={form.guardian2Phone}
+                    />
+                  </Field>
+                  <Field htmlFor="rr-g2-work" label="Guardian 2 work phone">
+                    <Input
+                      id="rr-g2-work"
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                guardian2WorkPhone: event.target.value,
+                              }
+                            : current,
+                        )
+                      }
+                      value={form.guardian2WorkPhone}
+                    />
+                  </Field>
+                  <Field
+                    htmlFor="rr-g2-relationship"
+                    label="Guardian 2 relationship"
+                  >
+                    <Input
+                      id="rr-g2-relationship"
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                guardian2Relationship: event.target.value,
+                              }
+                            : current,
+                        )
+                      }
+                      value={form.guardian2Relationship}
+                    />
+                  </Field>
+                  <Field htmlFor="rr-g2-address" label="Guardian 2 address">
+                    <Input
+                      id="rr-g2-address"
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                guardian2Address: event.target.value,
+                              }
+                            : current,
+                        )
+                      }
+                      value={form.guardian2Address}
+                    />
+                  </Field>
+                </div>
+              </CardContent>
+            </Card>
 
-              <Field htmlFor="rr-gender" label="Gender">
-                <Select
-                  id="rr-gender"
-                  onChange={(event) => setForm((current) => (current ? { ...current, gender: event.target.value } : current))}
-                  value={form.gender}
+            <Card>
+              <CardHeader>
+                <CardTitle>Health and emergency</CardTitle>
+                <CardDescription>
+                  Optional notes used by the school.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <Field htmlFor="rr-allergies" label="Allergies">
+                  <Textarea
+                    id="rr-allergies"
+                    onChange={(event) =>
+                      setForm((current) =>
+                        current
+                          ? { ...current, allergies: event.target.value }
+                          : current,
+                      )
+                    }
+                    rows={3}
+                    value={form.allergies}
+                  />
+                </Field>
+                <Field htmlFor="rr-medical" label="Medical conditions">
+                  <Textarea
+                    id="rr-medical"
+                    onChange={(event) =>
+                      setForm((current) =>
+                        current
+                          ? {
+                              ...current,
+                              medicalConditions: event.target.value,
+                            }
+                          : current,
+                      )
+                    }
+                    rows={3}
+                    value={form.medicalConditions}
+                  />
+                </Field>
+                <Field
+                  htmlFor="rr-emergency-name"
+                  label="Emergency contact name"
                 >
-                  <option value="">Not specified</option>
-                  <option value="MALE">Male</option>
-                  <option value="FEMALE">Female</option>
-                </Select>
-              </Field>
+                  <Input
+                    id="rr-emergency-name"
+                    onChange={(event) =>
+                      setForm((current) =>
+                        current
+                          ? {
+                              ...current,
+                              emergencyContactName: event.target.value,
+                            }
+                          : current,
+                      )
+                    }
+                    value={form.emergencyContactName}
+                  />
+                </Field>
+                <Field
+                  htmlFor="rr-emergency-phone"
+                  label="Emergency contact phone"
+                >
+                  <Input
+                    id="rr-emergency-phone"
+                    onChange={(event) =>
+                      setForm((current) =>
+                        current
+                          ? {
+                              ...current,
+                              emergencyContactPhone: event.target.value,
+                            }
+                          : current,
+                      )
+                    }
+                    value={form.emergencyContactPhone}
+                  />
+                </Field>
+                <Field
+                  htmlFor="rr-emergency-relationship"
+                  label="Emergency contact relationship"
+                >
+                  <Input
+                    id="rr-emergency-relationship"
+                    onChange={(event) =>
+                      setForm((current) =>
+                        current
+                          ? {
+                              ...current,
+                              emergencyContactRelationship: event.target.value,
+                            }
+                          : current,
+                      )
+                    }
+                    value={form.emergencyContactRelationship}
+                  />
+                </Field>
+              </CardContent>
+            </Card>
 
-              <Field htmlFor="rr-student-email" label="Student email">
-                <Input
-                  id="rr-student-email"
-                  onChange={(event) => setForm((current) => (current ? { ...current, studentEmail: event.target.value } : current))}
-                  type="email"
-                  value={form.studentEmail}
-                />
-              </Field>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Address</CardTitle>
-              <CardDescription>Primary home address for this student.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <Field htmlFor="rr-address1" label="Address line 1">
-                <Input
-                  id="rr-address1"
-                  onChange={(event) => setForm((current) => (current ? { ...current, addressLine1: event.target.value } : current))}
-                  value={form.addressLine1}
-                />
-              </Field>
-              <Field htmlFor="rr-address2" label="Address line 2">
-                <Input
-                  id="rr-address2"
-                  onChange={(event) => setForm((current) => (current ? { ...current, addressLine2: event.target.value } : current))}
-                  value={form.addressLine2}
-                />
-              </Field>
-              <Field htmlFor="rr-city" label="City">
-                <Input
-                  id="rr-city"
-                  onChange={(event) => setForm((current) => (current ? { ...current, city: event.target.value } : current))}
-                  value={form.city}
-                />
-              </Field>
-              <Field htmlFor="rr-province" label="Province/State">
-                <Input
-                  id="rr-province"
-                  onChange={(event) => setForm((current) => (current ? { ...current, province: event.target.value } : current))}
-                  value={form.province}
-                />
-              </Field>
-              <Field htmlFor="rr-postal" label="Postal code">
-                <Input
-                  id="rr-postal"
-                  onChange={(event) => setForm((current) => (current ? { ...current, postalCode: event.target.value } : current))}
-                  value={form.postalCode}
-                />
-              </Field>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Guardians</CardTitle>
-              <CardDescription>Update guardian contact information.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field htmlFor="rr-g1-name" label="Guardian 1 name">
-                  <Input
-                    id="rr-g1-name"
-                    onChange={(event) => setForm((current) => (current ? { ...current, guardian1Name: event.target.value } : current))}
-                    value={form.guardian1Name}
-                  />
-                </Field>
-                <Field htmlFor="rr-g1-email" label="Guardian 1 email">
-                  <Input
-                    id="rr-g1-email"
-                    onChange={(event) => setForm((current) => (current ? { ...current, guardian1Email: event.target.value } : current))}
-                    type="email"
-                    value={form.guardian1Email}
-                  />
-                </Field>
-                <Field htmlFor="rr-g1-phone" label="Guardian 1 phone">
-                  <Input
-                    id="rr-g1-phone"
-                    onChange={(event) => setForm((current) => (current ? { ...current, guardian1Phone: event.target.value } : current))}
-                    value={form.guardian1Phone}
-                  />
-                </Field>
-                <Field htmlFor="rr-g1-work" label="Guardian 1 work phone">
-                  <Input
-                    id="rr-g1-work"
-                    onChange={(event) => setForm((current) => (current ? { ...current, guardian1WorkPhone: event.target.value } : current))}
-                    value={form.guardian1WorkPhone}
-                  />
-                </Field>
-                <Field htmlFor="rr-g1-relationship" label="Guardian 1 relationship">
-                  <Input
-                    id="rr-g1-relationship"
-                    onChange={(event) => setForm((current) => (current ? { ...current, guardian1Relationship: event.target.value } : current))}
-                    value={form.guardian1Relationship}
-                  />
-                </Field>
-                <Field htmlFor="rr-g1-address" label="Guardian 1 address">
-                  <Input
-                    id="rr-g1-address"
-                    onChange={(event) => setForm((current) => (current ? { ...current, guardian1Address: event.target.value } : current))}
-                    value={form.guardian1Address}
-                  />
-                </Field>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field htmlFor="rr-g2-name" label="Guardian 2 name">
-                  <Input
-                    id="rr-g2-name"
-                    onChange={(event) => setForm((current) => (current ? { ...current, guardian2Name: event.target.value } : current))}
-                    value={form.guardian2Name}
-                  />
-                </Field>
-                <Field htmlFor="rr-g2-email" label="Guardian 2 email">
-                  <Input
-                    id="rr-g2-email"
-                    onChange={(event) => setForm((current) => (current ? { ...current, guardian2Email: event.target.value } : current))}
-                    type="email"
-                    value={form.guardian2Email}
-                  />
-                </Field>
-                <Field htmlFor="rr-g2-phone" label="Guardian 2 phone">
-                  <Input
-                    id="rr-g2-phone"
-                    onChange={(event) => setForm((current) => (current ? { ...current, guardian2Phone: event.target.value } : current))}
-                    value={form.guardian2Phone}
-                  />
-                </Field>
-                <Field htmlFor="rr-g2-work" label="Guardian 2 work phone">
-                  <Input
-                    id="rr-g2-work"
-                    onChange={(event) => setForm((current) => (current ? { ...current, guardian2WorkPhone: event.target.value } : current))}
-                    value={form.guardian2WorkPhone}
-                  />
-                </Field>
-                <Field htmlFor="rr-g2-relationship" label="Guardian 2 relationship">
-                  <Input
-                    id="rr-g2-relationship"
-                    onChange={(event) => setForm((current) => (current ? { ...current, guardian2Relationship: event.target.value } : current))}
-                    value={form.guardian2Relationship}
-                  />
-                </Field>
-                <Field htmlFor="rr-g2-address" label="Guardian 2 address">
-                  <Input
-                    id="rr-g2-address"
-                    onChange={(event) => setForm((current) => (current ? { ...current, guardian2Address: event.target.value } : current))}
-                    value={form.guardian2Address}
-                  />
-                </Field>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Health and emergency</CardTitle>
-              <CardDescription>Optional notes used by the school.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <Field htmlFor="rr-allergies" label="Allergies">
-                <Textarea
-                  id="rr-allergies"
-                  onChange={(event) => setForm((current) => (current ? { ...current, allergies: event.target.value } : current))}
-                  rows={3}
-                  value={form.allergies}
-                />
-              </Field>
-              <Field htmlFor="rr-medical" label="Medical conditions">
-                <Textarea
-                  id="rr-medical"
-                  onChange={(event) => setForm((current) => (current ? { ...current, medicalConditions: event.target.value } : current))}
-                  rows={3}
-                  value={form.medicalConditions}
-                />
-              </Field>
-              <Field htmlFor="rr-emergency-name" label="Emergency contact name">
-                <Input
-                  id="rr-emergency-name"
-                  onChange={(event) => setForm((current) => (current ? { ...current, emergencyContactName: event.target.value } : current))}
-                  value={form.emergencyContactName}
-                />
-              </Field>
-              <Field htmlFor="rr-emergency-phone" label="Emergency contact phone">
-                <Input
-                  id="rr-emergency-phone"
-                  onChange={(event) => setForm((current) => (current ? { ...current, emergencyContactPhone: event.target.value } : current))}
-                  value={form.emergencyContactPhone}
-                />
-              </Field>
-              <Field htmlFor="rr-emergency-relationship" label="Emergency contact relationship">
-                <Input
-                  id="rr-emergency-relationship"
-                  onChange={(event) =>
-                    setForm((current) =>
-                      current ? { ...current, emergencyContactRelationship: event.target.value } : current,
-                    )
-                  }
-                  value={form.emergencyContactRelationship}
-                />
-              </Field>
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-end">
-            {!isReadOnly ? (
-              <Button disabled={isSubmitting} type="submit">
-                {isSubmitting ? "Submitting..." : "Submit updates"}
-              </Button>
-            ) : null}
-          </div>
+            <div className="flex justify-end">
+              {!isReadOnly ? (
+                <Button disabled={isSubmitting} type="submit">
+                  {isSubmitting ? "Submitting..." : "Submit updates"}
+                </Button>
+              ) : null}
+            </div>
           </fieldset>
         </form>
       ) : null}

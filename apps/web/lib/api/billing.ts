@@ -55,15 +55,13 @@ export type BillingCharge = {
     description: string | null;
     isActive: boolean;
   };
-  schoolYear:
-    | {
-        id: string;
-        name: string;
-        startDate: string;
-        endDate: string;
-        isActive: boolean;
-      }
-    | null;
+  schoolYear: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    isActive: boolean;
+  } | null;
   libraryFine: {
     id: string;
     reason: LibraryFineReason;
@@ -242,9 +240,12 @@ export function updateBillingCategory(
 }
 
 export function archiveBillingCategory(categoryId: string) {
-  return apiFetch<BillingCategory>(`/billing/categories/${categoryId}/archive`, {
-    method: "PATCH",
-  });
+  return apiFetch<BillingCategory>(
+    `/billing/categories/${categoryId}/archive`,
+    {
+      method: "PATCH",
+    },
+  );
 }
 
 // ── Student account summary ────────────────────────────────────────────────
@@ -405,7 +406,10 @@ export function normalizeBillingMoneyValue(value: unknown): string {
     const decimalLike = value as DecimalLikeObject;
 
     const methodString = decimalLike.toString?.();
-    if (typeof methodString === "string" && methodString !== "[object Object]") {
+    if (
+      typeof methodString === "string" &&
+      methodString !== "[object Object]"
+    ) {
       const parsed = Number(methodString);
       if (Number.isFinite(parsed)) {
         return methodString;
@@ -517,7 +521,9 @@ export function createBillingPayment(input: CreateBillingPaymentInput) {
   });
 }
 
-export function createBatchBillingPayments(input: CreateBatchBillingPaymentsInput) {
+export function createBatchBillingPayments(
+  input: CreateBatchBillingPaymentsInput,
+) {
   return apiFetch<BatchBillingPaymentResult>("/billing/payments/batch", {
     method: "POST",
     json: input,
@@ -539,9 +545,7 @@ export function voidBillingPayment(
   });
 }
 
-export function getParentStudentAccountSummary(
-  studentId: string,
-) {
+export function getParentStudentAccountSummary(studentId: string) {
   return apiFetch<StudentAccountSummary>(
     `/billing/parent/students/${studentId}/account-summary`,
   ).then(normalizeStudentAccountSummary);
@@ -621,31 +625,31 @@ export function listBillingOverdue(options?: {
   const query = new URLSearchParams();
 
   if (options?.schoolId) {
-    query.set('schoolId', options.schoolId);
+    query.set("schoolId", options.schoolId);
   }
 
   if (options?.search) {
-    query.set('search', options.search);
+    query.set("search", options.search);
   }
 
   if (options?.minAmount) {
-    query.set('minAmount', options.minAmount);
+    query.set("minAmount", options.minAmount);
   }
 
   if (options?.classId) {
-    query.set('classId', options.classId);
+    query.set("classId", options.classId);
   }
 
   if (options?.page) {
-    query.set('page', String(options.page));
+    query.set("page", String(options.page));
   }
 
   if (options?.limit) {
-    query.set('limit', String(options.limit));
+    query.set("limit", String(options.limit));
   }
 
   return apiFetch<BillingOverdueResponse>(
-    `/billing/overdue${query.size ? `?${query.toString()}` : ''}`,
+    `/billing/overdue${query.size ? `?${query.toString()}` : ""}`,
   ).then(normalizeBillingOverdueResponse);
 }
 
@@ -737,7 +741,9 @@ export type BillingSummaryReport = {
   currentOverdue: string;
 };
 
-function normalizePaymentsReport(report: BillingPaymentsReport): BillingPaymentsReport {
+function normalizePaymentsReport(
+  report: BillingPaymentsReport,
+): BillingPaymentsReport {
   return {
     ...report,
     items: report.items.map((item) => ({
@@ -751,7 +757,9 @@ function normalizePaymentsReport(report: BillingPaymentsReport): BillingPayments
   };
 }
 
-function normalizeChargesReport(report: BillingChargesReport): BillingChargesReport {
+function normalizeChargesReport(
+  report: BillingChargesReport,
+): BillingChargesReport {
   return {
     ...report,
     items: report.items.map((item) => ({
@@ -780,16 +788,22 @@ function normalizeOutstandingReport(
     })),
     totals: {
       ...report.totals,
-      totalOutstanding: normalizeBillingMoneyValue(report.totals.totalOutstanding),
+      totalOutstanding: normalizeBillingMoneyValue(
+        report.totals.totalOutstanding,
+      ),
       totalOverdue: normalizeBillingMoneyValue(report.totals.totalOverdue),
     },
   };
 }
 
-function normalizeSummaryReport(report: BillingSummaryReport): BillingSummaryReport {
+function normalizeSummaryReport(
+  report: BillingSummaryReport,
+): BillingSummaryReport {
   return {
     totalChargesIssued: normalizeBillingMoneyValue(report.totalChargesIssued),
-    totalPaymentsReceived: normalizeBillingMoneyValue(report.totalPaymentsReceived),
+    totalPaymentsReceived: normalizeBillingMoneyValue(
+      report.totalPaymentsReceived,
+    ),
     totalVoidedPayments: normalizeBillingMoneyValue(report.totalVoidedPayments),
     currentOutstanding: normalizeBillingMoneyValue(report.currentOutstanding),
     currentOverdue: normalizeBillingMoneyValue(report.currentOverdue),
@@ -984,7 +998,9 @@ export function getPaymentReceipt(paymentId: string): Promise<PaymentReceipt> {
   return apiFetch(`/billing/payments/${paymentId}/receipt`);
 }
 
-export function getParentPaymentReceipt(paymentId: string): Promise<PaymentReceipt> {
+export function getParentPaymentReceipt(
+  paymentId: string,
+): Promise<PaymentReceipt> {
   return apiFetch(`/billing/parent/payments/${paymentId}/receipt`);
 }
 
@@ -1023,6 +1039,8 @@ export function getStudentStatement(
   );
 }
 
-export function getParentStudentStatement(studentId: string): Promise<StudentStatement> {
+export function getParentStudentStatement(
+  studentId: string,
+): Promise<StudentStatement> {
   return apiFetch(`/billing/parent/students/${studentId}/statement`);
 }

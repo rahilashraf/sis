@@ -21,13 +21,22 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { formatRoleLabel } from "@/lib/utils";
 import { listGradeLevels, type GradeLevel } from "@/lib/api/grade-levels";
 import {
+  listSchools,
+  listSchoolYears,
+  type School,
+  type SchoolYear,
+} from "@/lib/api/schools";
+import {
   listEnrollmentSubjectOptions,
   type EnrollmentSubjectOption,
 } from "@/lib/api/enrollment-history";
 import {
   assignTeacher,
+  copyGradebookSettings,
+  duplicateClass,
   enrollStudent,
   getClassById,
+  listClasses,
   removeStudent,
   removeTeacher,
   updateTeacherAssignment,
@@ -47,6 +56,7 @@ type ClassEditFormState = {
   gradeLevelId: string;
   subjectOptionId: string;
   isHomeroom: boolean;
+  takesAttendance: boolean;
   isActive: boolean;
 };
 
@@ -56,7 +66,24 @@ function buildEditForm(schoolClass: SchoolClass): ClassEditFormState {
     gradeLevelId: schoolClass.gradeLevelId ?? "",
     subjectOptionId: schoolClass.subjectOptionId ?? "",
     isHomeroom: schoolClass.isHomeroom,
+    takesAttendance: schoolClass.takesAttendance,
     isActive: schoolClass.isActive,
+  };
+}
+
+function buildDuplicateClassForm(
+  schoolClass: SchoolClass,
+): DuplicateClassFormState {
+  return {
+    targetSchoolId: schoolClass.schoolId,
+    targetSchoolYearId: schoolClass.schoolYearId,
+    targetGradeLevelId: schoolClass.gradeLevelId ?? "",
+    targetSubjectOptionId: schoolClass.subjectOptionId ?? "",
+    targetName: `${schoolClass.name} (Copy)`,
+    targetTeacherId: "",
+    isHomeroom: schoolClass.isHomeroom,
+    takesAttendance: schoolClass.takesAttendance,
+    copyAssessmentCategories: true,
   };
 }
 
@@ -64,6 +91,18 @@ type TeacherAssignmentDraft = {
   assignmentType: TeacherAssignmentType;
   startsAt: string;
   endsAt: string;
+};
+
+type DuplicateClassFormState = {
+  targetSchoolId: string;
+  targetSchoolYearId: string;
+  targetGradeLevelId: string;
+  targetSubjectOptionId: string;
+  targetName: string;
+  targetTeacherId: string;
+  isHomeroom: boolean;
+  takesAttendance: boolean;
+  copyAssessmentCategories: boolean;
 };
 
 function toDateTimeLocal(value: string | null | undefined) {
@@ -96,7 +135,9 @@ function toIsoOrNull(value: string) {
   return parsed.toISOString();
 }
 
-function mapAssignmentToDraft(assignment: TeacherAssignment): TeacherAssignmentDraft {
+function mapAssignmentToDraft(
+  assignment: TeacherAssignment,
+): TeacherAssignmentDraft {
   return {
     assignmentType: assignment.assignmentType,
     startsAt: toDateTimeLocal(assignment.startsAt),
@@ -109,13 +150,29 @@ export function ClassDetail({ classId }: { classId: string }) {
   const [schoolClass, setSchoolClass] = useState<SchoolClass | null>(null);
   const [teachers, setTeachers] = useState<ManagedUser[]>([]);
   const [students, setStudents] = useState<ManagedUser[]>([]);
+  const [schools, setSchools] = useState<School[]>([]);
+  const [allClasses, setAllClasses] = useState<SchoolClass[]>([]);
   const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
-  const [subjectOptions, setSubjectOptions] = useState<EnrollmentSubjectOption[]>([]);
+  const [duplicateGradeLevels, setDuplicateGradeLevels] = useState<
+    GradeLevel[]
+  >([]);
+  const [duplicateSchoolYears, setDuplicateSchoolYears] = useState<
+    SchoolYear[]
+  >([]);
+  const [subjectOptions, setSubjectOptions] = useState<
+    EnrollmentSubjectOption[]
+  >([]);
   const [editForm, setEditForm] = useState<ClassEditFormState | null>(null);
+  const [duplicateForm, setDuplicateForm] =
+    useState<DuplicateClassFormState | null>(null);
+  const [copyTargetClassId, setCopyTargetClassId] = useState("");
+  const [copyAssessmentCategoriesEnabled, setCopyAssessmentCategoriesEnabled] =
+    useState(false);
   const [teacherId, setTeacherId] = useState("");
   const [teacherAssignmentType, setTeacherAssignmentType] =
     useState<TeacherAssignmentType>("REGULAR");
-  const [teacherAssignmentStartsAt, setTeacherAssignmentStartsAt] = useState("");
+  const [teacherAssignmentStartsAt, setTeacherAssignmentStartsAt] =
+    useState("");
   const [teacherAssignmentEndsAt, setTeacherAssignmentEndsAt] = useState("");
   const [assignmentDraftByTeacherId, setAssignmentDraftByTeacherId] = useState<
     Record<string, TeacherAssignmentDraft>
@@ -123,6 +180,8 @@ export function ClassDetail({ classId }: { classId: string }) {
   const [studentId, setStudentId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
+  const [isCopyingSettings, setIsCopyingSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -139,6 +198,7 @@ export function ClassDetail({ classId }: { classId: string }) {
         const classResponse = await getClassById(classId);
         setSchoolClass(classResponse);
         setEditForm(buildEditForm(classResponse));
+        setDuplicateForm(buildDuplicateClassForm(classResponse));
         setAssignmentDraftByTeacherId(
           Object.fromEntries(
             classResponse.teachers.map((assignment) => [
@@ -149,10 +209,20 @@ export function ClassDetail({ classId }: { classId: string }) {
         );
 
         if (canManageClasses) {
-          const [userResponse, gradeLevelResponse, subjectOptionResponse] = await Promise.all([
+          const [
+            userResponse,
+            gradeLevelResponse,
+            subjectOptionResponse,
+            schoolResponse,
+            classDirectoryResponse,
+            schoolYearResponse,
+          ] = await Promise.all([
             listUsers(),
             listGradeLevels(classResponse.schoolId, { includeInactive: false }),
             listEnrollmentSubjectOptions({ includeInactive: false }),
+            listSchools(),
+            listClasses({ includeInactive: true }),
+            listSchoolYears(classResponse.schoolId),
           ]);
           const classTeachers = userResponse.filter(
             (user) =>
@@ -171,10 +241,26 @@ export function ClassDetail({ classId }: { classId: string }) {
 
           setTeachers(classTeachers);
           setStudents(classStudents);
-          setGradeLevels(gradeLevelResponse.filter((gradeLevel) => gradeLevel.isActive));
-          setSubjectOptions(subjectOptionResponse.filter((option) => option.isActive));
+          setSchools(schoolResponse);
+          setAllClasses(
+            classDirectoryResponse.filter((entry) => entry.id !== classId),
+          );
+          setGradeLevels(
+            gradeLevelResponse.filter((gradeLevel) => gradeLevel.isActive),
+          );
+          setDuplicateGradeLevels(
+            gradeLevelResponse.filter((gradeLevel) => gradeLevel.isActive),
+          );
+          setDuplicateSchoolYears(schoolYearResponse);
+          setSubjectOptions(
+            subjectOptionResponse.filter((option) => option.isActive),
+          );
           setTeacherId(classTeachers[0]?.id ?? "");
           setStudentId(classStudents[0]?.id ?? "");
+          setCopyTargetClassId(
+            classDirectoryResponse.find((entry) => entry.id !== classId)?.id ??
+              "",
+          );
         }
       } catch (loadError) {
         setError(
@@ -212,12 +298,66 @@ export function ClassDetail({ classId }: { classId: string }) {
       return;
     }
 
-    setTeacherAssignmentType(selectedTeacher.role === "SUPPLY_TEACHER" ? "SUPPLY" : "REGULAR");
+    setTeacherAssignmentType(
+      selectedTeacher.role === "SUPPLY_TEACHER" ? "SUPPLY" : "REGULAR",
+    );
     if (selectedTeacher.role !== "SUPPLY_TEACHER") {
       setTeacherAssignmentStartsAt("");
       setTeacherAssignmentEndsAt("");
     }
   }, [selectedTeacher]);
+
+  useEffect(() => {
+    async function loadDuplicateTargetContext() {
+      if (!duplicateForm?.targetSchoolId || !canManageClasses) {
+        return;
+      }
+
+      try {
+        const [years, levels] = await Promise.all([
+          listSchoolYears(duplicateForm.targetSchoolId),
+          listGradeLevels(duplicateForm.targetSchoolId, {
+            includeInactive: false,
+          }),
+        ]);
+        setDuplicateSchoolYears(years);
+        setDuplicateGradeLevels(
+          levels.filter((gradeLevel) => gradeLevel.isActive),
+        );
+        setDuplicateForm((current) => {
+          if (
+            !current ||
+            current.targetSchoolId !== duplicateForm.targetSchoolId
+          ) {
+            return current;
+          }
+
+          return {
+            ...current,
+            targetSchoolYearId:
+              years.find((entry) => entry.id === current.targetSchoolYearId)
+                ?.id ??
+              years.find((entry) => entry.isActive)?.id ??
+              years[0]?.id ??
+              "",
+            targetGradeLevelId:
+              levels.find((entry) => entry.id === current.targetGradeLevelId)
+                ?.id ??
+              levels[0]?.id ??
+              "",
+          };
+        });
+      } catch (loadError) {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load duplication options.",
+        );
+      }
+    }
+
+    void loadDuplicateTargetContext();
+  }, [canManageClasses, duplicateForm?.targetSchoolId]);
 
   const availableStudents = useMemo(() => {
     if (!schoolClass) {
@@ -230,6 +370,22 @@ export function ClassDetail({ classId }: { classId: string }) {
 
     return students.filter((student) => !enrolledStudentIds.has(student.id));
   }, [schoolClass, students]);
+
+  const copyTargetClassOptions = useMemo(() => {
+    return allClasses.filter((entry) => entry.id !== classId);
+  }, [allClasses, classId]);
+
+  const duplicateTeacherOptions = useMemo(() => {
+    if (!duplicateForm?.targetSchoolId) {
+      return [];
+    }
+
+    return teachers.filter((teacher) =>
+      teacher.memberships.some(
+        (membership) => membership.schoolId === duplicateForm.targetSchoolId,
+      ),
+    );
+  }, [duplicateForm?.targetSchoolId, teachers]);
 
   async function refreshClass() {
     const classResponse = await getClassById(classId);
@@ -262,6 +418,7 @@ export function ClassDetail({ classId }: { classId: string }) {
         gradeLevelId: editForm.gradeLevelId,
         subjectOptionId: editForm.subjectOptionId,
         isHomeroom: editForm.isHomeroom,
+        takesAttendance: editForm.takesAttendance,
         isActive: editForm.isActive,
       });
 
@@ -291,10 +448,17 @@ export function ClassDetail({ classId }: { classId: string }) {
 
     try {
       const assignmentType =
-        selectedTeacher?.role === "SUPPLY_TEACHER" ? "SUPPLY" : teacherAssignmentType;
+        selectedTeacher?.role === "SUPPLY_TEACHER"
+          ? "SUPPLY"
+          : teacherAssignmentType;
       const startsAt =
-        assignmentType === "SUPPLY" ? toIsoOrNull(teacherAssignmentStartsAt) : null;
-      const endsAt = assignmentType === "SUPPLY" ? toIsoOrNull(teacherAssignmentEndsAt) : null;
+        assignmentType === "SUPPLY"
+          ? toIsoOrNull(teacherAssignmentStartsAt)
+          : null;
+      const endsAt =
+        assignmentType === "SUPPLY"
+          ? toIsoOrNull(teacherAssignmentEndsAt)
+          : null;
 
       await assignTeacher(classId, {
         teacherId,
@@ -303,7 +467,9 @@ export function ClassDetail({ classId }: { classId: string }) {
         endsAt,
       });
       await refreshClass();
-      setTeacherId(availableTeachers.find((teacher) => teacher.id !== teacherId)?.id ?? "");
+      setTeacherId(
+        availableTeachers.find((teacher) => teacher.id !== teacherId)?.id ?? "",
+      );
       setTeacherAssignmentType("REGULAR");
       setTeacherAssignmentStartsAt("");
       setTeacherAssignmentEndsAt("");
@@ -360,8 +526,12 @@ export function ClassDetail({ classId }: { classId: string }) {
     try {
       await updateTeacherAssignment(classId, assignment.teacherId, {
         assignmentType: draft.assignmentType,
-        startsAt: draft.assignmentType === "SUPPLY" ? toIsoOrNull(draft.startsAt) : null,
-        endsAt: draft.assignmentType === "SUPPLY" ? toIsoOrNull(draft.endsAt) : null,
+        startsAt:
+          draft.assignmentType === "SUPPLY"
+            ? toIsoOrNull(draft.startsAt)
+            : null,
+        endsAt:
+          draft.assignmentType === "SUPPLY" ? toIsoOrNull(draft.endsAt) : null,
       });
       await refreshClass();
       setSuccessMessage("Teacher assignment updated.");
@@ -418,7 +588,9 @@ export function ClassDetail({ classId }: { classId: string }) {
     try {
       await enrollStudent(classId, studentId);
       await refreshClass();
-      setStudentId(availableStudents.find((student) => student.id !== studentId)?.id ?? "");
+      setStudentId(
+        availableStudents.find((student) => student.id !== studentId)?.id ?? "",
+      );
       setSuccessMessage("Student added to class successfully.");
     } catch (submissionError) {
       setError(
@@ -455,16 +627,97 @@ export function ClassDetail({ classId }: { classId: string }) {
     }
   }
 
+  async function handleDuplicateClass(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!duplicateForm || !canManageClasses) {
+      return;
+    }
+
+    setIsDuplicating(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await duplicateClass(classId, {
+        targetSchoolId: duplicateForm.targetSchoolId,
+        targetSchoolYearId: duplicateForm.targetSchoolYearId,
+        targetName: duplicateForm.targetName.trim(),
+        targetGradeLevelId: duplicateForm.targetGradeLevelId,
+        targetSubjectOptionId: duplicateForm.targetSubjectOptionId,
+        targetTeacherId: duplicateForm.targetTeacherId || undefined,
+        isHomeroom: duplicateForm.isHomeroom,
+        takesAttendance: duplicateForm.takesAttendance,
+        copyAssessmentCategories: duplicateForm.copyAssessmentCategories,
+      });
+
+      const refreshedClasses = await listClasses({ includeInactive: true });
+      setAllClasses(refreshedClasses.filter((entry) => entry.id !== classId));
+      setCopyTargetClassId(response.class.id);
+      setSuccessMessage(
+        `Class duplicated as "${response.class.name}". Students, grades, and assessment results were not copied.`,
+      );
+    } catch (submissionError) {
+      setError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : "Unable to duplicate class.",
+      );
+    } finally {
+      setIsDuplicating(false);
+    }
+  }
+
+  async function handleCopyGradebookSettings(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (!copyTargetClassId || !canManageClasses) {
+      return;
+    }
+
+    setIsCopyingSettings(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await copyGradebookSettings(classId, {
+        targetClassId: copyTargetClassId,
+        copyAssessmentCategories: copyAssessmentCategoriesEnabled,
+      });
+      setSuccessMessage(
+        `Copied ${response.weightingMode} settings to target class. Students, grades, and assessments were not copied.`,
+      );
+    } catch (submissionError) {
+      setError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : "Unable to copy gradebook settings.",
+      );
+    } finally {
+      setIsCopyingSettings(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         actions={
-          <Link
-            className={buttonClassName({ variant: "secondary" })}
-            href="/admin/classes"
-          >
-            Back to classes
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/admin/classes"
+            >
+              Back to classes
+            </Link>
+            <Link
+              className={buttonClassName({ variant: "ghost" })}
+              href={`/admin/classes/bulk-enrollment?classId=${encodeURIComponent(classId)}`}
+            >
+              Bulk enrollment tools
+            </Link>
+          </div>
         }
         description={
           schoolClass
@@ -560,7 +813,9 @@ export function ClassDetail({ classId }: { classId: string }) {
                   Subject
                 </p>
                 <p className="mt-2 text-sm font-medium text-slate-900">
-                  {schoolClass.subjectOption?.name ?? schoolClass.subject ?? "Not specified"}
+                  {schoolClass.subjectOption?.name ??
+                    schoolClass.subject ??
+                    "Not specified"}
                 </p>
               </CardContent>
             </Card>
@@ -571,11 +826,15 @@ export function ClassDetail({ classId }: { classId: string }) {
               <CardHeader>
                 <CardTitle>Edit Class</CardTitle>
                 <CardDescription>
-                  Update display details and classroom status without changing enrollment history.
+                  Update display details and classroom status without changing
+                  enrollment history.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSaveClass}>
+                <form
+                  className="grid gap-4 md:grid-cols-2"
+                  onSubmit={handleSaveClass}
+                >
                   <Field htmlFor="edit-class-name" label="Class name">
                     <Input
                       id="edit-class-name"
@@ -659,6 +918,22 @@ export function ClassDetail({ classId }: { classId: string }) {
                   />
 
                   <CheckboxField
+                    checked={editForm.takesAttendance}
+                    description="When disabled, attendance cannot be created or updated for this class."
+                    label="This class will take attendance"
+                    onChange={(event) =>
+                      setEditForm((current) =>
+                        current
+                          ? {
+                              ...current,
+                              takesAttendance: event.target.checked,
+                            }
+                          : current,
+                      )
+                    }
+                  />
+
+                  <CheckboxField
                     checked={editForm.isActive}
                     description="Inactive classes remain visible for reference but should not be used for active operations."
                     label="Class is active"
@@ -676,10 +951,325 @@ export function ClassDetail({ classId }: { classId: string }) {
 
                   <div className="md:col-span-2 flex justify-end">
                     <Button
-                      disabled={isSubmitting || !editForm.gradeLevelId || !editForm.subjectOptionId}
+                      disabled={
+                        isSubmitting ||
+                        !editForm.gradeLevelId ||
+                        !editForm.subjectOptionId
+                      }
                       type="submit"
                     >
                       {isSubmitting ? "Saving..." : "Save class"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {canManageClasses && duplicateForm ? (
+            <Card id="duplicate-class">
+              <CardHeader>
+                <CardTitle>Duplicate Class</CardTitle>
+                <CardDescription>
+                  Copy class structure, assigned teacher(s), weighting mode, and
+                  assessment categories. Student enrollments, grades, and
+                  assessment results are never copied in this flow.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form
+                  className="grid gap-4 md:grid-cols-2"
+                  onSubmit={handleDuplicateClass}
+                >
+                  <Field
+                    htmlFor="duplicate-target-school"
+                    label="Target school"
+                  >
+                    <Select
+                      id="duplicate-target-school"
+                      onChange={(event) =>
+                        setDuplicateForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                targetSchoolId: event.target.value,
+                                targetSchoolYearId: "",
+                                targetGradeLevelId: "",
+                              }
+                            : current,
+                        )
+                      }
+                      value={duplicateForm.targetSchoolId}
+                    >
+                      <option value="">Select school</option>
+                      {schools.map((school) => (
+                        <option key={school.id} value={school.id}>
+                          {school.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+
+                  <Field
+                    htmlFor="duplicate-target-year"
+                    label="Target school year"
+                  >
+                    <Select
+                      id="duplicate-target-year"
+                      onChange={(event) =>
+                        setDuplicateForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                targetSchoolYearId: event.target.value,
+                              }
+                            : current,
+                        )
+                      }
+                      value={duplicateForm.targetSchoolYearId}
+                    >
+                      <option value="">Select school year</option>
+                      {duplicateSchoolYears.map((schoolYear) => (
+                        <option key={schoolYear.id} value={schoolYear.id}>
+                          {schoolYear.name}
+                          {schoolYear.isActive ? " (Active)" : ""}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+
+                  <Field htmlFor="duplicate-target-name" label="New class name">
+                    <Input
+                      id="duplicate-target-name"
+                      onChange={(event) =>
+                        setDuplicateForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                targetName: event.target.value,
+                              }
+                            : current,
+                        )
+                      }
+                      value={duplicateForm.targetName}
+                    />
+                  </Field>
+
+                  <Field
+                    htmlFor="duplicate-target-grade-level"
+                    label="Target grade level"
+                  >
+                    <Select
+                      id="duplicate-target-grade-level"
+                      onChange={(event) =>
+                        setDuplicateForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                targetGradeLevelId: event.target.value,
+                              }
+                            : current,
+                        )
+                      }
+                      value={duplicateForm.targetGradeLevelId}
+                    >
+                      <option value="">Select grade level</option>
+                      {duplicateGradeLevels.map((gradeLevel) => (
+                        <option key={gradeLevel.id} value={gradeLevel.id}>
+                          {gradeLevel.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+
+                  <Field
+                    htmlFor="duplicate-target-subject"
+                    label="Target subject"
+                  >
+                    <Select
+                      id="duplicate-target-subject"
+                      onChange={(event) =>
+                        setDuplicateForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                targetSubjectOptionId: event.target.value,
+                              }
+                            : current,
+                        )
+                      }
+                      value={duplicateForm.targetSubjectOptionId}
+                    >
+                      <option value="">Select subject</option>
+                      {subjectOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+
+                  <Field
+                    htmlFor="duplicate-target-teacher"
+                    label="Override teacher (optional)"
+                  >
+                    <Select
+                      id="duplicate-target-teacher"
+                      onChange={(event) =>
+                        setDuplicateForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                targetTeacherId: event.target.value,
+                              }
+                            : current,
+                        )
+                      }
+                      value={duplicateForm.targetTeacherId}
+                    >
+                      <option value="">Copy source teacher assignments</option>
+                      {duplicateTeacherOptions.map((teacher) => (
+                        <option key={teacher.id} value={teacher.id}>
+                          {teacher.firstName} {teacher.lastName} (
+                          {formatRoleLabel(teacher.role)})
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+
+                  <CheckboxField
+                    checked={duplicateForm.isHomeroom}
+                    className="md:col-span-2"
+                    description="Keep the duplicated class as homeroom if enabled."
+                    label="Homeroom class"
+                    onChange={(event) =>
+                      setDuplicateForm((current) =>
+                        current
+                          ? {
+                              ...current,
+                              isHomeroom: event.target.checked,
+                            }
+                          : current,
+                      )
+                    }
+                  />
+
+                  <CheckboxField
+                    checked={duplicateForm.takesAttendance}
+                    className="md:col-span-2"
+                    description="Controls whether attendance is enabled on the duplicated class."
+                    label="This class will take attendance"
+                    onChange={(event) =>
+                      setDuplicateForm((current) =>
+                        current
+                          ? {
+                              ...current,
+                              takesAttendance: event.target.checked,
+                            }
+                          : current,
+                      )
+                    }
+                  />
+
+                  <CheckboxField
+                    checked={duplicateForm.copyAssessmentCategories}
+                    className="md:col-span-2"
+                    description="Copies category names and weights only. No assessments or results are copied."
+                    label="Copy assessment categories"
+                    onChange={(event) =>
+                      setDuplicateForm((current) =>
+                        current
+                          ? {
+                              ...current,
+                              copyAssessmentCategories: event.target.checked,
+                            }
+                          : current,
+                      )
+                    }
+                  />
+
+                  <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    This duplication does not copy student enrollments, grade
+                    records, assessment results, or overrides.
+                  </div>
+
+                  <div className="md:col-span-2 flex justify-end">
+                    <Button
+                      disabled={
+                        isDuplicating ||
+                        !duplicateForm.targetSchoolId ||
+                        !duplicateForm.targetSchoolYearId ||
+                        !duplicateForm.targetGradeLevelId ||
+                        !duplicateForm.targetSubjectOptionId ||
+                        !duplicateForm.targetName.trim()
+                      }
+                      type="submit"
+                    >
+                      {isDuplicating ? "Duplicating..." : "Duplicate class"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {canManageClasses ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Copy Gradebook Settings / Weighting</CardTitle>
+                <CardDescription>
+                  Copy weighting mode and optionally category weights into
+                  another class. Assessments, enrollments, and grades stay
+                  untouched.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form
+                  className="grid gap-4 md:grid-cols-2"
+                  onSubmit={handleCopyGradebookSettings}
+                >
+                  <Field
+                    htmlFor="copy-settings-target-class"
+                    label="Target class"
+                  >
+                    <Select
+                      id="copy-settings-target-class"
+                      onChange={(event) =>
+                        setCopyTargetClassId(event.target.value)
+                      }
+                      value={copyTargetClassId}
+                    >
+                      <option value="">Select target class</option>
+                      {copyTargetClassOptions.map((entry) => (
+                        <option key={entry.id} value={entry.id}>
+                          {entry.name} — {entry.school.name} (
+                          {entry.schoolYear.name})
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+
+                  <CheckboxField
+                    checked={copyAssessmentCategoriesEnabled}
+                    className="md:pt-7"
+                    description="Category names and weights are merged by name on the target class."
+                    label="Copy assessment categories"
+                    onChange={(event) =>
+                      setCopyAssessmentCategoriesEnabled(event.target.checked)
+                    }
+                  />
+
+                  <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    This action does not copy assessments, student enrollments,
+                    grades, or results.
+                  </div>
+
+                  <div className="md:col-span-2 flex justify-end">
+                    <Button
+                      disabled={isCopyingSettings || !copyTargetClassId}
+                      type="submit"
+                    >
+                      {isCopyingSettings ? "Copying..." : "Copy settings"}
                     </Button>
                   </div>
                 </form>
@@ -692,7 +1282,8 @@ export function ClassDetail({ classId }: { classId: string }) {
               <CardHeader>
                 <CardTitle>Assigned Teachers</CardTitle>
                 <CardDescription>
-                  Keep teaching coverage current for attendance and roster workflows.
+                  Keep teaching coverage current for attendance and roster
+                  workflows.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -710,13 +1301,17 @@ export function ClassDetail({ classId }: { classId: string }) {
                         <option value="">Select teacher</option>
                         {availableTeachers.map((teacher) => (
                           <option key={teacher.id} value={teacher.id}>
-                            {teacher.firstName} {teacher.lastName} ({formatRoleLabel(teacher.role)})
+                            {teacher.firstName} {teacher.lastName} (
+                            {formatRoleLabel(teacher.role)})
                           </option>
                         ))}
                       </Select>
                     </Field>
 
-                    <Field htmlFor="assign-teacher-type" label="Assignment type">
+                    <Field
+                      htmlFor="assign-teacher-type"
+                      label="Assignment type"
+                    >
                       <Select
                         disabled
                         id="assign-teacher-type"
@@ -729,10 +1324,15 @@ export function ClassDetail({ classId }: { classId: string }) {
 
                     {teacherAssignmentType === "SUPPLY" ? (
                       <>
-                        <Field htmlFor="assign-teacher-starts-at" label="Starts at">
+                        <Field
+                          htmlFor="assign-teacher-starts-at"
+                          label="Starts at"
+                        >
                           <Input
                             id="assign-teacher-starts-at"
-                            onChange={(event) => setTeacherAssignmentStartsAt(event.target.value)}
+                            onChange={(event) =>
+                              setTeacherAssignmentStartsAt(event.target.value)
+                            }
                             type="datetime-local"
                             value={teacherAssignmentStartsAt}
                           />
@@ -741,7 +1341,9 @@ export function ClassDetail({ classId }: { classId: string }) {
                         <Field htmlFor="assign-teacher-ends-at" label="Ends at">
                           <Input
                             id="assign-teacher-ends-at"
-                            onChange={(event) => setTeacherAssignmentEndsAt(event.target.value)}
+                            onChange={(event) =>
+                              setTeacherAssignmentEndsAt(event.target.value)
+                            }
                             type="datetime-local"
                             value={teacherAssignmentEndsAt}
                           />
@@ -750,7 +1352,10 @@ export function ClassDetail({ classId }: { classId: string }) {
                     ) : null}
 
                     <div className="md:col-span-2 flex justify-end">
-                      <Button disabled={isSubmitting || !teacherId} type="submit">
+                      <Button
+                        disabled={isSubmitting || !teacherId}
+                        type="submit"
+                      >
                         Assign teacher
                       </Button>
                     </div>
@@ -774,19 +1379,33 @@ export function ClassDetail({ classId }: { classId: string }) {
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium text-slate-900">
-                            {assignment.teacher.firstName} {assignment.teacher.lastName}
+                            {assignment.teacher.firstName}{" "}
+                            {assignment.teacher.lastName}
                           </p>
                           <p className="mt-1 text-sm text-slate-500">
                             {formatRoleLabel(assignment.teacher.role)}
                           </p>
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                            <Badge variant={assignment.assignmentType === "SUPPLY" ? "warning" : "neutral"}>
-                              {assignment.assignmentType === "SUPPLY" ? "Supply assignment" : "Regular assignment"}
+                            <Badge
+                              variant={
+                                assignment.assignmentType === "SUPPLY"
+                                  ? "warning"
+                                  : "neutral"
+                              }
+                            >
+                              {assignment.assignmentType === "SUPPLY"
+                                ? "Supply assignment"
+                                : "Regular assignment"}
                             </Badge>
                             {assignment.assignmentType === "SUPPLY" ? (
                               <span>
-                                {assignment.startsAt ? `Starts ${new Date(assignment.startsAt).toLocaleString()}` : "No start"} •{" "}
-                                {assignment.endsAt ? `Ends ${new Date(assignment.endsAt).toLocaleString()}` : "No end"}
+                                {assignment.startsAt
+                                  ? `Starts ${new Date(assignment.startsAt).toLocaleString()}`
+                                  : "No start"}{" "}
+                                •{" "}
+                                {assignment.endsAt
+                                  ? `Ends ${new Date(assignment.endsAt).toLocaleString()}`
+                                  : "No end"}
                               </span>
                             ) : null}
                           </div>
@@ -797,7 +1416,9 @@ export function ClassDetail({ classId }: { classId: string }) {
                             {assignment.assignmentType === "SUPPLY" ? (
                               <Button
                                 disabled={isSubmitting}
-                                onClick={() => void handleEndTeacherAssignment(assignment)}
+                                onClick={() =>
+                                  void handleEndTeacherAssignment(assignment)
+                                }
                                 type="button"
                                 variant="secondary"
                               >
@@ -806,7 +1427,9 @@ export function ClassDetail({ classId }: { classId: string }) {
                             ) : null}
                             <Button
                               disabled={isSubmitting}
-                              onClick={() => handleRemoveTeacher(assignment.teacherId)}
+                              onClick={() =>
+                                handleRemoveTeacher(assignment.teacherId)
+                              }
                               type="button"
                               variant="danger"
                             >
@@ -818,7 +1441,10 @@ export function ClassDetail({ classId }: { classId: string }) {
 
                       {canManageClasses ? (
                         <div className="mt-3 grid gap-3 md:grid-cols-3">
-                          <Field htmlFor={`assignment-type-${assignment.id}`} label="Type">
+                          <Field
+                            htmlFor={`assignment-type-${assignment.id}`}
+                            label="Type"
+                          >
                             <Select
                               disabled
                               id={`assignment-type-${assignment.id}`}
@@ -826,57 +1452,76 @@ export function ClassDetail({ classId }: { classId: string }) {
                                 setAssignmentDraftByTeacherId((current) => ({
                                   ...current,
                                   [assignment.teacherId]: {
-                                    ...(current[assignment.teacherId] ?? mapAssignmentToDraft(assignment)),
-                                    assignmentType: event.target.value as TeacherAssignmentType,
+                                    ...(current[assignment.teacherId] ??
+                                      mapAssignmentToDraft(assignment)),
+                                    assignmentType: event.target
+                                      .value as TeacherAssignmentType,
                                   },
                                 }))
                               }
                               value={
-                                assignmentDraftByTeacherId[assignment.teacherId]?.assignmentType ??
-                                assignment.assignmentType
+                                assignmentDraftByTeacherId[assignment.teacherId]
+                                  ?.assignmentType ?? assignment.assignmentType
                               }
                             >
                               <option value="REGULAR">Regular</option>
                               <option value="SUPPLY">Supply</option>
                             </Select>
                           </Field>
-                          {(assignmentDraftByTeacherId[assignment.teacherId]?.assignmentType ??
-                            assignment.assignmentType) === "SUPPLY" ? (
+                          {(assignmentDraftByTeacherId[assignment.teacherId]
+                            ?.assignmentType ?? assignment.assignmentType) ===
+                          "SUPPLY" ? (
                             <>
-                              <Field htmlFor={`assignment-starts-${assignment.id}`} label="Starts at">
+                              <Field
+                                htmlFor={`assignment-starts-${assignment.id}`}
+                                label="Starts at"
+                              >
                                 <Input
                                   id={`assignment-starts-${assignment.id}`}
                                   onChange={(event) =>
-                                    setAssignmentDraftByTeacherId((current) => ({
-                                      ...current,
-                                      [assignment.teacherId]: {
-                                        ...(current[assignment.teacherId] ?? mapAssignmentToDraft(assignment)),
-                                        startsAt: event.target.value,
-                                      },
-                                    }))
+                                    setAssignmentDraftByTeacherId(
+                                      (current) => ({
+                                        ...current,
+                                        [assignment.teacherId]: {
+                                          ...(current[assignment.teacherId] ??
+                                            mapAssignmentToDraft(assignment)),
+                                          startsAt: event.target.value,
+                                        },
+                                      }),
+                                    )
                                   }
                                   type="datetime-local"
                                   value={
-                                    assignmentDraftByTeacherId[assignment.teacherId]?.startsAt ??
+                                    assignmentDraftByTeacherId[
+                                      assignment.teacherId
+                                    ]?.startsAt ??
                                     toDateTimeLocal(assignment.startsAt)
                                   }
                                 />
                               </Field>
-                              <Field htmlFor={`assignment-ends-${assignment.id}`} label="Ends at">
+                              <Field
+                                htmlFor={`assignment-ends-${assignment.id}`}
+                                label="Ends at"
+                              >
                                 <Input
                                   id={`assignment-ends-${assignment.id}`}
                                   onChange={(event) =>
-                                    setAssignmentDraftByTeacherId((current) => ({
-                                      ...current,
-                                      [assignment.teacherId]: {
-                                        ...(current[assignment.teacherId] ?? mapAssignmentToDraft(assignment)),
-                                        endsAt: event.target.value,
-                                      },
-                                    }))
+                                    setAssignmentDraftByTeacherId(
+                                      (current) => ({
+                                        ...current,
+                                        [assignment.teacherId]: {
+                                          ...(current[assignment.teacherId] ??
+                                            mapAssignmentToDraft(assignment)),
+                                          endsAt: event.target.value,
+                                        },
+                                      }),
+                                    )
                                   }
                                   type="datetime-local"
                                   value={
-                                    assignmentDraftByTeacherId[assignment.teacherId]?.endsAt ??
+                                    assignmentDraftByTeacherId[
+                                      assignment.teacherId
+                                    ]?.endsAt ??
                                     toDateTimeLocal(assignment.endsAt)
                                   }
                                 />
@@ -894,7 +1539,9 @@ export function ClassDetail({ classId }: { classId: string }) {
                         <div className="mt-3 flex justify-end">
                           <Button
                             disabled={isSubmitting}
-                            onClick={() => void handleSaveTeacherAssignment(assignment)}
+                            onClick={() =>
+                              void handleSaveTeacherAssignment(assignment)
+                            }
                             type="button"
                             variant="secondary"
                           >
@@ -920,7 +1567,8 @@ export function ClassDetail({ classId }: { classId: string }) {
               <CardHeader>
                 <CardTitle>Student Roster</CardTitle>
                 <CardDescription>
-                  Review enrolled students and keep the roster aligned for attendance.
+                  Review enrolled students and keep the roster aligned for
+                  attendance.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -937,7 +1585,8 @@ export function ClassDetail({ classId }: { classId: string }) {
                       <option value="">Select student</option>
                       {availableStudents.map((student) => (
                         <option key={student.id} value={student.id}>
-                          {student.firstName} {student.lastName} ({student.username})
+                          {student.firstName} {student.lastName} (
+                          {student.username})
                         </option>
                       ))}
                     </Select>
@@ -961,19 +1610,31 @@ export function ClassDetail({ classId }: { classId: string }) {
                     <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                       <thead className="bg-slate-50/80">
                         <tr>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Username</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Email</th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Student
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Username
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Email
+                          </th>
                           {canManageClasses ? (
-                            <th className="px-4 py-3 font-semibold text-slate-700">Action</th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Action
+                            </th>
                           ) : null}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 bg-white">
                         {(schoolClass.students ?? []).map((enrollment) => (
-                          <tr className="align-top hover:bg-slate-50" key={enrollment.id}>
+                          <tr
+                            className="align-top hover:bg-slate-50"
+                            key={enrollment.id}
+                          >
                             <td className="px-4 py-4 font-medium text-slate-900">
-                              {enrollment.student.firstName} {enrollment.student.lastName}
+                              {enrollment.student.firstName}{" "}
+                              {enrollment.student.lastName}
                             </td>
                             <td className="px-4 py-4 text-slate-600">
                               {enrollment.student.username}
@@ -985,7 +1646,9 @@ export function ClassDetail({ classId }: { classId: string }) {
                               <td className="px-4 py-4">
                                 <Button
                                   disabled={isSubmitting}
-                                  onClick={() => handleRemoveStudent(enrollment.studentId)}
+                                  onClick={() =>
+                                    handleRemoveStudent(enrollment.studentId)
+                                  }
                                   type="button"
                                   variant="danger"
                                 >

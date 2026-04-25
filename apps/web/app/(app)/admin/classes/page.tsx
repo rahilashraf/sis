@@ -7,12 +7,26 @@ export default function AdminClassesPage() {
     <CurrentClassesTable
       mode="admin"
       actions={
-        <Link
-          className={buttonClassName({ variant: "secondary" })}
-          href="/admin/classes/manage"
-        >
-          Manage classes
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            className={buttonClassName({ variant: "secondary" })}
+            href="/admin/classes/bulk-enrollment"
+          >
+            Bulk enrollment
+          </Link>
+          <Link
+            className={buttonClassName({ variant: "secondary" })}
+            href="/admin/classes/manage"
+          >
+            Manage classes
+          </Link>
+          <Link
+            className={buttonClassName({ variant: "secondary" })}
+            href="/admin/classes/manage#create-class"
+          >
+            Create Classes
+          </Link>
+        </div>
       }
     />
   );

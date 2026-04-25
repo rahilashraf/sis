@@ -97,32 +97,45 @@ const statusOptions: Array<{ value: BehaviorRecordStatus; label: string }> = [
   { value: "RESOLVED", label: "Resolved" },
 ];
 
-const affectedPersonTypeOptions: Array<{ value: IncidentAffectedPersonType; label: string }> = [
+const affectedPersonTypeOptions: Array<{
+  value: IncidentAffectedPersonType;
+  label: string;
+}> = [
   { value: "STUDENT", label: "Student" },
   { value: "STAFF", label: "Staff" },
   { value: "OTHER", label: "Other" },
 ];
 
-const firstAidStatusOptions: Array<{ value: IncidentFirstAidStatus; label: string }> = [
+const firstAidStatusOptions: Array<{
+  value: IncidentFirstAidStatus;
+  label: string;
+}> = [
   { value: "YES", label: "Yes" },
   { value: "NO", label: "No" },
   { value: "NOT_APPLICABLE", label: "Not applicable" },
 ];
 
-const witnessRoleOptions: Array<{ value: IncidentWitnessRole; label: string }> = [
-  { value: "STAFF", label: "Staff" },
-  { value: "STUDENT", label: "Student" },
-  { value: "OTHER", label: "Other" },
-];
+const witnessRoleOptions: Array<{ value: IncidentWitnessRole; label: string }> =
+  [
+    { value: "STAFF", label: "Staff" },
+    { value: "STUDENT", label: "Student" },
+    { value: "OTHER", label: "Other" },
+  ];
 
-const destinationOptions: Array<{ value: IncidentPostDestination; label: string }> = [
+const destinationOptions: Array<{
+  value: IncidentPostDestination;
+  label: string;
+}> = [
   { value: "RETURNED_TO_CLASS_OR_WORK", label: "Returned to class/work" },
   { value: "HOME", label: "Home" },
   { value: "HOSPITAL", label: "Hospital" },
   { value: "OTHER", label: "Other" },
 ];
 
-const jhscOptions: Array<{ value: IncidentJhscNotificationStatus; label: string }> = [
+const jhscOptions: Array<{
+  value: IncidentJhscNotificationStatus;
+  label: string;
+}> = [
   { value: "YES", label: "Yes" },
   { value: "NO", label: "No" },
   { value: "NOT_APPLICABLE", label: "Not applicable" },
@@ -164,7 +177,9 @@ function buildEmptyWitness(): IncidentWitnessInput {
   };
 }
 
-function buildDefaultForm(categories: BehaviorCategoryOption[]): IncidentFormState {
+function buildDefaultForm(
+  categories: BehaviorCategoryOption[],
+): IncidentFormState {
   return {
     studentId: "",
     incidentAt: getDefaultIncidentAt(),
@@ -219,14 +234,17 @@ function buildEditForm(record: BehaviorRecord): IncidentFormState {
     affectedPersonType: report?.affectedPersonType ?? "STUDENT",
     affectedPersonName: report?.affectedPersonName ?? "",
     affectedPersonAddress: report?.affectedPersonAddress ?? "",
-    affectedPersonDateOfBirth: toDateInput(report?.affectedPersonDateOfBirth ?? null),
+    affectedPersonDateOfBirth: toDateInput(
+      report?.affectedPersonDateOfBirth ?? null,
+    ),
     affectedPersonPhone: report?.affectedPersonPhone ?? "",
     firstAidStatus: report?.firstAidStatus ?? "NOT_APPLICABLE",
     firstAidAdministeredBy: report?.firstAidAdministeredBy ?? "",
     firstAidAdministeredByPhone: report?.firstAidAdministeredByPhone ?? "",
     firstAidDetails: report?.firstAidDetails ?? "",
     isIncidentTimeApproximate: report?.isIncidentTimeApproximate ?? false,
-    postIncidentDestination: report?.postIncidentDestination ?? "RETURNED_TO_CLASS_OR_WORK",
+    postIncidentDestination:
+      report?.postIncidentDestination ?? "RETURNED_TO_CLASS_OR_WORK",
     postIncidentDestinationOther: report?.postIncidentDestinationOther ?? "",
     jhscNotificationStatus: report?.jhscNotificationStatus ?? "NOT_APPLICABLE",
     additionalNotes: report?.additionalNotes ?? "",
@@ -241,7 +259,8 @@ function buildEditForm(record: BehaviorRecord): IncidentFormState {
 }
 
 function getStudentLabel(student: BehaviorStudentLookup) {
-  const schoolLabel = student.schools[0]?.shortName ?? student.schools[0]?.name ?? "No school";
+  const schoolLabel =
+    student.schools[0]?.shortName ?? student.schools[0]?.name ?? "No school";
   return `${student.fullName} • ${schoolLabel}`;
 }
 
@@ -254,7 +273,8 @@ function buildReporterSnapshot(sessionUser: AuthenticatedUser | null) {
     };
   }
 
-  const reporterName = `${sessionUser.firstName} ${sessionUser.lastName}`.trim();
+  const reporterName =
+    `${sessionUser.firstName} ${sessionUser.lastName}`.trim();
 
   return {
     reporterName,
@@ -280,15 +300,26 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
   });
   const [form, setForm] = useState<IncidentFormState>(buildDefaultForm([]));
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
-  const [editingForm, setEditingForm] = useState<IncidentFormState | null>(null);
-  const [attachmentFiles, setAttachmentFiles] = useState<Record<string, File | null>>({});
+  const [editingForm, setEditingForm] = useState<IncidentFormState | null>(
+    null,
+  );
+  const [attachmentFiles, setAttachmentFiles] = useState<
+    Record<string, File | null>
+  >({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
-  const [uploadingRecordId, setUploadingRecordId] = useState<string | null>(null);
-  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
-  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
-  const [didApplyInitialStudentFilter, setDidApplyInitialStudentFilter] = useState(false);
+  const [uploadingRecordId, setUploadingRecordId] = useState<string | null>(
+    null,
+  );
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<
+    string | null
+  >(null);
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<
+    string | null
+  >(null);
+  const [didApplyInitialStudentFilter, setDidApplyInitialStudentFilter] =
+    useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const initialStudentId = searchParams.get("studentId")?.trim() || "";
@@ -317,7 +348,8 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
     () =>
       [...records].sort(
         (left, right) =>
-          new Date(right.incidentAt).getTime() - new Date(left.incidentAt).getTime(),
+          new Date(right.incidentAt).getTime() -
+          new Date(left.incidentAt).getTime(),
       ),
     [records],
   );
@@ -334,7 +366,8 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
         ? {
             ...current,
             reporterName: current.reporterName || reporterSnapshot.reporterName,
-            reporterEmail: current.reporterEmail || reporterSnapshot.reporterEmail,
+            reporterEmail:
+              current.reporterEmail || reporterSnapshot.reporterEmail,
             reporterRole: current.reporterRole || reporterSnapshot.reporterRole,
           }
         : current,
@@ -347,7 +380,11 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
       const response = await listBehaviorStudents({ query, limit: 50 });
       setStudents(response);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load students.");
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load students.",
+      );
     } finally {
       setIsLoadingStudents(false);
     }
@@ -377,12 +414,17 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
           ? current
           : {
               ...current,
-              categoryOptionId: categoryResponse.find((entry) => entry.isActive)?.id ?? "",
+              categoryOptionId:
+                categoryResponse.find((entry) => entry.isActive)?.id ?? "",
             },
       );
       await Promise.all([loadStudents(), loadRecords()]);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load incident reports.");
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load incident reports.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -408,7 +450,10 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
     void loadRecords(nextFilters);
   }, [didApplyInitialStudentFilter, filters, initialStudentId]);
 
-  async function applyPrefill(targetStudentId: string, target: "create" | "edit") {
+  async function applyPrefill(
+    targetStudentId: string,
+    target: "create" | "edit",
+  ) {
     if (!targetStudentId) {
       return;
     }
@@ -418,15 +463,20 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
       const studentName = prefill.student.fullName;
       const studentDob = toDateInput(prefill.student.dateOfBirth);
       const schoolProgramContext =
-        prefill.student.schools[0]?.shortName ?? prefill.student.schools[0]?.name ?? "";
+        prefill.student.schools[0]?.shortName ??
+        prefill.student.schools[0]?.name ??
+        "";
 
       if (target === "create") {
         setForm((current) => ({
           ...current,
           affectedPersonName: studentName || current.affectedPersonName,
-          affectedPersonDateOfBirth: studentDob || current.affectedPersonDateOfBirth,
-          affectedPersonAddress: prefill.student.address || current.affectedPersonAddress,
-          affectedPersonPhone: prefill.student.phone || current.affectedPersonPhone,
+          affectedPersonDateOfBirth:
+            studentDob || current.affectedPersonDateOfBirth,
+          affectedPersonAddress:
+            prefill.student.address || current.affectedPersonAddress,
+          affectedPersonPhone:
+            prefill.student.phone || current.affectedPersonPhone,
           program: schoolProgramContext || current.program,
         }));
       } else {
@@ -435,17 +485,23 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
             ? {
                 ...current,
                 affectedPersonName: studentName || current.affectedPersonName,
-                affectedPersonDateOfBirth: studentDob || current.affectedPersonDateOfBirth,
+                affectedPersonDateOfBirth:
+                  studentDob || current.affectedPersonDateOfBirth,
                 affectedPersonAddress:
                   prefill.student.address || current.affectedPersonAddress,
-                affectedPersonPhone: prefill.student.phone || current.affectedPersonPhone,
+                affectedPersonPhone:
+                  prefill.student.phone || current.affectedPersonPhone,
                 program: schoolProgramContext || current.program,
               }
             : current,
         );
       }
     } catch (prefillError) {
-      setError(prefillError instanceof Error ? prefillError.message : "Unable to prefill student data.");
+      setError(
+        prefillError instanceof Error
+          ? prefillError.message
+          : "Unable to prefill student data.",
+      );
     }
   }
 
@@ -469,11 +525,13 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
         affectedPersonPhone: input.affectedPersonPhone.trim() || null,
         firstAidStatus: input.firstAidStatus,
         firstAidAdministeredBy: input.firstAidAdministeredBy.trim() || null,
-        firstAidAdministeredByPhone: input.firstAidAdministeredByPhone.trim() || null,
+        firstAidAdministeredByPhone:
+          input.firstAidAdministeredByPhone.trim() || null,
         firstAidDetails: input.firstAidDetails.trim() || null,
         isIncidentTimeApproximate: input.isIncidentTimeApproximate,
         postIncidentDestination: input.postIncidentDestination,
-        postIncidentDestinationOther: input.postIncidentDestinationOther.trim() || null,
+        postIncidentDestinationOther:
+          input.postIncidentDestinationOther.trim() || null,
         jhscNotificationStatus: input.jhscNotificationStatus,
         additionalNotes: input.additionalNotes.trim() || null,
         witnesses: input.witnesses
@@ -507,7 +565,11 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
       setForm(buildDefaultForm(categories));
       setSuccessMessage("Incident report created.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to create incident report.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to create incident report.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -531,13 +593,20 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
     setSuccessMessage(null);
 
     try {
-      await updateBehaviorRecord(editingRecordId, mapFormToPayload(editingForm));
+      await updateBehaviorRecord(
+        editingRecordId,
+        mapFormToPayload(editingForm),
+      );
       await loadRecords();
       setEditingRecordId(null);
       setEditingForm(null);
       setSuccessMessage("Incident report updated.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update incident report.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update incident report.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -560,13 +629,20 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
       setAttachmentFiles((current) => ({ ...current, [recordId]: null }));
       setSuccessMessage("Attachment uploaded.");
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Unable to upload attachment.");
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "Unable to upload attachment.",
+      );
     } finally {
       setUploadingRecordId(null);
     }
   }
 
-  async function handleDownloadAttachment(recordId: string, attachmentId: string) {
+  async function handleDownloadAttachment(
+    recordId: string,
+    attachmentId: string,
+  ) {
     setDownloadingAttachmentId(attachmentId);
     setError(null);
 
@@ -581,13 +657,20 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
       link.remove();
       URL.revokeObjectURL(objectUrl);
     } catch (downloadError) {
-      setError(downloadError instanceof Error ? downloadError.message : "Unable to download attachment.");
+      setError(
+        downloadError instanceof Error
+          ? downloadError.message
+          : "Unable to download attachment.",
+      );
     } finally {
       setDownloadingAttachmentId(null);
     }
   }
 
-  async function handleDeleteAttachment(recordId: string, attachmentId: string) {
+  async function handleDeleteAttachment(
+    recordId: string,
+    attachmentId: string,
+  ) {
     setDeletingAttachmentId(attachmentId);
     setError(null);
     setSuccessMessage(null);
@@ -597,7 +680,11 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
       await loadRecords();
       setSuccessMessage("Attachment deleted.");
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "Unable to delete attachment.");
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Unable to delete attachment.",
+      );
     } finally {
       setDeletingAttachmentId(null);
     }
@@ -653,7 +740,9 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
     if (target === "create") {
       setForm((current) => ({
         ...current,
-        witnesses: current.witnesses.filter((_, witnessIndex) => witnessIndex !== index),
+        witnesses: current.witnesses.filter(
+          (_, witnessIndex) => witnessIndex !== index,
+        ),
       }));
       return;
     }
@@ -662,13 +751,16 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
       current
         ? {
             ...current,
-            witnesses: current.witnesses.filter((_, witnessIndex) => witnessIndex !== index),
+            witnesses: current.witnesses.filter(
+              (_, witnessIndex) => witnessIndex !== index,
+            ),
           }
         : current,
     );
   }
 
-  const pageTitle = mode === "admin" ? "Incident Reports" : "Class Incident Reports";
+  const pageTitle =
+    mode === "admin" ? "Incident Reports" : "Class Incident Reports";
   const pageDescription =
     mode === "admin"
       ? "File, review, and update incident reports across your allowed schools."
@@ -689,7 +781,8 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
         <CardHeader>
           <CardTitle>Search and Filters</CardTitle>
           <CardDescription>
-            Find students and filter incident reports by level, status, category, and date.
+            Find students and filter incident reports by level, status,
+            category, and date.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
@@ -710,7 +803,10 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
               id="incident-filter-student"
               value={filters.studentId}
               onChange={(event) =>
-                setFilters((current) => ({ ...current, studentId: event.target.value }))
+                setFilters((current) => ({
+                  ...current,
+                  studentId: event.target.value,
+                }))
               }
             >
               <option value="">All students</option>
@@ -729,7 +825,8 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
               onChange={(event) =>
                 setFilters((current) => ({
                   ...current,
-                  incidentLevel: event.target.value as RecordFilters["incidentLevel"],
+                  incidentLevel: event.target
+                    .value as RecordFilters["incidentLevel"],
                 }))
               }
             >
@@ -767,7 +864,10 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
               id="incident-filter-category"
               value={filters.category}
               onChange={(event) =>
-                setFilters((current) => ({ ...current, category: event.target.value }))
+                setFilters((current) => ({
+                  ...current,
+                  category: event.target.value,
+                }))
               }
             >
               <option value="">All categories</option>
@@ -785,7 +885,10 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
               type="date"
               value={filters.startDate}
               onChange={(event) =>
-                setFilters((current) => ({ ...current, startDate: event.target.value }))
+                setFilters((current) => ({
+                  ...current,
+                  startDate: event.target.value,
+                }))
               }
             />
           </Field>
@@ -796,7 +899,10 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
               type="date"
               value={filters.endDate}
               onChange={(event) =>
-                setFilters((current) => ({ ...current, endDate: event.target.value }))
+                setFilters((current) => ({
+                  ...current,
+                  endDate: event.target.value,
+                }))
               }
             />
           </Field>
@@ -841,9 +947,12 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>{editingRecordId ? "Edit Incident Report" : "New Incident Report"}</CardTitle>
+          <CardTitle>
+            {editingRecordId ? "Edit Incident Report" : "New Incident Report"}
+          </CardTitle>
           <CardDescription>
-            Complete the incident report sections and upload supporting PDF documents as needed.
+            Complete the incident report sections and upload supporting PDF
+            documents as needed.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -855,16 +964,25 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
               <Field htmlFor="incident-form-student" label="Affected student">
                 <Select
                   id="incident-form-student"
-                  value={(editingRecordId ? editingForm?.studentId : form.studentId) ?? ""}
+                  value={
+                    (editingRecordId
+                      ? editingForm?.studentId
+                      : form.studentId) ?? ""
+                  }
                   onChange={(event) => {
                     const nextStudentId = event.target.value;
                     if (editingRecordId) {
                       setEditingForm((current) =>
-                        current ? { ...current, studentId: nextStudentId } : current,
+                        current
+                          ? { ...current, studentId: nextStudentId }
+                          : current,
                       );
                       void applyPrefill(nextStudentId, "edit");
                     } else {
-                      setForm((current) => ({ ...current, studentId: nextStudentId }));
+                      setForm((current) => ({
+                        ...current,
+                        studentId: nextStudentId,
+                      }));
                       void applyPrefill(nextStudentId, "create");
                     }
                   }}
@@ -878,19 +996,31 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                 </Select>
               </Field>
 
-              <Field htmlFor="incident-form-date-time" label="Incident date/time">
+              <Field
+                htmlFor="incident-form-date-time"
+                label="Incident date/time"
+              >
                 <Input
                   id="incident-form-date-time"
                   type="datetime-local"
-                  value={(editingRecordId ? editingForm?.incidentAt : form.incidentAt) ?? ""}
+                  value={
+                    (editingRecordId
+                      ? editingForm?.incidentAt
+                      : form.incidentAt) ?? ""
+                  }
                   onChange={(event) => {
                     const nextValue = event.target.value;
                     if (editingRecordId) {
                       setEditingForm((current) =>
-                        current ? { ...current, incidentAt: nextValue } : current,
+                        current
+                          ? { ...current, incidentAt: nextValue }
+                          : current,
                       );
                     } else {
-                      setForm((current) => ({ ...current, incidentAt: nextValue }));
+                      setForm((current) => ({
+                        ...current,
+                        incidentAt: nextValue,
+                      }));
                     }
                   }}
                 />
@@ -902,16 +1032,23 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                 <Select
                   id="incident-form-category"
                   value={
-                    (editingRecordId ? editingForm?.categoryOptionId : form.categoryOptionId) ?? ""
+                    (editingRecordId
+                      ? editingForm?.categoryOptionId
+                      : form.categoryOptionId) ?? ""
                   }
                   onChange={(event) => {
                     const nextValue = event.target.value;
                     if (editingRecordId) {
                       setEditingForm((current) =>
-                        current ? { ...current, categoryOptionId: nextValue } : current,
+                        current
+                          ? { ...current, categoryOptionId: nextValue }
+                          : current,
                       );
                     } else {
-                      setForm((current) => ({ ...current, categoryOptionId: nextValue }));
+                      setForm((current) => ({
+                        ...current,
+                        categoryOptionId: nextValue,
+                      }));
                     }
                   }}
                 >
@@ -927,15 +1064,24 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
               <Field htmlFor="incident-form-level" label="Incident level">
                 <Select
                   id="incident-form-level"
-                  value={(editingRecordId ? editingForm?.incidentLevel : form.incidentLevel) ?? "MINOR"}
+                  value={
+                    (editingRecordId
+                      ? editingForm?.incidentLevel
+                      : form.incidentLevel) ?? "MINOR"
+                  }
                   onChange={(event) => {
                     const nextValue = event.target.value as IncidentLevel;
                     if (editingRecordId) {
                       setEditingForm((current) =>
-                        current ? { ...current, incidentLevel: nextValue } : current,
+                        current
+                          ? { ...current, incidentLevel: nextValue }
+                          : current,
                       );
                     } else {
-                      setForm((current) => ({ ...current, incidentLevel: nextValue }));
+                      setForm((current) => ({
+                        ...current,
+                        incidentLevel: nextValue,
+                      }));
                     }
                   }}
                 >
@@ -950,9 +1096,13 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
               <Field htmlFor="incident-form-status" label="Status">
                 <Select
                   id="incident-form-status"
-                  value={(editingRecordId ? editingForm?.status : form.status) ?? "OPEN"}
+                  value={
+                    (editingRecordId ? editingForm?.status : form.status) ??
+                    "OPEN"
+                  }
                   onChange={(event) => {
-                    const nextValue = event.target.value as BehaviorRecordStatus;
+                    const nextValue = event.target
+                      .value as BehaviorRecordStatus;
                     if (editingRecordId) {
                       setEditingForm((current) =>
                         current ? { ...current, status: nextValue } : current,
@@ -975,7 +1125,9 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
               <Field htmlFor="incident-form-title" label="Short summary">
                 <Input
                   id="incident-form-title"
-                  value={(editingRecordId ? editingForm?.title : form.title) ?? ""}
+                  value={
+                    (editingRecordId ? editingForm?.title : form.title) ?? ""
+                  }
                   onChange={(event) => {
                     const nextValue = event.target.value;
                     if (editingRecordId) {
@@ -992,7 +1144,10 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
               <Field htmlFor="incident-form-program" label="Program">
                 <Input
                   id="incident-form-program"
-                  value={(editingRecordId ? editingForm?.program : form.program) ?? ""}
+                  value={
+                    (editingRecordId ? editingForm?.program : form.program) ??
+                    ""
+                  }
                   onChange={(event) => {
                     const nextValue = event.target.value;
                     if (editingRecordId) {
@@ -1000,7 +1155,10 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                         current ? { ...current, program: nextValue } : current,
                       );
                     } else {
-                      setForm((current) => ({ ...current, program: nextValue }));
+                      setForm((current) => ({
+                        ...current,
+                        program: nextValue,
+                      }));
                     }
                   }}
                 />
@@ -1011,29 +1169,44 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
               <Textarea
                 id="incident-form-description"
                 rows={4}
-                value={(editingRecordId ? editingForm?.description : form.description) ?? ""}
+                value={
+                  (editingRecordId
+                    ? editingForm?.description
+                    : form.description) ?? ""
+                }
                 onChange={(event) => {
                   const nextValue = event.target.value;
                   if (editingRecordId) {
                     setEditingForm((current) =>
-                      current ? { ...current, description: nextValue } : current,
+                      current
+                        ? { ...current, description: nextValue }
+                        : current,
                     );
                   } else {
-                    setForm((current) => ({ ...current, description: nextValue }));
+                    setForm((current) => ({
+                      ...current,
+                      description: nextValue,
+                    }));
                   }
                 }}
               />
             </Field>
 
             <section className="space-y-3 rounded-xl border border-slate-200 p-4">
-              <h3 className="text-sm font-semibold text-slate-900">Staff Information</h3>
+              <h3 className="text-sm font-semibold text-slate-900">
+                Staff Information
+              </h3>
               <div className="grid gap-4 md:grid-cols-3">
                 <Field htmlFor="incident-reporter-name" label="Submitted by">
                   <Input
                     disabled
                     id="incident-reporter-name"
                     readOnly
-                    value={(editingRecordId ? editingForm?.reporterName : form.reporterName) ?? ""}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.reporterName
+                        : form.reporterName) ?? ""
+                    }
                   />
                 </Field>
                 <Field htmlFor="incident-reporter-email" label="Reporter email">
@@ -1041,7 +1214,11 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                     disabled
                     id="incident-reporter-email"
                     readOnly
-                    value={(editingRecordId ? editingForm?.reporterEmail : form.reporterEmail) ?? ""}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.reporterEmail
+                        : form.reporterEmail) ?? ""
+                    }
                   />
                 </Field>
                 <Field htmlFor="incident-reporter-role" label="Reporter role">
@@ -1049,27 +1226,46 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                     disabled
                     id="incident-reporter-role"
                     readOnly
-                    value={(editingRecordId ? editingForm?.reporterRole : form.reporterRole) ?? ""}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.reporterRole
+                        : form.reporterRole) ?? ""
+                    }
                   />
                 </Field>
               </div>
             </section>
 
             <section className="space-y-3 rounded-xl border border-slate-200 p-4">
-              <h3 className="text-sm font-semibold text-slate-900">The Affected Person</h3>
+              <h3 className="text-sm font-semibold text-slate-900">
+                The Affected Person
+              </h3>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field htmlFor="incident-affected-type" label="Affected person type">
+                <Field
+                  htmlFor="incident-affected-type"
+                  label="Affected person type"
+                >
                   <Select
                     id="incident-affected-type"
-                    value={(editingRecordId ? editingForm?.affectedPersonType : form.affectedPersonType) ?? "STUDENT"}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.affectedPersonType
+                        : form.affectedPersonType) ?? "STUDENT"
+                    }
                     onChange={(event) => {
-                      const nextValue = event.target.value as IncidentAffectedPersonType;
+                      const nextValue = event.target
+                        .value as IncidentAffectedPersonType;
                       if (editingRecordId) {
                         setEditingForm((current) =>
-                          current ? { ...current, affectedPersonType: nextValue } : current,
+                          current
+                            ? { ...current, affectedPersonType: nextValue }
+                            : current,
                         );
                       } else {
-                        setForm((current) => ({ ...current, affectedPersonType: nextValue }));
+                        setForm((current) => ({
+                          ...current,
+                          affectedPersonType: nextValue,
+                        }));
                       }
                     }}
                   >
@@ -1083,15 +1279,24 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                 <Field htmlFor="incident-affected-name" label="Name">
                   <Input
                     id="incident-affected-name"
-                    value={(editingRecordId ? editingForm?.affectedPersonName : form.affectedPersonName) ?? ""}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.affectedPersonName
+                        : form.affectedPersonName) ?? ""
+                    }
                     onChange={(event) => {
                       const nextValue = event.target.value;
                       if (editingRecordId) {
                         setEditingForm((current) =>
-                          current ? { ...current, affectedPersonName: nextValue } : current,
+                          current
+                            ? { ...current, affectedPersonName: nextValue }
+                            : current,
                         );
                       } else {
-                        setForm((current) => ({ ...current, affectedPersonName: nextValue }));
+                        setForm((current) => ({
+                          ...current,
+                          affectedPersonName: nextValue,
+                        }));
                       }
                     }}
                   />
@@ -1100,15 +1305,27 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                   <Input
                     id="incident-affected-dob"
                     type="date"
-                    value={(editingRecordId ? editingForm?.affectedPersonDateOfBirth : form.affectedPersonDateOfBirth) ?? ""}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.affectedPersonDateOfBirth
+                        : form.affectedPersonDateOfBirth) ?? ""
+                    }
                     onChange={(event) => {
                       const nextValue = event.target.value;
                       if (editingRecordId) {
                         setEditingForm((current) =>
-                          current ? { ...current, affectedPersonDateOfBirth: nextValue } : current,
+                          current
+                            ? {
+                                ...current,
+                                affectedPersonDateOfBirth: nextValue,
+                              }
+                            : current,
                         );
                       } else {
-                        setForm((current) => ({ ...current, affectedPersonDateOfBirth: nextValue }));
+                        setForm((current) => ({
+                          ...current,
+                          affectedPersonDateOfBirth: nextValue,
+                        }));
                       }
                     }}
                   />
@@ -1116,31 +1333,53 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                 <Field htmlFor="incident-affected-phone" label="Phone number">
                   <Input
                     id="incident-affected-phone"
-                    value={(editingRecordId ? editingForm?.affectedPersonPhone : form.affectedPersonPhone) ?? ""}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.affectedPersonPhone
+                        : form.affectedPersonPhone) ?? ""
+                    }
                     onChange={(event) => {
                       const nextValue = event.target.value;
                       if (editingRecordId) {
                         setEditingForm((current) =>
-                          current ? { ...current, affectedPersonPhone: nextValue } : current,
+                          current
+                            ? { ...current, affectedPersonPhone: nextValue }
+                            : current,
                         );
                       } else {
-                        setForm((current) => ({ ...current, affectedPersonPhone: nextValue }));
+                        setForm((current) => ({
+                          ...current,
+                          affectedPersonPhone: nextValue,
+                        }));
                       }
                     }}
                   />
                 </Field>
-                <Field className="md:col-span-2" htmlFor="incident-affected-address" label="Address">
+                <Field
+                  className="md:col-span-2"
+                  htmlFor="incident-affected-address"
+                  label="Address"
+                >
                   <Input
                     id="incident-affected-address"
-                    value={(editingRecordId ? editingForm?.affectedPersonAddress : form.affectedPersonAddress) ?? ""}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.affectedPersonAddress
+                        : form.affectedPersonAddress) ?? ""
+                    }
                     onChange={(event) => {
                       const nextValue = event.target.value;
                       if (editingRecordId) {
                         setEditingForm((current) =>
-                          current ? { ...current, affectedPersonAddress: nextValue } : current,
+                          current
+                            ? { ...current, affectedPersonAddress: nextValue }
+                            : current,
                         );
                       } else {
-                        setForm((current) => ({ ...current, affectedPersonAddress: nextValue }));
+                        setForm((current) => ({
+                          ...current,
+                          affectedPersonAddress: nextValue,
+                        }));
                       }
                     }}
                   />
@@ -1150,23 +1389,43 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
 
             <section className="space-y-3 rounded-xl border border-slate-200 p-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-900">Witness Details</h3>
-                <Button type="button" size="sm" variant="secondary" onClick={() => addWitness(editingRecordId ? "edit" : "create")}>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Witness Details
+                </h3>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    addWitness(editingRecordId ? "edit" : "create")
+                  }
+                >
                   Add witness
                 </Button>
               </div>
-              {(editingRecordId ? editingForm?.witnesses : form.witnesses)?.length ? (
+              {(editingRecordId ? editingForm?.witnesses : form.witnesses)
+                ?.length ? (
                 <div className="space-y-3">
-                  {(editingRecordId ? editingForm?.witnesses : form.witnesses)?.map((witness, index) => (
-                    <div key={`${index}-${witness.name}`} className="grid gap-3 rounded-lg border border-slate-200 p-3 md:grid-cols-4">
+                  {(editingRecordId
+                    ? editingForm?.witnesses
+                    : form.witnesses
+                  )?.map((witness, index) => (
+                    <div
+                      key={`${index}-${witness.name}`}
+                      className="grid gap-3 rounded-lg border border-slate-200 p-3 md:grid-cols-4"
+                    >
                       <Field htmlFor={`witness-name-${index}`} label="Name">
                         <Input
                           id={`witness-name-${index}`}
                           value={witness.name}
                           onChange={(event) =>
-                            updateWitness(editingRecordId ? "edit" : "create", index, {
-                              name: event.target.value,
-                            })
+                            updateWitness(
+                              editingRecordId ? "edit" : "create",
+                              index,
+                              {
+                                name: event.target.value,
+                              },
+                            )
                           }
                         />
                       </Field>
@@ -1175,9 +1434,13 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                           id={`witness-phone-${index}`}
                           value={witness.phoneNumber ?? ""}
                           onChange={(event) =>
-                            updateWitness(editingRecordId ? "edit" : "create", index, {
-                              phoneNumber: event.target.value,
-                            })
+                            updateWitness(
+                              editingRecordId ? "edit" : "create",
+                              index,
+                              {
+                                phoneNumber: event.target.value,
+                              },
+                            )
                           }
                         />
                       </Field>
@@ -1186,9 +1449,13 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                           id={`witness-role-${index}`}
                           value={witness.role ?? "OTHER"}
                           onChange={(event) =>
-                            updateWitness(editingRecordId ? "edit" : "create", index, {
-                              role: event.target.value as IncidentWitnessRole,
-                            })
+                            updateWitness(
+                              editingRecordId ? "edit" : "create",
+                              index,
+                              {
+                                role: event.target.value as IncidentWitnessRole,
+                              },
+                            )
                           }
                         >
                           {witnessRoleOptions.map((option) => (
@@ -1203,9 +1470,13 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                           id={`witness-notes-${index}`}
                           value={witness.notes ?? ""}
                           onChange={(event) =>
-                            updateWitness(editingRecordId ? "edit" : "create", index, {
-                              notes: event.target.value,
-                            })
+                            updateWitness(
+                              editingRecordId ? "edit" : "create",
+                              index,
+                              {
+                                notes: event.target.value,
+                              },
+                            )
                           }
                         />
                       </Field>
@@ -1214,7 +1485,12 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                           type="button"
                           size="sm"
                           variant="ghost"
-                          onClick={() => removeWitness(editingRecordId ? "edit" : "create", index)}
+                          onClick={() =>
+                            removeWitness(
+                              editingRecordId ? "edit" : "create",
+                              index,
+                            )
+                          }
                         >
                           Remove witness
                         </Button>
@@ -1228,20 +1504,35 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
             </section>
 
             <section className="space-y-3 rounded-xl border border-slate-200 p-4">
-              <h3 className="text-sm font-semibold text-slate-900">First Aid Details</h3>
+              <h3 className="text-sm font-semibold text-slate-900">
+                First Aid Details
+              </h3>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field htmlFor="incident-first-aid-status" label="First aid administered">
+                <Field
+                  htmlFor="incident-first-aid-status"
+                  label="First aid administered"
+                >
                   <Select
                     id="incident-first-aid-status"
-                    value={(editingRecordId ? editingForm?.firstAidStatus : form.firstAidStatus) ?? "NOT_APPLICABLE"}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.firstAidStatus
+                        : form.firstAidStatus) ?? "NOT_APPLICABLE"
+                    }
                     onChange={(event) => {
-                      const nextValue = event.target.value as IncidentFirstAidStatus;
+                      const nextValue = event.target
+                        .value as IncidentFirstAidStatus;
                       if (editingRecordId) {
                         setEditingForm((current) =>
-                          current ? { ...current, firstAidStatus: nextValue } : current,
+                          current
+                            ? { ...current, firstAidStatus: nextValue }
+                            : current,
                         );
                       } else {
-                        setForm((current) => ({ ...current, firstAidStatus: nextValue }));
+                        setForm((current) => ({
+                          ...current,
+                          firstAidStatus: nextValue,
+                        }));
                       }
                     }}
                   >
@@ -1252,51 +1543,91 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                     ))}
                   </Select>
                 </Field>
-                <Field htmlFor="incident-first-aid-by" label="Who administered first aid">
+                <Field
+                  htmlFor="incident-first-aid-by"
+                  label="Who administered first aid"
+                >
                   <Input
                     id="incident-first-aid-by"
-                    value={(editingRecordId ? editingForm?.firstAidAdministeredBy : form.firstAidAdministeredBy) ?? ""}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.firstAidAdministeredBy
+                        : form.firstAidAdministeredBy) ?? ""
+                    }
                     onChange={(event) => {
                       const nextValue = event.target.value;
                       if (editingRecordId) {
                         setEditingForm((current) =>
-                          current ? { ...current, firstAidAdministeredBy: nextValue } : current,
+                          current
+                            ? { ...current, firstAidAdministeredBy: nextValue }
+                            : current,
                         );
                       } else {
-                        setForm((current) => ({ ...current, firstAidAdministeredBy: nextValue }));
+                        setForm((current) => ({
+                          ...current,
+                          firstAidAdministeredBy: nextValue,
+                        }));
                       }
                     }}
                   />
                 </Field>
-                <Field htmlFor="incident-first-aid-phone" label="First aid phone number">
+                <Field
+                  htmlFor="incident-first-aid-phone"
+                  label="First aid phone number"
+                >
                   <Input
                     id="incident-first-aid-phone"
-                    value={(editingRecordId ? editingForm?.firstAidAdministeredByPhone : form.firstAidAdministeredByPhone) ?? ""}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.firstAidAdministeredByPhone
+                        : form.firstAidAdministeredByPhone) ?? ""
+                    }
                     onChange={(event) => {
                       const nextValue = event.target.value;
                       if (editingRecordId) {
                         setEditingForm((current) =>
-                          current ? { ...current, firstAidAdministeredByPhone: nextValue } : current,
+                          current
+                            ? {
+                                ...current,
+                                firstAidAdministeredByPhone: nextValue,
+                              }
+                            : current,
                         );
                       } else {
-                        setForm((current) => ({ ...current, firstAidAdministeredByPhone: nextValue }));
+                        setForm((current) => ({
+                          ...current,
+                          firstAidAdministeredByPhone: nextValue,
+                        }));
                       }
                     }}
                   />
                 </Field>
-                <Field className="md:col-span-2" htmlFor="incident-first-aid-details" label="First aid care details">
+                <Field
+                  className="md:col-span-2"
+                  htmlFor="incident-first-aid-details"
+                  label="First aid care details"
+                >
                   <Textarea
                     id="incident-first-aid-details"
                     rows={2}
-                    value={(editingRecordId ? editingForm?.firstAidDetails : form.firstAidDetails) ?? ""}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.firstAidDetails
+                        : form.firstAidDetails) ?? ""
+                    }
                     onChange={(event) => {
                       const nextValue = event.target.value;
                       if (editingRecordId) {
                         setEditingForm((current) =>
-                          current ? { ...current, firstAidDetails: nextValue } : current,
+                          current
+                            ? { ...current, firstAidDetails: nextValue }
+                            : current,
                         );
                       } else {
-                        setForm((current) => ({ ...current, firstAidDetails: nextValue }));
+                        setForm((current) => ({
+                          ...current,
+                          firstAidDetails: nextValue,
+                        }));
                       }
                     }}
                   />
@@ -1305,20 +1636,36 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
             </section>
 
             <section className="space-y-3 rounded-xl border border-slate-200 p-4">
-              <h3 className="text-sm font-semibold text-slate-900">Post-Incident Details</h3>
+              <h3 className="text-sm font-semibold text-slate-900">
+                Post-Incident Details
+              </h3>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field htmlFor="incident-destination" label="Where did the affected person go next">
+                <Field
+                  htmlFor="incident-destination"
+                  label="Where did the affected person go next"
+                >
                   <Select
                     id="incident-destination"
-                    value={(editingRecordId ? editingForm?.postIncidentDestination : form.postIncidentDestination) ?? "RETURNED_TO_CLASS_OR_WORK"}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.postIncidentDestination
+                        : form.postIncidentDestination) ??
+                      "RETURNED_TO_CLASS_OR_WORK"
+                    }
                     onChange={(event) => {
-                      const nextValue = event.target.value as IncidentPostDestination;
+                      const nextValue = event.target
+                        .value as IncidentPostDestination;
                       if (editingRecordId) {
                         setEditingForm((current) =>
-                          current ? { ...current, postIncidentDestination: nextValue } : current,
+                          current
+                            ? { ...current, postIncidentDestination: nextValue }
+                            : current,
                         );
                       } else {
-                        setForm((current) => ({ ...current, postIncidentDestination: nextValue }));
+                        setForm((current) => ({
+                          ...current,
+                          postIncidentDestination: nextValue,
+                        }));
                       }
                     }}
                   >
@@ -1329,18 +1676,31 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                     ))}
                   </Select>
                 </Field>
-                <Field htmlFor="incident-jhsc" label="Joint Health and Safety notified">
+                <Field
+                  htmlFor="incident-jhsc"
+                  label="Joint Health and Safety notified"
+                >
                   <Select
                     id="incident-jhsc"
-                    value={(editingRecordId ? editingForm?.jhscNotificationStatus : form.jhscNotificationStatus) ?? "NOT_APPLICABLE"}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.jhscNotificationStatus
+                        : form.jhscNotificationStatus) ?? "NOT_APPLICABLE"
+                    }
                     onChange={(event) => {
-                      const nextValue = event.target.value as IncidentJhscNotificationStatus;
+                      const nextValue = event.target
+                        .value as IncidentJhscNotificationStatus;
                       if (editingRecordId) {
                         setEditingForm((current) =>
-                          current ? { ...current, jhscNotificationStatus: nextValue } : current,
+                          current
+                            ? { ...current, jhscNotificationStatus: nextValue }
+                            : current,
                         );
                       } else {
-                        setForm((current) => ({ ...current, jhscNotificationStatus: nextValue }));
+                        setForm((current) => ({
+                          ...current,
+                          jhscNotificationStatus: nextValue,
+                        }));
                       }
                     }}
                   >
@@ -1351,33 +1711,57 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                     ))}
                   </Select>
                 </Field>
-                <Field htmlFor="incident-destination-other" label="Destination details (if other)">
+                <Field
+                  htmlFor="incident-destination-other"
+                  label="Destination details (if other)"
+                >
                   <Input
                     id="incident-destination-other"
-                    value={(editingRecordId ? editingForm?.postIncidentDestinationOther : form.postIncidentDestinationOther) ?? ""}
+                    value={
+                      (editingRecordId
+                        ? editingForm?.postIncidentDestinationOther
+                        : form.postIncidentDestinationOther) ?? ""
+                    }
                     onChange={(event) => {
                       const nextValue = event.target.value;
                       if (editingRecordId) {
                         setEditingForm((current) =>
-                          current ? { ...current, postIncidentDestinationOther: nextValue } : current,
+                          current
+                            ? {
+                                ...current,
+                                postIncidentDestinationOther: nextValue,
+                              }
+                            : current,
                         );
                       } else {
-                        setForm((current) => ({ ...current, postIncidentDestinationOther: nextValue }));
+                        setForm((current) => ({
+                          ...current,
+                          postIncidentDestinationOther: nextValue,
+                        }));
                       }
                     }}
                   />
                 </Field>
                 <CheckboxField
-                  checked={(editingRecordId ? editingForm?.isIncidentTimeApproximate : form.isIncidentTimeApproximate) ?? false}
+                  checked={
+                    (editingRecordId
+                      ? editingForm?.isIncidentTimeApproximate
+                      : form.isIncidentTimeApproximate) ?? false
+                  }
                   label="Incident time is approximate"
                   onChange={(event) => {
                     const nextValue = event.target.checked;
                     if (editingRecordId) {
                       setEditingForm((current) =>
-                        current ? { ...current, isIncidentTimeApproximate: nextValue } : current,
+                        current
+                          ? { ...current, isIncidentTimeApproximate: nextValue }
+                          : current,
                       );
                     } else {
-                      setForm((current) => ({ ...current, isIncidentTimeApproximate: nextValue }));
+                      setForm((current) => ({
+                        ...current,
+                        isIncidentTimeApproximate: nextValue,
+                      }));
                     }
                   }}
                 />
@@ -1388,15 +1772,24 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
               <Textarea
                 id="incident-action-taken"
                 rows={2}
-                value={(editingRecordId ? editingForm?.actionTaken : form.actionTaken) ?? ""}
+                value={
+                  (editingRecordId
+                    ? editingForm?.actionTaken
+                    : form.actionTaken) ?? ""
+                }
                 onChange={(event) => {
                   const nextValue = event.target.value;
                   if (editingRecordId) {
                     setEditingForm((current) =>
-                      current ? { ...current, actionTaken: nextValue } : current,
+                      current
+                        ? { ...current, actionTaken: nextValue }
+                        : current,
                     );
                   } else {
-                    setForm((current) => ({ ...current, actionTaken: nextValue }));
+                    setForm((current) => ({
+                      ...current,
+                      actionTaken: nextValue,
+                    }));
                   }
                 }}
               />
@@ -1406,15 +1799,24 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
               <Textarea
                 id="incident-additional-notes"
                 rows={3}
-                value={(editingRecordId ? editingForm?.additionalNotes : form.additionalNotes) ?? ""}
+                value={
+                  (editingRecordId
+                    ? editingForm?.additionalNotes
+                    : form.additionalNotes) ?? ""
+                }
                 onChange={(event) => {
                   const nextValue = event.target.value;
                   if (editingRecordId) {
                     setEditingForm((current) =>
-                      current ? { ...current, additionalNotes: nextValue } : current,
+                      current
+                        ? { ...current, additionalNotes: nextValue }
+                        : current,
                     );
                   } else {
-                    setForm((current) => ({ ...current, additionalNotes: nextValue }));
+                    setForm((current) => ({
+                      ...current,
+                      additionalNotes: nextValue,
+                    }));
                   }
                 }}
               />
@@ -1422,30 +1824,48 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
 
             <div className="grid gap-2 md:grid-cols-2">
               <CheckboxField
-                checked={(editingRecordId ? editingForm?.followUpRequired : form.followUpRequired) ?? false}
+                checked={
+                  (editingRecordId
+                    ? editingForm?.followUpRequired
+                    : form.followUpRequired) ?? false
+                }
                 label="Follow-up required"
                 onChange={(event) => {
                   const nextValue = event.target.checked;
                   if (editingRecordId) {
                     setEditingForm((current) =>
-                      current ? { ...current, followUpRequired: nextValue } : current,
+                      current
+                        ? { ...current, followUpRequired: nextValue }
+                        : current,
                     );
                   } else {
-                    setForm((current) => ({ ...current, followUpRequired: nextValue }));
+                    setForm((current) => ({
+                      ...current,
+                      followUpRequired: nextValue,
+                    }));
                   }
                 }}
               />
               <CheckboxField
-                checked={(editingRecordId ? editingForm?.parentContacted : form.parentContacted) ?? false}
+                checked={
+                  (editingRecordId
+                    ? editingForm?.parentContacted
+                    : form.parentContacted) ?? false
+                }
                 label="Parent contacted"
                 onChange={(event) => {
                   const nextValue = event.target.checked;
                   if (editingRecordId) {
                     setEditingForm((current) =>
-                      current ? { ...current, parentContacted: nextValue } : current,
+                      current
+                        ? { ...current, parentContacted: nextValue }
+                        : current,
                     );
                   } else {
-                    setForm((current) => ({ ...current, parentContacted: nextValue }));
+                    setForm((current) => ({
+                      ...current,
+                      parentContacted: nextValue,
+                    }));
                   }
                 }}
               />
@@ -1485,40 +1905,67 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
         </CardHeader>
         <CardContent className="space-y-3">
           {isLoading ? (
-            <p className="text-sm text-slate-500">Loading incident reports...</p>
+            <p className="text-sm text-slate-500">
+              Loading incident reports...
+            </p>
           ) : recordsSorted.length === 0 ? (
-            <p className="text-sm text-slate-500">No incident reports found for the selected filters.</p>
+            <p className="text-sm text-slate-500">
+              No incident reports found for the selected filters.
+            </p>
           ) : (
             recordsSorted.map((record) => (
-              <div key={record.id} className="rounded-xl border border-slate-200 bg-white p-4">
+              <div
+                key={record.id}
+                className="rounded-xl border border-slate-200 bg-white p-4"
+              >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{record.title}</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {formatDateTimeLabel(record.incidentAt)} • {record.categoryName}
+                    <p className="text-sm font-semibold text-slate-900">
+                      {record.title}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      Student: {studentById.get(record.studentId)?.fullName ?? record.studentId}
+                      {formatDateTimeLabel(record.incidentAt)} •{" "}
+                      {record.categoryName}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Student:{" "}
+                      {studentById.get(record.studentId)?.fullName ??
+                        record.studentId}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={record.incidentLevel === "MAJOR" ? "danger" : "warning"}>
+                    <Badge
+                      variant={
+                        record.incidentLevel === "MAJOR" ? "danger" : "warning"
+                      }
+                    >
                       {record.incidentLevel === "MAJOR" ? "Major" : "Minor"}
                     </Badge>
-                    <Badge variant={record.status === "RESOLVED" ? "success" : "warning"}>
+                    <Badge
+                      variant={
+                        record.status === "RESOLVED" ? "success" : "warning"
+                      }
+                    >
                       {record.status === "RESOLVED" ? "Resolved" : "Open"}
                     </Badge>
                   </div>
                 </div>
 
-                <p className="mt-3 text-sm text-slate-700">{record.description}</p>
+                <p className="mt-3 text-sm text-slate-700">
+                  {record.description}
+                </p>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Badge variant="neutral">
                     {record.attachments?.length ?? 0} attachment
                     {(record.attachments?.length ?? 0) === 1 ? "" : "s"}
                   </Badge>
-                  <Button size="sm" type="button" variant="secondary" onClick={() => beginEditing(record)}>
+                  <Button
+                    size="sm"
+                    type="button"
+                    variant="secondary"
+                    onClick={() => beginEditing(record)}
+                  >
                     Edit report
                   </Button>
                 </div>
@@ -1535,9 +1982,15 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                           className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 px-3 py-2 text-sm"
                         >
                           <div>
-                            <p className="font-medium text-slate-800">{attachment.originalFileName}</p>
+                            <p className="font-medium text-slate-800">
+                              {attachment.originalFileName}
+                            </p>
                             <p className="text-xs text-slate-500">
-                              {Math.max(1, Math.round(attachment.fileSize / 1024))} KB
+                              {Math.max(
+                                1,
+                                Math.round(attachment.fileSize / 1024),
+                              )}{" "}
+                              KB
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -1545,24 +1998,38 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                               size="sm"
                               type="button"
                               variant="secondary"
-                              disabled={downloadingAttachmentId === attachment.id}
+                              disabled={
+                                downloadingAttachmentId === attachment.id
+                              }
                               onClick={() => {
-                                void handleDownloadAttachment(record.id, attachment.id);
+                                void handleDownloadAttachment(
+                                  record.id,
+                                  attachment.id,
+                                );
                               }}
                             >
-                              {downloadingAttachmentId === attachment.id ? "Downloading..." : "Download"}
+                              {downloadingAttachmentId === attachment.id
+                                ? "Downloading..."
+                                : "Download"}
                             </Button>
                             {canDeleteAttachments ? (
                               <Button
                                 size="sm"
                                 type="button"
                                 variant="danger"
-                                disabled={deletingAttachmentId === attachment.id}
+                                disabled={
+                                  deletingAttachmentId === attachment.id
+                                }
                                 onClick={() => {
-                                  void handleDeleteAttachment(record.id, attachment.id);
+                                  void handleDeleteAttachment(
+                                    record.id,
+                                    attachment.id,
+                                  );
                                 }}
                               >
-                                {deletingAttachmentId === attachment.id ? "Deleting..." : "Delete"}
+                                {deletingAttachmentId === attachment.id
+                                  ? "Deleting..."
+                                  : "Delete"}
                               </Button>
                             ) : null}
                           </div>
@@ -1570,7 +2037,9 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                       ))}
                     </div>
                   ) : (
-                    <p className="mt-2 text-sm text-slate-500">No attachments.</p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      No attachments.
+                    </p>
                   )}
 
                   <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -1588,12 +2057,17 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
                     <Button
                       size="sm"
                       type="button"
-                      disabled={uploadingRecordId === record.id || !attachmentFiles[record.id]}
+                      disabled={
+                        uploadingRecordId === record.id ||
+                        !attachmentFiles[record.id]
+                      }
                       onClick={() => {
                         void handleUploadAttachment(record.id);
                       }}
                     >
-                      {uploadingRecordId === record.id ? "Uploading..." : "Upload PDF"}
+                      {uploadingRecordId === record.id
+                        ? "Uploading..."
+                        : "Upload PDF"}
                     </Button>
                   </div>
                 </div>

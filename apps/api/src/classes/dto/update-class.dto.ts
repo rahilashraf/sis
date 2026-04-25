@@ -20,4 +20,8 @@ export class UpdateClassDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  takesAttendance?: boolean;
 }

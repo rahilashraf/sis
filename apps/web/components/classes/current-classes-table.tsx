@@ -5,15 +5,28 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonClassName } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
-import { listClasses, listMyClasses, type SchoolClass } from "@/lib/api/classes";
-import { listReportingPeriods, type ReportingPeriod } from "@/lib/api/reporting-periods";
+import {
+  listClasses,
+  listMyClasses,
+  type SchoolClass,
+} from "@/lib/api/classes";
+import {
+  listReportingPeriods,
+  type ReportingPeriod,
+} from "@/lib/api/reporting-periods";
 import { dateOnlyFromDate, parseDateOnly } from "@/lib/date";
 
 type Mode = "teacher" | "admin";
@@ -70,7 +83,9 @@ function getStudentCount(schoolClass: SchoolClass) {
 function getGradeSortKey(schoolClass: SchoolClass) {
   const label = getGradeLevelFilterValue(schoolClass);
   const gradeNumberMatch = label.match(/(\d{1,2})/);
-  const gradeNumber = gradeNumberMatch ? Number(gradeNumberMatch[1]) : Number.MAX_SAFE_INTEGER;
+  const gradeNumber = gradeNumberMatch
+    ? Number(gradeNumberMatch[1])
+    : Number.MAX_SAFE_INTEGER;
 
   return {
     gradeNumber,
@@ -78,7 +93,10 @@ function getGradeSortKey(schoolClass: SchoolClass) {
   };
 }
 
-function findCurrentReportingPeriod(periods: ReportingPeriod[], now = new Date()) {
+function findCurrentReportingPeriod(
+  periods: ReportingPeriod[],
+  now = new Date(),
+) {
   const currentDate = parseDateOnly(dateOnlyFromDate(now));
   if (!currentDate) {
     return null;
@@ -91,10 +109,18 @@ function findCurrentReportingPeriod(periods: ReportingPeriod[], now = new Date()
     return Boolean(start && end && currentDate >= start && currentDate <= end);
   });
 
-  return matchingPeriod ?? activePeriods.sort((a, b) => a.order - b.order)[0] ?? null;
+  return (
+    matchingPeriod ?? activePeriods.sort((a, b) => a.order - b.order)[0] ?? null
+  );
 }
 
-export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: ReactNode }) {
+export function CurrentClassesTable({
+  mode,
+  actions,
+}: {
+  mode: Mode;
+  actions?: ReactNode;
+}) {
   const router = useRouter();
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [reportingPeriodByKey, setReportingPeriodByKey] = useState<
@@ -111,22 +137,29 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
 
   const gradeLevelFilterOptions = useMemo(
     () =>
-      Array.from(new Set(classes.map((schoolClass) => getGradeLevelFilterValue(schoolClass)))).sort(
-        (a, b) => a.localeCompare(b),
-      ),
+      Array.from(
+        new Set(
+          classes.map((schoolClass) => getGradeLevelFilterValue(schoolClass)),
+        ),
+      ).sort((a, b) => a.localeCompare(b)),
     [classes],
   );
 
   const subjectFilterOptions = useMemo(
     () =>
-      Array.from(new Set(classes.map((schoolClass) => getSubjectFilterValue(schoolClass)))).sort(
-        (a, b) => a.localeCompare(b),
-      ),
+      Array.from(
+        new Set(
+          classes.map((schoolClass) => getSubjectFilterValue(schoolClass)),
+        ),
+      ).sort((a, b) => a.localeCompare(b)),
     [classes],
   );
 
   const schoolYearFilterOptions = useMemo(() => {
-    const byId = new Map<string, { id: string; name: string; isActive: boolean }>();
+    const byId = new Map<
+      string,
+      { id: string; name: string; isActive: boolean }
+    >();
     for (const schoolClass of classes) {
       byId.set(schoolClass.schoolYear.id, {
         id: schoolClass.schoolYear.id,
@@ -135,7 +168,9 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
       });
     }
 
-    return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(byId.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
   }, [classes]);
 
   const reportingPeriodFilterOptions = useMemo(() => {
@@ -156,7 +191,9 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
   );
 
   const effectiveSchoolYearFilter =
-    selectedSchoolYear === "current" && !hasActiveSchoolYears ? "all" : selectedSchoolYear;
+    selectedSchoolYear === "current" && !hasActiveSchoolYears
+      ? "all"
+      : selectedSchoolYear;
 
   const filteredAndSortedClasses = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -167,7 +204,9 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
       const className = schoolClass.name.toLowerCase();
       const subjectName = getSubjectLabel(schoolClass).toLowerCase();
       const schoolName = schoolClass.school.name.toLowerCase();
-      const schoolShortName = (schoolClass.school.shortName ?? "").toLowerCase();
+      const schoolShortName = (
+        schoolClass.school.shortName ?? ""
+      ).toLowerCase();
 
       const matchesSearch =
         normalizedQuery.length === 0 ||
@@ -181,7 +220,8 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
         getGradeLevelFilterValue(schoolClass) === selectedGradeLevel;
 
       const matchesSubject =
-        selectedSubject === "all" || getSubjectFilterValue(schoolClass) === selectedSubject;
+        selectedSubject === "all" ||
+        getSubjectFilterValue(schoolClass) === selectedSubject;
 
       const matchesSchoolYear =
         effectiveSchoolYearFilter === "all" ||
@@ -266,10 +306,15 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
       setError(null);
 
       try {
-        const response = mode === "teacher" ? await listMyClasses() : await listClasses();
+        const response =
+          mode === "teacher" ? await listMyClasses() : await listClasses();
         setClasses(response);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load classes.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load classes.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -286,13 +331,21 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
       }
 
       const uniqueKeys = Array.from(
-        new Set(classes.map((schoolClass) => `${schoolClass.schoolId}:${schoolClass.schoolYearId}`)),
+        new Set(
+          classes.map(
+            (schoolClass) =>
+              `${schoolClass.schoolId}:${schoolClass.schoolYearId}`,
+          ),
+        ),
       );
 
       const results = await Promise.allSettled(
         uniqueKeys.map(async (key) => {
           const [schoolId, schoolYearId] = key.split(":");
-          const periods = await listReportingPeriods({ schoolId, schoolYearId });
+          const periods = await listReportingPeriods({
+            schoolId,
+            schoolYearId,
+          });
           return { key, period: findCurrentReportingPeriod(periods) };
         }),
       );
@@ -329,7 +382,10 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
         meta={
           <Badge variant="neutral">
             {filteredAndSortedClasses.length}
-            {filteredAndSortedClasses.length !== classes.length ? ` of ${classes.length}` : ""} classes
+            {filteredAndSortedClasses.length !== classes.length
+              ? ` of ${classes.length}`
+              : ""}{" "}
+            classes
           </Badge>
         }
       />
@@ -350,7 +406,8 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
           <CardHeader>
             <CardTitle>Classes</CardTitle>
             <CardDescription>
-              Filter, sort, and open classes directly into gradebook, attendance, or student views.
+              Filter, sort, and open classes directly into gradebook,
+              attendance, or student views.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -364,10 +421,15 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
                 />
               </Field>
 
-              <Field htmlFor={`${mode}-classes-grade-level-filter`} label="Grade level">
+              <Field
+                htmlFor={`${mode}-classes-grade-level-filter`}
+                label="Grade level"
+              >
                 <Select
                   id={`${mode}-classes-grade-level-filter`}
-                  onChange={(event) => setSelectedGradeLevel(event.target.value)}
+                  onChange={(event) =>
+                    setSelectedGradeLevel(event.target.value)
+                  }
                   value={selectedGradeLevel}
                 >
                   <option value="all">All grade levels</option>
@@ -394,10 +456,15 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
                 </Select>
               </Field>
 
-              <Field htmlFor={`${mode}-classes-school-year-filter`} label="School year">
+              <Field
+                htmlFor={`${mode}-classes-school-year-filter`}
+                label="School year"
+              >
                 <Select
                   id={`${mode}-classes-school-year-filter`}
-                  onChange={(event) => setSelectedSchoolYear(event.target.value)}
+                  onChange={(event) =>
+                    setSelectedSchoolYear(event.target.value)
+                  }
                   value={selectedSchoolYear}
                 >
                   <option value="current">Current school year</option>
@@ -411,10 +478,15 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
                 </Select>
               </Field>
 
-              <Field htmlFor={`${mode}-classes-reporting-period-filter`} label="Reporting period">
+              <Field
+                htmlFor={`${mode}-classes-reporting-period-filter`}
+                label="Reporting period"
+              >
                 <Select
                   id={`${mode}-classes-reporting-period-filter`}
-                  onChange={(event) => setSelectedReportingPeriod(event.target.value)}
+                  onChange={(event) =>
+                    setSelectedReportingPeriod(event.target.value)
+                  }
                   value={selectedReportingPeriod}
                 >
                   <option value="all">All reporting periods</option>
@@ -422,7 +494,9 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
                   {reportingPeriodFilterOptions.map((period) => (
                     <option key={period.id} value={period.id}>
                       {period.order}. {period.name}
-                      {period.school?.shortName ? ` • ${period.school.shortName}` : ""}
+                      {period.school?.shortName
+                        ? ` • ${period.school.shortName}`
+                        : ""}
                     </option>
                   ))}
                 </Select>
@@ -431,14 +505,20 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
               <Field htmlFor={`${mode}-classes-sort`} label="Sort by">
                 <Select
                   id={`${mode}-classes-sort`}
-                  onChange={(event) => setSortOption(event.target.value as SortOption)}
+                  onChange={(event) =>
+                    setSortOption(event.target.value as SortOption)
+                  }
                   value={sortOption}
                 >
                   <option value="NAME_ASC">Class name (A–Z)</option>
                   <option value="NAME_DESC">Class name (Z–A)</option>
                   <option value="GRADE_LEVEL_ASC">Grade level</option>
-                  <option value="STUDENT_COUNT_DESC">Student count (high to low)</option>
-                  <option value="STUDENT_COUNT_ASC">Student count (low to high)</option>
+                  <option value="STUDENT_COUNT_DESC">
+                    Student count (high to low)
+                  </option>
+                  <option value="STUDENT_COUNT_ASC">
+                    Student count (low to high)
+                  </option>
                   <option value="UPDATED_DESC">Recently updated</option>
                   <option value="UPDATED_ASC">Least recently updated</option>
                 </Select>
@@ -474,13 +554,27 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
                   <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                     <thead className="bg-slate-50/80">
                       <tr>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Class</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Subject</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Students</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Grade level</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">School year</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Reporting period</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Class
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Subject
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Students
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Grade level
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          School year
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Reporting period
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white">
@@ -489,7 +583,10 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
                         const currentPeriod = reportingPeriodByKey[key] ?? null;
 
                         return (
-                          <tr className="align-top hover:bg-slate-50" key={schoolClass.id}>
+                          <tr
+                            className="align-top hover:bg-slate-50"
+                            key={schoolClass.id}
+                          >
                             <td className="px-4 py-4">
                               <button
                                 className="text-left font-medium text-slate-900 hover:underline"
@@ -502,12 +599,22 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
                               >
                                 {schoolClass.name}
                               </button>
-                              <p className="mt-1 text-xs text-slate-500">{schoolClass.school.name}</p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {schoolClass.school.name}
+                              </p>
                             </td>
-                            <td className="px-4 py-4 text-slate-600">{getSubjectLabel(schoolClass)}</td>
-                            <td className="px-4 py-4 text-slate-600">{getStudentCount(schoolClass)}</td>
-                            <td className="px-4 py-4 text-slate-600">{inferGradeLevelLabel(schoolClass)}</td>
-                            <td className="px-4 py-4 text-slate-600">{schoolClass.schoolYear.name}</td>
+                            <td className="px-4 py-4 text-slate-600">
+                              {getSubjectLabel(schoolClass)}
+                            </td>
+                            <td className="px-4 py-4 text-slate-600">
+                              {getStudentCount(schoolClass)}
+                            </td>
+                            <td className="px-4 py-4 text-slate-600">
+                              {inferGradeLevelLabel(schoolClass)}
+                            </td>
+                            <td className="px-4 py-4 text-slate-600">
+                              {schoolClass.schoolYear.name}
+                            </td>
                             <td className="px-4 py-4 text-slate-600">
                               {currentPeriod ? (
                                 <span>
@@ -519,40 +626,96 @@ export function CurrentClassesTable({ mode, actions }: { mode: Mode; actions?: R
                               )}
                             </td>
                             <td className="px-4 py-4">
-                              <div className="flex flex-wrap gap-2">
-                                <Link
-                                  className={buttonClassName({ size: "sm", variant: "secondary" })}
-                                  href={`/${mode}/gradebook?classId=${encodeURIComponent(
-                                    schoolClass.id,
-                                  )}`}
-                                >
-                                  Gradebook
-                                </Link>
-                                <Link
-                                  className={buttonClassName({ size: "sm", variant: "secondary" })}
-                                  href={`/${mode}/attendance?classId=${encodeURIComponent(schoolClass.id)}`}
-                                >
-                                  Attendance
-                                </Link>
-                                <Link
-                                  className={buttonClassName({ size: "sm", variant: "secondary" })}
-                                  href={
-                                    mode === "admin"
-                                      ? `/admin/classes/${schoolClass.id}/summary`
-                                      : `/teacher/classes/${schoolClass.id}`
-                                  }
-                                >
-                                  Students
-                                </Link>
-                                <Link
-                                  className={buttonClassName({ size: "sm", variant: "secondary" })}
-                                  href={`/${mode}/classes/${schoolClass.id}/assignments`}
-                                >
-                                  Assignments
-                                </Link>
-                                <Button size="sm" type="button" variant="secondary" disabled>
-                                  Reports
-                                </Button>
+                              <div className="space-y-2">
+                                <div className="flex flex-wrap gap-2">
+                                  <Link
+                                    className={buttonClassName({
+                                      size: "sm",
+                                      variant: "secondary",
+                                    })}
+                                    href={`/${mode}/gradebook?classId=${encodeURIComponent(
+                                      schoolClass.id,
+                                    )}`}
+                                  >
+                                    Gradebook
+                                  </Link>
+                                  <Link
+                                    className={buttonClassName({
+                                      size: "sm",
+                                      variant: "secondary",
+                                    })}
+                                    aria-disabled={!schoolClass.takesAttendance}
+                                    href={
+                                      schoolClass.takesAttendance
+                                        ? `/${mode}/attendance?classId=${encodeURIComponent(schoolClass.id)}`
+                                        : "#"
+                                    }
+                                    onClick={(event) => {
+                                      if (!schoolClass.takesAttendance) {
+                                        event.preventDefault();
+                                      }
+                                    }}
+                                  >
+                                    Attendance
+                                  </Link>
+                                  {!schoolClass.takesAttendance ? (
+                                    <Badge variant="warning">
+                                      Attendance disabled
+                                    </Badge>
+                                  ) : null}
+                                  <Link
+                                    className={buttonClassName({
+                                      size: "sm",
+                                      variant: "secondary",
+                                    })}
+                                    href={
+                                      mode === "admin"
+                                        ? `/admin/classes/${schoolClass.id}/summary`
+                                        : `/teacher/classes/${schoolClass.id}`
+                                    }
+                                  >
+                                    Students
+                                  </Link>
+                                  <Link
+                                    className={buttonClassName({
+                                      size: "sm",
+                                      variant: "secondary",
+                                    })}
+                                    href={`/${mode}/classes/${schoolClass.id}/assignments`}
+                                  >
+                                    Assignments
+                                  </Link>
+                                  <Button
+                                    size="sm"
+                                    type="button"
+                                    variant="secondary"
+                                    disabled
+                                  >
+                                    Reports
+                                  </Button>
+                                </div>
+                                {mode === "admin" ? (
+                                  <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-2">
+                                    <Link
+                                      className={buttonClassName({
+                                        size: "sm",
+                                        variant: "secondary",
+                                      })}
+                                      href={`/admin/classes/${schoolClass.id}`}
+                                    >
+                                      Edit Class
+                                    </Link>
+                                    <Link
+                                      className={buttonClassName({
+                                        size: "sm",
+                                        variant: "secondary",
+                                      })}
+                                      href={`/admin/classes/${schoolClass.id}#duplicate-class`}
+                                    >
+                                      Duplicate Class
+                                    </Link>
+                                  </div>
+                                ) : null}
                               </div>
                             </td>
                           </tr>

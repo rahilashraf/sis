@@ -133,7 +133,10 @@ export function createAssessmentType(input: CreateAssessmentTypeInput) {
   });
 }
 
-export function updateAssessmentType(typeId: string, input: UpdateAssessmentTypeInput) {
+export function updateAssessmentType(
+  typeId: string,
+  input: UpdateAssessmentTypeInput,
+) {
   return apiFetch<AssessmentType>(`/assessment-types/${typeId}`, {
     method: "PATCH",
     json: input,
@@ -152,7 +155,10 @@ export function activateAssessmentType(typeId: string) {
   });
 }
 
-export function listAssessments(classId: string, options?: { includeInactive?: boolean }) {
+export function listAssessments(
+  classId: string,
+  options?: { includeInactive?: boolean },
+) {
   const query = new URLSearchParams({ classId });
   if (options?.includeInactive) {
     query.set("includeInactive", "true");
@@ -167,7 +173,10 @@ export function createAssessment(input: CreateAssessmentInput) {
   });
 }
 
-export function updateAssessment(assessmentId: string, input: UpdateAssessmentInput) {
+export function updateAssessment(
+  assessmentId: string,
+  input: UpdateAssessmentInput,
+) {
   return apiFetch<Assessment>(`/assessments/${assessmentId}`, {
     method: "PATCH",
     json: input,
@@ -193,7 +202,9 @@ export function deleteAssessment(assessmentId: string) {
 }
 
 export function getAssessmentGrades(assessmentId: string) {
-  return apiFetch<AssessmentGradesResponse>(`/assessments/${assessmentId}/grades`);
+  return apiFetch<AssessmentGradesResponse>(
+    `/assessments/${assessmentId}/grades`,
+  );
 }
 
 export function upsertAssessmentGrades(
@@ -219,12 +230,17 @@ export type AssessmentResultStatusLabel = {
   updatedAt: string;
 };
 
-export function listAssessmentResultStatusLabels(options: { schoolId: string; includeInactive?: boolean }) {
+export function listAssessmentResultStatusLabels(options: {
+  schoolId: string;
+  includeInactive?: boolean;
+}) {
   const query = new URLSearchParams({ schoolId: options.schoolId });
   if (options.includeInactive) {
     query.set("includeInactive", "true");
   }
-  return apiFetch<AssessmentResultStatusLabel[]>(`/assessment-result-status-labels?${query.toString()}`);
+  return apiFetch<AssessmentResultStatusLabel[]>(
+    `/assessment-result-status-labels?${query.toString()}`,
+  );
 }
 
 export function createAssessmentResultStatusLabel(input: {
@@ -234,18 +250,29 @@ export function createAssessmentResultStatusLabel(input: {
   behavior?: AssessmentResultStatusLabel["behavior"];
   sortOrder?: number;
 }) {
-  return apiFetch<AssessmentResultStatusLabel>("/assessment-result-status-labels", {
-    method: "POST",
-    json: input,
-  });
+  return apiFetch<AssessmentResultStatusLabel>(
+    "/assessment-result-status-labels",
+    {
+      method: "POST",
+      json: input,
+    },
+  );
 }
 
 export function updateAssessmentResultStatusLabel(
   id: string,
-  input: Partial<Pick<AssessmentResultStatusLabel, "label" | "behavior" | "sortOrder" | "isActive">>,
+  input: Partial<
+    Pick<
+      AssessmentResultStatusLabel,
+      "label" | "behavior" | "sortOrder" | "isActive"
+    >
+  >,
 ) {
-  return apiFetch<AssessmentResultStatusLabel>(`/assessment-result-status-labels/${id}`, {
-    method: "PATCH",
-    json: input,
-  });
+  return apiFetch<AssessmentResultStatusLabel>(
+    `/assessment-result-status-labels/${id}`,
+    {
+      method: "PATCH",
+      json: input,
+    },
+  );
 }

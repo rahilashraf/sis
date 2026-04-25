@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsEmail,
   IsEnum,
+  MaxLength,
   IsOptional,
   IsString,
   MinLength,
@@ -33,6 +34,19 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @Transform(({ value }) => {
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
 
   @Transform(({ value }) => {
     if (typeof value !== 'string') {

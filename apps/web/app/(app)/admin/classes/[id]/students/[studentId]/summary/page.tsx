@@ -6,5 +6,7 @@ export default async function AdminStudentSummaryAliasPage({
   params: Promise<{ id: string; studentId: string }>;
 }) {
   const { id, studentId } = await params;
-  redirect(`/admin/classes/${encodeURIComponent(id)}/students/${encodeURIComponent(studentId)}`);
+  redirect(
+    `/admin/classes/${encodeURIComponent(id)}/students/${encodeURIComponent(studentId)}`,
+  );
 }

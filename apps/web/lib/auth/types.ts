@@ -26,6 +26,7 @@ export type AuthenticatedUser = {
   schoolId: string | null;
   username: string;
   email: string | null;
+  phone: string | null;
   firstName: string;
   lastName: string;
   role: UserRole;

@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonClassName } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -20,7 +19,10 @@ import { Select } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAuth } from "@/lib/auth/auth-context";
 import type { UserRole } from "@/lib/auth/types";
-import { getAccessibleSchoolIds as getUserAccessibleSchoolIds, getDefaultSchoolContextId } from "@/lib/auth/school-membership";
+import {
+  getAccessibleSchoolIds as getUserAccessibleSchoolIds,
+  getDefaultSchoolContextId,
+} from "@/lib/auth/school-membership";
 import { formatRoleLabel } from "@/lib/utils";
 import { listSchools, type School } from "@/lib/api/schools";
 import { listGradeLevels, type GradeLevel } from "@/lib/api/grade-levels";
@@ -51,6 +53,7 @@ type CreateUserFormState = {
   lastName: string;
   username: string;
   email: string;
+  phone: string;
   password: string;
   role: UserRole;
   schoolIds: string[];
@@ -62,6 +65,7 @@ type EditUserFormState = {
   lastName: string;
   username: string;
   email: string;
+  phone: string;
   role: UserRole;
   isActive: boolean;
   password: string;
@@ -72,6 +76,7 @@ const emptyCreateForm: CreateUserFormState = {
   lastName: "",
   username: "",
   email: "",
+  phone: "",
   password: "",
   role: "TEACHER",
   schoolIds: [],
@@ -94,6 +99,7 @@ function buildEditForm(user: ManagedUser): EditUserFormState {
     lastName: user.lastName,
     username: user.username,
     email: user.email ?? "",
+    phone: user.phone ?? "",
     role: user.role,
     isActive: user.isActive,
     password: "",
@@ -108,7 +114,11 @@ function getUserSchoolIds(user: ManagedUser) {
   return getUserAccessibleSchoolIds(user);
 }
 
-function toggleSchoolId(selectedSchoolIds: string[], schoolId: string, checked: boolean) {
+function toggleSchoolId(
+  selectedSchoolIds: string[],
+  schoolId: string,
+  checked: boolean,
+) {
   if (checked) {
     return selectedSchoolIds.includes(schoolId)
       ? selectedSchoolIds
@@ -127,6 +137,7 @@ function buildUpdatePayload(
   const nextLastName = form.lastName.trim();
   const nextUsername = form.username.trim();
   const nextEmail = form.email.trim();
+  const nextPhone = form.phone.trim();
 
   if (nextFirstName !== originalUser.firstName) {
     payload.firstName = nextFirstName;
@@ -142,6 +153,10 @@ function buildUpdatePayload(
 
   if (nextEmail !== (originalUser.email ?? "")) {
     payload.email = nextEmail || undefined;
+  }
+
+  if (nextPhone !== (originalUser.phone ?? "")) {
+    payload.phone = nextPhone || undefined;
   }
 
   if (form.role !== originalUser.role) {
@@ -176,11 +191,13 @@ export function UsersManagement() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
-  const [createForm, setCreateForm] = useState<CreateUserFormState>(emptyCreateForm);
+  const [createForm, setCreateForm] =
+    useState<CreateUserFormState>(emptyCreateForm);
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
   const [editForm, setEditForm] = useState<EditUserFormState | null>(null);
   const [editingSchoolIds, setEditingSchoolIds] = useState<string[]>([]);
-  const [editingPrimarySchoolId, setEditingPrimarySchoolId] = useState<string>("");
+  const [editingPrimarySchoolId, setEditingPrimarySchoolId] =
+    useState<string>("");
   const [deleteTarget, setDeleteTarget] = useState<ManagedUser | null>(null);
   const [showRemoved, setShowRemoved] = useState(false);
   const [roleFilter, setRoleFilter] = useState<UserRole | "ALL">("ALL");
@@ -194,7 +211,9 @@ export function UsersManagement() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const currentRole = session?.user.role;
-  const canManageUsers = currentRole ? adminManageRoles.includes(currentRole) : false;
+  const canManageUsers = currentRole
+    ? adminManageRoles.includes(currentRole)
+    : false;
   const roleOptions = currentRole ? getRoleOptions(currentRole) : [];
 
   const activeUsersCount = useMemo(
@@ -232,10 +251,17 @@ export function UsersManagement() {
                 ? [schoolResponse[0].id]
                 : [],
           primarySchoolId:
-            current.primarySchoolId || current.schoolIds[0] || schoolResponse[0]?.id || "",
+            current.primarySchoolId ||
+            current.schoolIds[0] ||
+            schoolResponse[0]?.id ||
+            "",
         }));
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load users.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load users.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -258,7 +284,9 @@ export function UsersManagement() {
       }
 
       const settled = await Promise.allSettled(
-        schools.filter((school) => school.isActive).map((school) => listGradeLevels(school.id)),
+        schools
+          .filter((school) => school.isActive)
+          .map((school) => listGradeLevels(school.id)),
       );
 
       const results: GradeLevel[] = [];
@@ -289,7 +317,9 @@ export function UsersManagement() {
       includeInactive: showRemoved,
       role: roleFilter === "ALL" ? undefined : roleFilter,
       gradeLevelId:
-        roleFilter === "STUDENT" && gradeLevelFilter ? gradeLevelFilter : undefined,
+        roleFilter === "STUDENT" && gradeLevelFilter
+          ? gradeLevelFilter
+          : undefined,
       sort: sortOption,
     });
     setUsers(userResponse);
@@ -322,14 +352,18 @@ export function UsersManagement() {
         currentRole !== "SUPER_ADMIN" &&
         createForm.schoolIds.length === 0
       ) {
-        throw new Error("Select at least one school before creating this user.");
+        throw new Error(
+          "Select at least one school before creating this user.",
+        );
       }
 
       if (createForm.password.length < 6) {
         throw new Error("Password must be at least 6 characters.");
       }
 
-      const normalizedSchoolIds = Array.from(new Set(createForm.schoolIds.filter(Boolean)));
+      const normalizedSchoolIds = Array.from(
+        new Set(createForm.schoolIds.filter(Boolean)),
+      );
       const primarySchoolId =
         (createForm.primarySchoolId &&
         normalizedSchoolIds.includes(createForm.primarySchoolId)
@@ -341,6 +375,7 @@ export function UsersManagement() {
         lastName: createForm.lastName.trim(),
         username: createForm.username.trim(),
         email: createForm.email.trim() || undefined,
+        phone: createForm.phone.trim() || undefined,
         password: createForm.password,
         role: createForm.role,
         schoolId: primarySchoolId,
@@ -389,7 +424,9 @@ export function UsersManagement() {
       );
       const hasMembershipChanges =
         originalSchoolIds.length !== normalizedEditingSchoolIds.length ||
-        originalSchoolIds.some((schoolId) => !normalizedEditingSchoolIds.includes(schoolId)) ||
+        originalSchoolIds.some(
+          (schoolId) => !normalizedEditingSchoolIds.includes(schoolId),
+        ) ||
         getPrimarySchoolId(editingUser) !== editingPrimarySchoolId;
 
       if (Object.keys(payload).length === 0 && !hasMembershipChanges) {
@@ -403,7 +440,8 @@ export function UsersManagement() {
       }
 
       const effectivePrimarySchoolId =
-        editingPrimarySchoolId && normalizedEditingSchoolIds.includes(editingPrimarySchoolId)
+        editingPrimarySchoolId &&
+        normalizedEditingSchoolIds.includes(editingPrimarySchoolId)
           ? editingPrimarySchoolId
           : normalizedEditingSchoolIds[0];
 
@@ -456,7 +494,9 @@ export function UsersManagement() {
 
       await refreshUsers();
       setSuccessMessage(
-        updatedUser.isActive ? "User activated successfully." : "User deactivated successfully.",
+        updatedUser.isActive
+          ? "User activated successfully."
+          : "User deactivated successfully.",
       );
 
       if (editingUser?.id === updatedUser.id) {
@@ -553,7 +593,9 @@ export function UsersManagement() {
         meta={
           <>
             <Badge variant="neutral">
-              {showRemoved ? `${users.length} visible users` : `${users.length} active users`}
+              {showRemoved
+                ? `${users.length} visible users`
+                : `${users.length} active users`}
             </Badge>
             <Badge variant="neutral">{activeUsersCount} active</Badge>
           </>
@@ -568,11 +610,15 @@ export function UsersManagement() {
           <CardHeader>
             <CardTitle>Create User</CardTitle>
             <CardDescription>
-              Add staff, teachers, families, or students with the correct role and school assignment.
+              Add staff, teachers, families, or students with the correct role
+              and school assignment.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form className="grid gap-4 md:grid-cols-2" onSubmit={handleCreateUser}>
+            <form
+              className="grid gap-4 md:grid-cols-2"
+              onSubmit={handleCreateUser}
+            >
               <Field htmlFor="create-user-first-name" label="First name">
                 <Input
                   id="create-user-first-name"
@@ -626,6 +672,20 @@ export function UsersManagement() {
                   }
                   type="email"
                   value={createForm.email}
+                />
+              </Field>
+
+              <Field htmlFor="create-user-phone" label="Phone">
+                <Input
+                  id="create-user-phone"
+                  onChange={(event) =>
+                    setCreateForm((current) => ({
+                      ...current,
+                      phone: event.target.value,
+                    }))
+                  }
+                  placeholder="Optional"
+                  value={createForm.phone}
                 />
               </Field>
 
@@ -696,7 +756,9 @@ export function UsersManagement() {
                                 const nextPrimarySchoolId =
                                   nextSchoolIds.length === 0
                                     ? ""
-                                    : nextSchoolIds.includes(current.primarySchoolId)
+                                    : nextSchoolIds.includes(
+                                          current.primarySchoolId,
+                                        )
                                       ? current.primarySchoolId
                                       : nextSchoolIds[0];
                                 return {
@@ -714,7 +776,10 @@ export function UsersManagement() {
                     })}
                   </div>
 
-                  <Field htmlFor="create-user-school-primary" label="Default school">
+                  <Field
+                    htmlFor="create-user-school-primary"
+                    label="Default school"
+                  >
                     <Select
                       id="create-user-school-primary"
                       onChange={(event) =>
@@ -726,10 +791,14 @@ export function UsersManagement() {
                       value={createForm.primarySchoolId}
                     >
                       {createForm.schoolIds.length === 0 ? (
-                        <option value="">Select school assignments first</option>
+                        <option value="">
+                          Select school assignments first
+                        </option>
                       ) : null}
                       {createForm.schoolIds.map((schoolId) => {
-                        const school = schools.find((entry) => entry.id === schoolId);
+                        const school = schools.find(
+                          (entry) => entry.id === schoolId,
+                        );
                         return (
                           <option key={schoolId} value={schoolId}>
                             {school?.name ?? schoolId}
@@ -773,7 +842,10 @@ export function UsersManagement() {
               </Button>
             </CardHeader>
             <CardContent>
-              <form className="grid gap-4 md:grid-cols-2" onSubmit={handleUpdateUser}>
+              <form
+                className="grid gap-4 md:grid-cols-2"
+                onSubmit={handleUpdateUser}
+              >
                 <Field htmlFor="edit-user-first-name" label="First name">
                   <Input
                     id="edit-user-first-name"
@@ -843,6 +915,24 @@ export function UsersManagement() {
                     }
                     type="email"
                     value={editForm.email}
+                  />
+                </Field>
+
+                <Field htmlFor="edit-user-phone" label="Phone">
+                  <Input
+                    id="edit-user-phone"
+                    onChange={(event) =>
+                      setEditForm((current) =>
+                        current
+                          ? {
+                              ...current,
+                              phone: event.target.value,
+                            }
+                          : current,
+                      )
+                    }
+                    placeholder="Optional"
+                    value={editForm.phone}
                   />
                 </Field>
 
@@ -922,7 +1012,10 @@ export function UsersManagement() {
                                   if (nextSchoolIds.length === 0) {
                                     return "";
                                   }
-                                  if (current && nextSchoolIds.includes(current)) {
+                                  if (
+                                    current &&
+                                    nextSchoolIds.includes(current)
+                                  ) {
                                     return current;
                                   }
                                   return nextSchoolIds[0];
@@ -936,17 +1029,26 @@ export function UsersManagement() {
                       })}
                     </div>
 
-                    <Field htmlFor="edit-user-primary-school" label="Default school">
+                    <Field
+                      htmlFor="edit-user-primary-school"
+                      label="Default school"
+                    >
                       <Select
                         id="edit-user-primary-school"
-                        onChange={(event) => setEditingPrimarySchoolId(event.target.value)}
+                        onChange={(event) =>
+                          setEditingPrimarySchoolId(event.target.value)
+                        }
                         value={editingPrimarySchoolId}
                       >
                         {editingSchoolIds.length === 0 ? (
-                          <option value="">Select school assignments first</option>
+                          <option value="">
+                            Select school assignments first
+                          </option>
                         ) : null}
                         {editingSchoolIds.map((schoolId) => {
-                          const school = schools.find((entry) => entry.id === schoolId);
+                          const school = schools.find(
+                            (entry) => entry.id === schoolId,
+                          );
                           return (
                             <option key={schoolId} value={schoolId}>
                               {school?.name ?? schoolId}
@@ -980,7 +1082,8 @@ export function UsersManagement() {
                       User is active
                     </span>
                     <span className="mt-1 block text-xs leading-5 text-slate-500">
-                      Inactive users keep their record but cannot continue signing in.
+                      Inactive users keep their record but cannot continue
+                      signing in.
                     </span>
                   </span>
                 </label>
@@ -998,7 +1101,8 @@ export function UsersManagement() {
             <CardHeader>
               <CardTitle>Edit User</CardTitle>
               <CardDescription>
-                Select a user from the table to update access, names, or role details.
+                Select a user from the table to update access, names, or role
+                details.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1017,7 +1121,8 @@ export function UsersManagement() {
           <div>
             <CardTitle>User Directory</CardTitle>
             <CardDescription>
-              Review current account status, school assignment, and role coverage at a glance.
+              Review current account status, school assignment, and role
+              coverage at a glance.
             </CardDescription>
           </div>
           <div className="flex flex-col gap-3 sm:items-end">
@@ -1029,7 +1134,9 @@ export function UsersManagement() {
                 <Field htmlFor="user-filter-role" label="Role">
                   <Select
                     id="user-filter-role"
-                    onChange={(event) => setRoleFilter(event.target.value as UserRole | "ALL")}
+                    onChange={(event) =>
+                      setRoleFilter(event.target.value as UserRole | "ALL")
+                    }
                     value={roleFilter}
                   >
                     <option value="ALL">All roles</option>
@@ -1044,7 +1151,9 @@ export function UsersManagement() {
                 <Field htmlFor="user-filter-sort" label="Sort">
                   <Select
                     id="user-filter-sort"
-                    onChange={(event) => setSortOption(event.target.value as "name" | "createdAt")}
+                    onChange={(event) =>
+                      setSortOption(event.target.value as "name" | "createdAt")
+                    }
                     value={sortOption}
                   >
                     <option value="name">Name (A–Z)</option>
@@ -1057,13 +1166,16 @@ export function UsersManagement() {
                 <Field htmlFor="user-filter-grade" label="Grade level">
                   <Select
                     id="user-filter-grade"
-                    onChange={(event) => setGradeLevelFilter(event.target.value)}
+                    onChange={(event) =>
+                      setGradeLevelFilter(event.target.value)
+                    }
                     value={gradeLevelFilter}
                   >
                     <option value="">All grade levels</option>
                     {gradeLevels.map((level) => (
                       <option key={level.id} value={level.id}>
-                        {(level.school.shortName ?? level.school.name).trim()} — {level.name}
+                        {(level.school.shortName ?? level.school.name).trim()} —{" "}
+                        {level.name}
                       </option>
                     ))}
                   </Select>
@@ -1085,11 +1197,21 @@ export function UsersManagement() {
               <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                 <thead className="bg-slate-50/80">
                   <tr>
-                    <th className="px-4 py-3 font-semibold text-slate-700">User</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Role</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">School</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      User
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Role
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      School
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
@@ -1099,9 +1221,14 @@ export function UsersManagement() {
                         <p className="font-medium text-slate-900">
                           {user.firstName} {user.lastName}
                         </p>
-                        <p className="mt-1 text-sm text-slate-500">@{user.username}</p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          @{user.username}
+                        </p>
                         <p className="mt-1 text-sm text-slate-500">
                           {user.email ?? "No email on file"}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {user.phone ?? "No phone on file"}
                         </p>
                       </td>
                       <td className="px-4 py-4">
@@ -1109,7 +1236,9 @@ export function UsersManagement() {
                           {formatRoleLabel(user.role)}
                         </Badge>
                       </td>
-                      <td className="px-4 py-4 text-slate-600">{getSchoolLabel(user)}</td>
+                      <td className="px-4 py-4 text-slate-600">
+                        {getSchoolLabel(user)}
+                      </td>
                       <td className="px-4 py-4">
                         <Badge variant={user.isActive ? "success" : "neutral"}>
                           {user.isActive ? "Active" : "Inactive"}
@@ -1124,14 +1253,6 @@ export function UsersManagement() {
                           >
                             Edit
                           </Button>
-                          {user.role === "STUDENT" ? (
-                            <Link
-                              className={buttonClassName({ variant: "ghost" })}
-                              href={`/admin/students/${user.id}`}
-                            >
-                              Student detail
-                            </Link>
-                          ) : null}
                           <Button
                             disabled={isSubmitting || isDeleting}
                             onClick={() => handleToggleActive(user)}

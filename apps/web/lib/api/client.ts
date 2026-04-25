@@ -18,9 +18,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
 
   if (!response.ok) {
     const message =
-      typeof payload === "object" &&
-      payload !== null &&
-      "message" in payload
+      typeof payload === "object" && payload !== null && "message" in payload
         ? Array.isArray(payload.message)
           ? payload.message.join(", ")
           : typeof payload.message === "string"
@@ -60,14 +58,13 @@ export async function apiFetch<T>(
     }
   }
 
-  const url = path.startsWith("http")
-    ? path
-    : `${apiConfig.baseUrl}${path}`;
+  const url = path.startsWith("http") ? path : `${apiConfig.baseUrl}${path}`;
 
   const response = await fetch(url, {
     ...options,
     headers,
-    body: options.json !== undefined ? JSON.stringify(options.json) : options.body,
+    body:
+      options.json !== undefined ? JSON.stringify(options.json) : options.body,
   });
 
   if (response.status === 401) {

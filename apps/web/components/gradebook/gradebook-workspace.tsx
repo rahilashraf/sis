@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClassName } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -48,9 +49,7 @@ import {
   type ClassGradebookGrid,
   type StudentInClassSummary,
 } from "@/lib/api/gradebook";
-import {
-  getDisplayText,
-} from "@/lib/utils";
+import { getDisplayText } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
 import { formatDateOnly, normalizeDateOnlyPayload } from "@/lib/date";
 
@@ -100,7 +99,10 @@ function buildEditForm(assessment: Assessment): AssessmentFormState {
 
 function getClassOptionLabel(schoolClass: SchoolClass) {
   const className = getDisplayText(schoolClass.name);
-  const subject = getDisplayText(schoolClass.subjectOption?.name ?? schoolClass.subject, "");
+  const subject = getDisplayText(
+    schoolClass.subjectOption?.name ?? schoolClass.subject,
+    "",
+  );
   const gradeLevel = getDisplayText(schoolClass.gradeLevel?.name, "");
 
   return `${className}${gradeLevel ? ` • ${gradeLevel}` : ""}${subject ? ` • ${subject}` : ""}${schoolClass.isActive ? "" : " • Inactive"}`;
@@ -127,7 +129,10 @@ function getFullName(firstName: unknown, lastName: unknown, fallback = "—") {
 }
 
 export function GradebookWorkspace({ mode }: { mode: Mode }) {
-  const { selectedSchoolId: schoolContextId, setSelectedSchoolId: setSchoolContextId } = useAuth();
+  const {
+    selectedSchoolId: schoolContextId,
+    setSelectedSchoolId: setSchoolContextId,
+  } = useAuth();
   const searchParams = useSearchParams();
   const requestedClassId = searchParams.get("classId") ?? "";
   const [classes, setClasses] = useState<SchoolClass[]>([]);
@@ -135,8 +140,12 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
   const [assessmentTypeError, setAssessmentTypeError] = useState<string | null>(
     null,
   );
-  const [reportingPeriods, setReportingPeriods] = useState<ReportingPeriod[]>([]);
-  const [reportingPeriodError, setReportingPeriodError] = useState<string | null>(null);
+  const [reportingPeriods, setReportingPeriods] = useState<ReportingPeriod[]>(
+    [],
+  );
+  const [reportingPeriodError, setReportingPeriodError] = useState<
+    string | null
+  >(null);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState("");
   const [selectedGradeLevelId, setSelectedGradeLevelId] = useState("");
@@ -148,27 +157,34 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
   );
   const [selectedAssessmentId, setSelectedAssessmentId] = useState("");
   const [gradeRows, setGradeRows] = useState<AssessmentGradeRow[]>([]);
-  const [scoreByStudentId, setScoreByStudentId] = useState<Record<string, string>>({});
-  const [commentByStudentId, setCommentByStudentId] = useState<Record<string, string>>(
-    {},
-  );
+  const [scoreByStudentId, setScoreByStudentId] = useState<
+    Record<string, string>
+  >({});
+  const [commentByStudentId, setCommentByStudentId] = useState<
+    Record<string, string>
+  >({});
   const [summary, setSummary] = useState<ClassGradeSummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [grid, setGrid] = useState<ClassGradebookGrid | null>(null);
   const [gridError, setGridError] = useState<string | null>(null);
   const [gridSaveError, setGridSaveError] = useState<string | null>(null);
   const [isSavingGrid, setIsSavingGrid] = useState(false);
-  const [draftGridScores, setDraftGridScores] = useState<Record<string, string>>({});
-  const [selectedGridReportingPeriodId, setSelectedGridReportingPeriodId] = useState<string>("all");
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-  const [studentSummary, setStudentSummary] = useState<StudentInClassSummary | null>(null);
+  const [draftGridScores, setDraftGridScores] = useState<
+    Record<string, string>
+  >({});
+  const [selectedGridReportingPeriodId, setSelectedGridReportingPeriodId] =
+    useState<string>("all");
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
+    null,
+  );
+  const [studentSummary, setStudentSummary] =
+    useState<StudentInClassSummary | null>(null);
   const [studentError, setStudentError] = useState<string | null>(null);
-  const [studentScoreByAssessmentId, setStudentScoreByAssessmentId] = useState<Record<string, string>>(
-    {},
-  );
-  const [studentCommentByAssessmentId, setStudentCommentByAssessmentId] = useState<Record<string, string>>(
-    {},
-  );
+  const [studentScoreByAssessmentId, setStudentScoreByAssessmentId] = useState<
+    Record<string, string>
+  >({});
+  const [studentCommentByAssessmentId, setStudentCommentByAssessmentId] =
+    useState<Record<string, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<Assessment | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -192,7 +208,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
       });
     }
 
-    return Array.from(schoolMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(schoolMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
   }, [classes]);
 
   const visibleClasses = useMemo(() => {
@@ -200,26 +218,44 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
       mode === "teacher"
         ? classes
         : selectedSchoolId
-          ? classes.filter((schoolClass) => schoolClass.schoolId === selectedSchoolId)
+          ? classes.filter(
+              (schoolClass) => schoolClass.schoolId === selectedSchoolId,
+            )
           : classes;
 
     return schoolFiltered.filter((schoolClass) => {
-      if (selectedGradeLevelId && schoolClass.gradeLevelId !== selectedGradeLevelId) {
+      if (
+        selectedGradeLevelId &&
+        schoolClass.gradeLevelId !== selectedGradeLevelId
+      ) {
         return false;
       }
 
-      if (selectedSubjectOptionId && schoolClass.subjectOptionId !== selectedSubjectOptionId) {
+      if (
+        selectedSubjectOptionId &&
+        schoolClass.subjectOptionId !== selectedSubjectOptionId
+      ) {
         return false;
       }
 
       return true;
     });
-  }, [classes, mode, selectedGradeLevelId, selectedSchoolId, selectedSubjectOptionId]);
+  }, [
+    classes,
+    mode,
+    selectedGradeLevelId,
+    selectedSchoolId,
+    selectedSubjectOptionId,
+  ]);
 
   const availableGradeLevelOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const schoolClass of classes) {
-      if (mode === "admin" && selectedSchoolId && schoolClass.schoolId !== selectedSchoolId) {
+      if (
+        mode === "admin" &&
+        selectedSchoolId &&
+        schoolClass.schoolId !== selectedSchoolId
+      ) {
         continue;
       }
 
@@ -229,7 +265,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
 
       map.set(
         schoolClass.gradeLevelId,
-        schoolClass.gradeLevel?.name ?? `Grade level ${schoolClass.gradeLevelId}`,
+        schoolClass.gradeLevel?.name ??
+          `Grade level ${schoolClass.gradeLevelId}`,
       );
     }
 
@@ -241,7 +278,11 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
   const availableSubjectOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const schoolClass of classes) {
-      if (mode === "admin" && selectedSchoolId && schoolClass.schoolId !== selectedSchoolId) {
+      if (
+        mode === "admin" &&
+        selectedSchoolId &&
+        schoolClass.schoolId !== selectedSchoolId
+      ) {
         continue;
       }
 
@@ -261,12 +302,16 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
   }, [classes, mode, selectedSchoolId]);
 
   const selectedClass = useMemo(
-    () => visibleClasses.find((schoolClass) => schoolClass.id === selectedClassId) ?? null,
+    () =>
+      visibleClasses.find(
+        (schoolClass) => schoolClass.id === selectedClassId,
+      ) ?? null,
     [selectedClassId, visibleClasses],
   );
 
   const selectedAssessment = useMemo(
-    () => assessments.find((entry) => entry.id === selectedAssessmentId) ?? null,
+    () =>
+      assessments.find((entry) => entry.id === selectedAssessmentId) ?? null,
     [assessments, selectedAssessmentId],
   );
 
@@ -275,11 +320,16 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
       return null;
     }
 
-    return reportingPeriods.find((period) => period.id === formState.reportingPeriodId) ?? null;
+    return (
+      reportingPeriods.find(
+        (period) => period.id === formState.reportingPeriodId,
+      ) ?? null
+    );
   }, [formState.reportingPeriodId, reportingPeriods]);
 
   const isAssessmentFormLocked = selectedFormReportingPeriod?.isLocked ?? false;
-  const isEditingLockedAssessment = formState.mode === "edit" && isAssessmentFormLocked;
+  const isEditingLockedAssessment =
+    formState.mode === "edit" && isAssessmentFormLocked;
 
   const selectedAssessmentIsLocked = useMemo(() => {
     if (!selectedAssessmentId || !grid) {
@@ -287,13 +337,17 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
     }
 
     return (
-      grid.assessments.find((assessment) => assessment.id === selectedAssessmentId)
-        ?.reportingPeriod?.isLocked ?? false
+      grid.assessments.find(
+        (assessment) => assessment.id === selectedAssessmentId,
+      )?.reportingPeriod?.isLocked ?? false
     );
   }, [grid, selectedAssessmentId]);
 
   const summaryByStudentId = useMemo(() => {
-    const map = new Map<string, { averagePercent: number | null; averageLetterGrade: string | null }>();
+    const map = new Map<
+      string,
+      { averagePercent: number | null; averageLetterGrade: string | null }
+    >();
 
     if (!summary) {
       return map;
@@ -320,7 +374,10 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
     >();
 
     for (const assessment of grid.assessments) {
-      const byStudent = new Map<string, { score: number | null; comment: string | null }>();
+      const byStudent = new Map<
+        string,
+        { score: number | null; comment: string | null }
+      >();
 
       for (const result of assessment.results) {
         byStudent.set(result.studentId, {
@@ -359,11 +416,14 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
     }
 
     if (selectedGridReportingPeriodId === "unassigned") {
-      return grid.assessments.filter((assessment) => !assessment.reportingPeriod);
+      return grid.assessments.filter(
+        (assessment) => !assessment.reportingPeriod,
+      );
     }
 
     return grid.assessments.filter(
-      (assessment) => assessment.reportingPeriod?.id === selectedGridReportingPeriodId,
+      (assessment) =>
+        assessment.reportingPeriod?.id === selectedGridReportingPeriodId,
     );
   }, [grid, selectedGridReportingPeriodId]);
 
@@ -379,8 +439,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
           label:
             selectedGridReportingPeriodId === "unassigned"
               ? "Unassigned"
-              : reportingPeriods.find((period) => period.id === selectedGridReportingPeriodId)
-                  ?.name ?? "Reporting period",
+              : (reportingPeriods.find(
+                  (period) => period.id === selectedGridReportingPeriodId,
+                )?.name ?? "Reporting period"),
           assessments: visibleGridAssessments,
         },
       ];
@@ -400,15 +461,13 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
     for (const assessment of visibleGridAssessments) {
       const period = assessment.reportingPeriod;
       const key = period?.id ?? "unassigned";
-      const existing =
-        byKey.get(key) ??
-        {
-          key,
-          label: period ? `${period.order}. ${period.name}` : "Unassigned",
-          order: period?.order ?? 9999,
-          isLocked: period?.isLocked ?? false,
-          assessments: [],
-        };
+      const existing = byKey.get(key) ?? {
+        key,
+        label: period ? `${period.order}. ${period.name}` : "Unassigned",
+        order: period?.order ?? 9999,
+        isLocked: period?.isLocked ?? false,
+        assessments: [],
+      };
 
       existing.assessments.push(assessment);
       byKey.set(key, existing);
@@ -421,7 +480,12 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
 
       return a.label.localeCompare(b.label);
     });
-  }, [grid, reportingPeriods, selectedGridReportingPeriodId, visibleGridAssessments]);
+  }, [
+    grid,
+    reportingPeriods,
+    selectedGridReportingPeriodId,
+    visibleGridAssessments,
+  ]);
 
   const pendingGridChangeCount = useMemo(() => {
     if (!gridResultsByAssessmentId) {
@@ -437,7 +501,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
       }
 
       const [assessmentId, studentId] = key.split(":");
-      const original = gridResultsByAssessmentId.get(assessmentId)?.get(studentId)?.score ?? null;
+      const original =
+        gridResultsByAssessmentId.get(assessmentId)?.get(studentId)?.score ??
+        null;
       const numeric = Number(trimmed);
       if (!Number.isFinite(numeric)) {
         continue;
@@ -464,7 +530,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
             : await listClasses({ includeInactive: includeInactiveClasses });
 
         const requested =
-          requestedClassId && classResponse.some((entry) => entry.id === requestedClassId)
+          requestedClassId &&
+          classResponse.some((entry) => entry.id === requestedClassId)
             ? requestedClassId
             : "";
         const initialClassId = requested || classResponse[0]?.id || "";
@@ -476,7 +543,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
             : "";
         const initialSchoolId =
           mode === "admin"
-            ? (classResponse.find((entry) => entry.id === initialClassId)?.schoolId ??
+            ? (classResponse.find((entry) => entry.id === initialClassId)
+                ?.schoolId ??
               contextSchoolId ??
               classResponse[0]?.schoolId ??
               "")
@@ -542,7 +610,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
       setAssessmentTypeError(null);
 
       try {
-        const response = await listAssessmentTypes({ schoolId: schoolIdForTypes });
+        const response = await listAssessmentTypes({
+          schoolId: schoolIdForTypes,
+        });
         setAssessmentTypes(response);
         setFormState((current) => {
           if (current.mode === "edit") {
@@ -625,11 +695,12 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
     setSummaryError(null);
     setGridError(null);
 
-    const [assessmentsResult, summaryResult, gridResult] = await Promise.allSettled([
-      listAssessments(nextClassId),
-      getClassGradeSummary(nextClassId),
-      getClassGradebookGrid(nextClassId),
-    ]);
+    const [assessmentsResult, summaryResult, gridResult] =
+      await Promise.allSettled([
+        listAssessments(nextClassId),
+        getClassGradeSummary(nextClassId),
+        getClassGradebookGrid(nextClassId),
+      ]);
 
     if (assessmentsResult.status === "fulfilled") {
       setAssessments(assessmentsResult.value);
@@ -732,7 +803,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
       return null;
     }
 
-    return grid.students.find((student) => student.id === selectedStudentId) ?? null;
+    return (
+      grid.students.find((student) => student.id === selectedStudentId) ?? null
+    );
   }, [grid, selectedStudentId]);
 
   useEffect(() => {
@@ -747,7 +820,10 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
       setStudentError(null);
 
       try {
-        const response = await getStudentInClassSummary(selectedClassId, selectedStudentId);
+        const response = await getStudentInClassSummary(
+          selectedClassId,
+          selectedStudentId,
+        );
         setStudentSummary(response);
 
         const nextScores: Record<string, string> = {};
@@ -835,7 +911,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
       setFormState(buildDefaultForm(assessmentTypes));
     } catch (submissionError) {
       setError(
-        submissionError instanceof Error ? submissionError.message : "Unable to save assessment.",
+        submissionError instanceof Error
+          ? submissionError.message
+          : "Unable to save assessment.",
       );
     } finally {
       setIsSaving(false);
@@ -849,11 +927,21 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
 
     try {
       const nextValue = !assessment.isPublishedToParents;
-      await updateAssessment(assessment.id, { isPublishedToParents: nextValue });
+      await updateAssessment(assessment.id, {
+        isPublishedToParents: nextValue,
+      });
       await refreshClassData();
-      setSuccessMessage(nextValue ? "Assessment is now visible to parents." : "Assessment hidden from parents.");
+      setSuccessMessage(
+        nextValue
+          ? "Assessment is now visible to parents."
+          : "Assessment hidden from parents.",
+      );
     } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : "Unable to update parent visibility.");
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Unable to update parent visibility.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -885,7 +973,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
       setDeleteTarget(null);
     } catch (deletionError) {
       setDeleteError(
-        deletionError instanceof Error ? deletionError.message : "Unable to remove assessment.",
+        deletionError instanceof Error
+          ? deletionError.message
+          : "Unable to remove assessment.",
       );
     } finally {
       setIsDeleting(false);
@@ -913,16 +1003,23 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
           const score = Number(scoreValue);
 
           if (!Number.isFinite(score) || score < 0) {
-            throw new Error(`Invalid score provided for ${getFullName(row.student.firstName, row.student.lastName)}.`);
+            throw new Error(
+              `Invalid score provided for ${getFullName(row.student.firstName, row.student.lastName)}.`,
+            );
           }
 
           return {
             studentId: row.student.id,
             score,
-            comment: (commentByStudentId[row.student.id] ?? "").trim() || undefined,
+            comment:
+              (commentByStudentId[row.student.id] ?? "").trim() || undefined,
           };
         })
-        .filter(Boolean) as Array<{ studentId: string; score: number; comment?: string }>;
+        .filter(Boolean) as Array<{
+        studentId: string;
+        score: number;
+        comment?: string;
+      }>;
 
       await upsertAssessmentGrades(selectedAssessment.id, gradesPayload);
       await refreshClassData();
@@ -932,7 +1029,11 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
 
       setSuccessMessage("Grades saved successfully.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to save grades.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save grades.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -948,7 +1049,10 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
     setSuccessMessage(null);
 
     try {
-      const gradesByAssessmentId = new Map<string, Array<{ studentId: string; score: number }>>();
+      const gradesByAssessmentId = new Map<
+        string,
+        Array<{ studentId: string; score: number }>
+      >();
 
       for (const [key, value] of Object.entries(draftGridScores)) {
         const trimmed = value.trim();
@@ -972,10 +1076,14 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
         }
 
         if (score > assessment.maxScore) {
-          throw new Error(`Score for ${assessment.title} cannot exceed ${assessment.maxScore}.`);
+          throw new Error(
+            `Score for ${assessment.title} cannot exceed ${assessment.maxScore}.`,
+          );
         }
 
-        const original = gridResultsByAssessmentId.get(assessmentId)?.get(studentId)?.score ?? null;
+        const original =
+          gridResultsByAssessmentId.get(assessmentId)?.get(studentId)?.score ??
+          null;
         if (original === score) {
           continue;
         }
@@ -992,7 +1100,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
 
       const batches = Array.from(gradesByAssessmentId.entries());
       const settled = await Promise.allSettled(
-        batches.map(([assessmentId, grades]) => upsertAssessmentGrades(assessmentId, grades)),
+        batches.map(([assessmentId, grades]) =>
+          upsertAssessmentGrades(assessmentId, grades),
+        ),
       );
 
       const failures = settled
@@ -1026,7 +1136,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
         setGridSaveError(
           failures
             .map(({ result }) =>
-              result.reason instanceof Error ? result.reason.message : "Unable to save grades.",
+              result.reason instanceof Error
+                ? result.reason.message
+                : "Unable to save grades.",
             )
             .join(" "),
         );
@@ -1034,7 +1146,11 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
         setSuccessMessage("Scoresheet saved.");
       }
     } catch (saveError) {
-      setGridSaveError(saveError instanceof Error ? saveError.message : "Unable to save grades.");
+      setGridSaveError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save grades.",
+      );
     } finally {
       setIsSavingGrid(false);
     }
@@ -1065,7 +1181,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
             return null;
           }
 
-          const scoreValue = studentScoreByAssessmentId[assessment.id]?.trim() ?? "";
+          const scoreValue =
+            studentScoreByAssessmentId[assessment.id]?.trim() ?? "";
 
           if (!scoreValue) {
             return null;
@@ -1082,9 +1199,13 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
             );
           }
 
-          const comment = (studentCommentByAssessmentId[assessment.id] ?? "").trim();
+          const comment = (
+            studentCommentByAssessmentId[assessment.id] ?? ""
+          ).trim();
           const normalizedExistingScore =
-            existingScore === null || existingScore === undefined ? null : existingScore;
+            existingScore === null || existingScore === undefined
+              ? null
+              : existingScore;
           const normalizedExistingComment = existingComment.trim();
 
           if (
@@ -1100,7 +1221,11 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
             comment: comment || undefined,
           };
         })
-        .filter(Boolean) as Array<{ assessmentId: string; score: number; comment?: string }>;
+        .filter(Boolean) as Array<{
+        assessmentId: string;
+        score: number;
+        comment?: string;
+      }>;
 
       if (updates.length === 0) {
         setSuccessMessage("No grade changes to save.");
@@ -1120,7 +1245,10 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
       );
 
       await refreshClassData();
-      const refreshed = await getStudentInClassSummary(selectedClassId, selectedStudentId);
+      const refreshed = await getStudentInClassSummary(
+        selectedClassId,
+        selectedStudentId,
+      );
       setStudentSummary(refreshed);
 
       const nextScores: Record<string, string> = {};
@@ -1141,7 +1269,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
       setSuccessMessage("Student grades updated successfully.");
     } catch (saveError) {
       setStudentError(
-        saveError instanceof Error ? saveError.message : "Unable to save student grades.",
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save student grades.",
       );
     } finally {
       setIsSavingStudentDetail(false);
@@ -1163,10 +1293,22 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
       <PageHeader
         title="Gradebook"
         description="Create assessments, enter grades in bulk, and control parent visibility."
+        actions={
+          mode === "admin" && selectedClassId ? (
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href={`/admin/classes/${selectedClassId}`}
+            >
+              Edit Class
+            </Link>
+          ) : undefined
+        }
         meta={
           <>
             <Badge variant="neutral">
-              {selectedClass ? getDisplayText(selectedClass.name) : "Select class"}
+              {selectedClass
+                ? getDisplayText(selectedClass.name)
+                : "Select class"}
             </Badge>
             <Badge variant="neutral">{assessments.length} assessments</Badge>
           </>
@@ -1180,7 +1322,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
         <CardHeader>
           <CardTitle>Class Context</CardTitle>
           <CardDescription>
-            Select a class to load assessments, grade entry, and summary calculations.
+            Select a class to load assessments, grade entry, and summary
+            calculations.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -1223,7 +1366,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
           <Field htmlFor="gradebook-subject-filter" label="Subject">
             <Select
               id="gradebook-subject-filter"
-              onChange={(event) => setSelectedSubjectOptionId(event.target.value)}
+              onChange={(event) =>
+                setSelectedSubjectOptionId(event.target.value)
+              }
               value={selectedSubjectOptionId}
             >
               <option value="">All subjects</option>
@@ -1259,7 +1404,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
               className="md:col-span-2 lg:col-span-4"
               description="Include inactive classes that were removed from normal workflows."
               label="Show inactive classes"
-              onChange={(event) => setIncludeInactiveClasses(event.target.checked)}
+              onChange={(event) =>
+                setIncludeInactiveClasses(event.target.checked)
+              }
             />
           ) : null}
         </CardContent>
@@ -1279,10 +1426,13 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
       <Card>
         <CardHeader>
           <CardTitle>
-            {formState.mode === "create" ? "Create Assessment" : "Edit Assessment"}
+            {formState.mode === "create"
+              ? "Create Assessment"
+              : "Edit Assessment"}
           </CardTitle>
           <CardDescription>
-            Assessments stay in the teacher gradebook and can be shown or hidden from parents at any time.
+            Assessments stay in the teacher gradebook and can be shown or hidden
+            from parents at any time.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -1292,8 +1442,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
             </Notice>
           ) : assessmentTypes.length === 0 ? (
             <Notice tone="info">
-              No assessment types are available for this school yet, so assessment creation
-              is disabled.
+              No assessment types are available for this school yet, so
+              assessment creation is disabled.
             </Notice>
           ) : null}
           {reportingPeriodError ? (
@@ -1306,13 +1456,23 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                 : "The selected reporting period is locked. Choose a different reporting period to create this assessment."}
             </Notice>
           ) : null}
-          <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmitAssessment}>
+          <form
+            className="grid gap-4 md:grid-cols-2"
+            onSubmit={handleSubmitAssessment}
+          >
             <Field htmlFor="assessment-title" label="Title">
               <Input
-                disabled={assessmentTypes.length === 0 || !selectedClassId || isEditingLockedAssessment}
+                disabled={
+                  assessmentTypes.length === 0 ||
+                  !selectedClassId ||
+                  isEditingLockedAssessment
+                }
                 id="assessment-title"
                 onChange={(event) =>
-                  setFormState((current) => ({ ...current, title: event.target.value }))
+                  setFormState((current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
                 }
                 placeholder="Assessment title"
                 required
@@ -1322,7 +1482,11 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
 
             <Field htmlFor="assessment-type" label="Type">
               <Select
-                disabled={assessmentTypes.length === 0 || !selectedClassId || isEditingLockedAssessment}
+                disabled={
+                  assessmentTypes.length === 0 ||
+                  !selectedClassId ||
+                  isEditingLockedAssessment
+                }
                 id="assessment-type"
                 onChange={(event) =>
                   setFormState((current) => ({
@@ -1342,7 +1506,11 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
 
             <Field htmlFor="assessment-max-score" label="Max score">
               <Input
-                disabled={assessmentTypes.length === 0 || !selectedClassId || isEditingLockedAssessment}
+                disabled={
+                  assessmentTypes.length === 0 ||
+                  !selectedClassId ||
+                  isEditingLockedAssessment
+                }
                 id="assessment-max-score"
                 min={1}
                 onChange={(event) =>
@@ -1364,7 +1532,11 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
               description="Relative weighting used in averages. Set to 0 to exclude from weighted averages."
             >
               <Input
-                disabled={assessmentTypes.length === 0 || !selectedClassId || isEditingLockedAssessment}
+                disabled={
+                  assessmentTypes.length === 0 ||
+                  !selectedClassId ||
+                  isEditingLockedAssessment
+                }
                 id="assessment-weight"
                 min={0}
                 onChange={(event) =>
@@ -1386,7 +1558,11 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
               description="Optional grouping used for academic reporting."
             >
               <Select
-                disabled={assessmentTypes.length === 0 || !selectedClassId || isEditingLockedAssessment}
+                disabled={
+                  assessmentTypes.length === 0 ||
+                  !selectedClassId ||
+                  isEditingLockedAssessment
+                }
                 id="assessment-reporting-period"
                 onChange={(event) =>
                   setFormState((current) => ({
@@ -1414,7 +1590,11 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
               description="Optional date shown to staff; parent visibility is controlled separately."
             >
               <Input
-                disabled={assessmentTypes.length === 0 || !selectedClassId || isEditingLockedAssessment}
+                disabled={
+                  assessmentTypes.length === 0 ||
+                  !selectedClassId ||
+                  isEditingLockedAssessment
+                }
                 id="assessment-due-date"
                 onChange={(event) =>
                   setFormState((current) => ({
@@ -1431,7 +1611,11 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
               checked={formState.isPublishedToParents}
               className="md:col-span-2"
               description="If checked, parents will see this assessment and its grades. You can change this anytime."
-              disabled={assessmentTypes.length === 0 || !selectedClassId || isEditingLockedAssessment}
+              disabled={
+                assessmentTypes.length === 0 ||
+                !selectedClassId ||
+                isEditingLockedAssessment
+              }
               label="Visible to parents"
               onChange={(event) =>
                 setFormState((current) => ({
@@ -1445,7 +1629,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
               {formState.mode === "edit" ? (
                 <Button
                   disabled={isSaving}
-                  onClick={() => setFormState(buildDefaultForm(assessmentTypes))}
+                  onClick={() =>
+                    setFormState(buildDefaultForm(assessmentTypes))
+                  }
                   type="button"
                   variant="secondary"
                 >
@@ -1462,7 +1648,11 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                 }
                 type="submit"
               >
-                {isSaving ? "Saving..." : formState.mode === "create" ? "Create assessment" : "Save changes"}
+                {isSaving
+                  ? "Saving..."
+                  : formState.mode === "create"
+                    ? "Create assessment"
+                    : "Save changes"}
               </Button>
             </div>
           </form>
@@ -1474,7 +1664,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
           <div>
             <CardTitle>Assessments</CardTitle>
             <CardDescription>
-              Manage assessments for the selected class and open bulk grade entry.
+              Manage assessments for the selected class and open bulk grade
+              entry.
             </CardDescription>
           </div>
           <Button
@@ -1500,13 +1691,27 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Assessment</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Type</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Max</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Weight</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Due</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Parents</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Assessment
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Type
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Max
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Weight
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Due
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Parents
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
@@ -1530,15 +1735,21 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                           {assessment.weight}
                         </td>
                         <td className="px-4 py-4 text-slate-600">
-                          {assessment.dueAt ? formatDateOnly(assessment.dueAt) : "—"}
+                          {assessment.dueAt
+                            ? formatDateOnly(assessment.dueAt)
+                            : "—"}
                         </td>
                         <td className="px-4 py-4">
                           <Badge
                             variant={
-                              assessment.isPublishedToParents ? "success" : "neutral"
+                              assessment.isPublishedToParents
+                                ? "success"
+                                : "neutral"
                             }
                           >
-                            {assessment.isPublishedToParents ? "Visible" : "Hidden"}
+                            {assessment.isPublishedToParents
+                              ? "Visible"
+                              : "Hidden"}
                           </Badge>
                         </td>
                         <td className="px-4 py-4">
@@ -1559,7 +1770,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                               Enter grades
                             </Button>
                             <Button
-                              onClick={() => setFormState(buildEditForm(assessment))}
+                              onClick={() =>
+                                setFormState(buildEditForm(assessment))
+                              }
                               size="sm"
                               type="button"
                               variant="secondary"
@@ -1575,7 +1788,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                               type="button"
                               variant="ghost"
                             >
-                              {assessment.isPublishedToParents ? "Hide from parents" : "Show to parents"}
+                              {assessment.isPublishedToParents
+                                ? "Hide from parents"
+                                : "Show to parents"}
                             </Button>
                             <Button
                               onClick={() => setDeleteTarget(assessment)}
@@ -1602,14 +1817,20 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
           <div>
             <CardTitle>Scoresheet</CardTitle>
             <CardDescription>
-              PowerTeacher-style view of student marks. Edit cells inline and click a student name to drill down.
+              PowerTeacher-style view of student marks. Edit cells inline and
+              click a student name to drill down.
             </CardDescription>
           </div>
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-end sm:justify-end">
-            <Field htmlFor="scoresheet-reporting-period" label="Reporting period">
+            <Field
+              htmlFor="scoresheet-reporting-period"
+              label="Reporting period"
+            >
               <Select
                 id="scoresheet-reporting-period"
-                onChange={(event) => setSelectedGridReportingPeriodId(event.target.value)}
+                onChange={(event) =>
+                  setSelectedGridReportingPeriodId(event.target.value)
+                }
                 value={selectedGridReportingPeriodId}
               >
                 <option value="all">All</option>
@@ -1619,7 +1840,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                   .sort((a, b) => a.order - b.order)
                   .map((period) => (
                     <option key={period.id} value={period.id}>
-                      {period.order}. {period.name}{period.isLocked ? " (Locked)" : ""}
+                      {period.order}. {period.name}
+                      {period.isLocked ? " (Locked)" : ""}
                     </option>
                   ))}
               </Select>
@@ -1627,13 +1849,22 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
 
             <div className="flex flex-wrap gap-2 sm:pb-[0.125rem]">
               <Button
-                disabled={pendingGridChangeCount === 0 || isSavingGrid || isLoadingGrid || !selectedClassId}
+                disabled={
+                  pendingGridChangeCount === 0 ||
+                  isSavingGrid ||
+                  isLoadingGrid ||
+                  !selectedClassId
+                }
                 onClick={() => {
                   void handleSaveGridEdits();
                 }}
                 type="button"
               >
-                {isSavingGrid ? "Saving..." : pendingGridChangeCount > 0 ? `Save (${pendingGridChangeCount})` : "Save"}
+                {isSavingGrid
+                  ? "Saving..."
+                  : pendingGridChangeCount > 0
+                    ? `Save (${pendingGridChangeCount})`
+                    : "Save"}
               </Button>
               <Button
                 disabled={isLoadingGrid || !selectedClassId}
@@ -1650,7 +1881,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
         </CardHeader>
         <CardContent>
           {gridError ? <Notice tone="danger">{gridError}</Notice> : null}
-          {gridSaveError ? <Notice tone="danger">{gridSaveError}</Notice> : null}
+          {gridSaveError ? (
+            <Notice tone="danger">{gridSaveError}</Notice>
+          ) : null}
           {!grid ? (
             <EmptyState
               title="No gradebook grid available"
@@ -1671,7 +1904,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
-                    {selectedGridReportingPeriodId === "all" && gridAssessmentGroups.length > 1 ? (
+                    {selectedGridReportingPeriodId === "all" &&
+                    gridAssessmentGroups.length > 1 ? (
                       <>
                         <tr>
                           <th
@@ -1694,13 +1928,22 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                               </div>
                             </th>
                           ))}
-                          <th className="px-4 py-3 font-semibold text-slate-700" rowSpan={2}>
+                          <th
+                            className="px-4 py-3 font-semibold text-slate-700"
+                            rowSpan={2}
+                          >
                             Avg
                           </th>
-                          <th className="px-4 py-3 font-semibold text-slate-700" rowSpan={2}>
+                          <th
+                            className="px-4 py-3 font-semibold text-slate-700"
+                            rowSpan={2}
+                          >
                             %
                           </th>
-                          <th className="px-4 py-3 font-semibold text-slate-700" rowSpan={2}>
+                          <th
+                            className="px-4 py-3 font-semibold text-slate-700"
+                            rowSpan={2}
+                          >
                             Grade
                           </th>
                         </tr>
@@ -1723,7 +1966,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                                     {assessment.title}
                                   </span>
                                   <span className="mt-0.5 block text-xs font-normal text-slate-500">
-                                    {assessment.assessmentType.name} • Wt {assessment.weight} •{" "}
+                                    {assessment.assessmentType.name} • Wt{" "}
+                                    {assessment.weight} •{" "}
                                     {assessment.reportingPeriod
                                       ? `Term ${assessment.reportingPeriod.order}`
                                       : "Unassigned"}
@@ -1756,7 +2000,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                                 {assessment.title}
                               </span>
                               <span className="mt-0.5 block text-xs font-normal text-slate-500">
-                                {assessment.assessmentType.name} • Wt {assessment.weight} •{" "}
+                                {assessment.assessmentType.name} • Wt{" "}
+                                {assessment.weight} •{" "}
                                 {assessment.reportingPeriod
                                   ? `Term ${assessment.reportingPeriod.order}`
                                   : "Unassigned"}
@@ -1764,9 +2009,15 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                             </button>
                           </th>
                         ))}
-                        <th className="px-4 py-3 font-semibold text-slate-700">Avg</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">%</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Grade</th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Avg
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          %
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Grade
+                        </th>
                       </tr>
                     )}
                   </thead>
@@ -1793,15 +2044,17 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                           </td>
                           {visibleGridAssessments.map((assessment) => {
                             const result =
-                              gridResultsByAssessmentId?.get(assessment.id)?.get(student.id) ??
-                              null;
+                              gridResultsByAssessmentId
+                                ?.get(assessment.id)
+                                ?.get(student.id) ?? null;
                             const originalScore = result?.score ?? null;
                             const cellKey = `${assessment.id}:${student.id}`;
                             const draftValue = draftGridScores[cellKey];
                             const displayValue =
                               draftValue !== undefined
                                 ? draftValue
-                                : originalScore === null || originalScore === undefined
+                                : originalScore === null ||
+                                    originalScore === undefined
                                   ? ""
                                   : `${originalScore}`;
 
@@ -1809,20 +2062,29 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                             const numeric = trimmed ? Number(trimmed) : null;
                             const percent =
                               numeric === null || !Number.isFinite(numeric)
-                                ? originalScore === null || originalScore === undefined
+                                ? originalScore === null ||
+                                  originalScore === undefined
                                   ? null
-                                  : round1((originalScore / assessment.maxScore) * 100)
+                                  : round1(
+                                      (originalScore / assessment.maxScore) *
+                                        100,
+                                    )
                                 : round1((numeric / assessment.maxScore) * 100);
-                            const isLocked = assessment.reportingPeriod?.isLocked ?? false;
+                            const isLocked =
+                              assessment.reportingPeriod?.isLocked ?? false;
                             const isDirty =
                               trimmed &&
                               Number.isFinite(Number(trimmed)) &&
-                              (originalScore === null || originalScore === undefined
+                              (originalScore === null ||
+                              originalScore === undefined
                                 ? true
                                 : Number(trimmed) !== originalScore);
 
                             return (
-                              <td className="px-2 py-2" key={`${student.id}-${assessment.id}`}>
+                              <td
+                                className="px-2 py-2"
+                                key={`${student.id}-${assessment.id}`}
+                              >
                                 <Input
                                   aria-label={`${getFullName(student.firstName, student.lastName)} ${assessment.title}`}
                                   className={[
@@ -1848,7 +2110,11 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                                     }
 
                                     const parsed = Number(nextValue);
-                                    if (Number.isFinite(parsed) && original !== null && parsed === original) {
+                                    if (
+                                      Number.isFinite(parsed) &&
+                                      original !== null &&
+                                      parsed === original
+                                    ) {
                                       setDraftGridScores((current) => {
                                         if (!(cellKey in current)) {
                                           return current;
@@ -1880,12 +2146,15 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                             );
                           })}
                           <td className="px-4 py-3 text-slate-900">
-                            {summaryEntry?.averagePercent === null || summaryEntry?.averagePercent === undefined
+                            {summaryEntry?.averagePercent === null ||
+                            summaryEntry?.averagePercent === undefined
                               ? "—"
                               : round1(summaryEntry.averagePercent)}
                           </td>
                           <td className="px-4 py-3 text-slate-900">
-                            {formatPercent(summaryEntry?.averagePercent ?? null)}
+                            {formatPercent(
+                              summaryEntry?.averagePercent ?? null,
+                            )}
                           </td>
                           <td className="px-4 py-3 text-slate-900">
                             {summaryEntry?.averageLetterGrade ?? "—"}
@@ -1936,10 +2205,14 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
             </div>
           </CardHeader>
           <CardContent>
-            {studentError ? <Notice tone="danger">{studentError}</Notice> : null}
+            {studentError ? (
+              <Notice tone="danger">{studentError}</Notice>
+            ) : null}
 
             {isLoadingStudentSummary ? (
-              <p className="text-sm text-slate-500">Loading student grades...</p>
+              <p className="text-sm text-slate-500">
+                Loading student grades...
+              </p>
             ) : !studentSummary ? (
               <EmptyState
                 title="Student grades unavailable"
@@ -1949,7 +2222,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="neutral">
-                    {studentSummary.gradedCount}/{studentSummary.assessmentCount} graded
+                    {studentSummary.gradedCount}/
+                    {studentSummary.assessmentCount} graded
                   </Badge>
                   <Badge variant="neutral">
                     Average:{" "}
@@ -1978,7 +2252,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                               ? `${group.reportingPeriod.order}. ${group.reportingPeriod.name}`
                               : "Unassigned"}
                           </p>
-                          {isLocked ? <Badge variant="neutral">Locked</Badge> : null}
+                          {isLocked ? (
+                            <Badge variant="neutral">Locked</Badge>
+                          ) : null}
                         </div>
 
                         <div className="overflow-hidden rounded-xl border border-slate-200">
@@ -1989,12 +2265,24 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                                   <th className="px-4 py-3 font-semibold text-slate-700">
                                     Assessment
                                   </th>
-                                  <th className="px-4 py-3 font-semibold text-slate-700">Type</th>
-                                  <th className="px-4 py-3 font-semibold text-slate-700">Due</th>
-                                  <th className="px-4 py-3 font-semibold text-slate-700">Weight</th>
-                                  <th className="px-4 py-3 font-semibold text-slate-700">Parents</th>
-                                  <th className="px-4 py-3 font-semibold text-slate-700">Percent</th>
-                                  <th className="px-4 py-3 font-semibold text-slate-700">Score</th>
+                                  <th className="px-4 py-3 font-semibold text-slate-700">
+                                    Type
+                                  </th>
+                                  <th className="px-4 py-3 font-semibold text-slate-700">
+                                    Due
+                                  </th>
+                                  <th className="px-4 py-3 font-semibold text-slate-700">
+                                    Weight
+                                  </th>
+                                  <th className="px-4 py-3 font-semibold text-slate-700">
+                                    Parents
+                                  </th>
+                                  <th className="px-4 py-3 font-semibold text-slate-700">
+                                    Percent
+                                  </th>
+                                  <th className="px-4 py-3 font-semibold text-slate-700">
+                                    Score
+                                  </th>
                                   <th className="px-4 py-3 font-semibold text-slate-700">
                                     Comment
                                   </th>
@@ -2002,16 +2290,27 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                               </thead>
                               <tbody className="divide-y divide-slate-200 bg-white">
                                 {group.assessments.map((assessment) => {
-                                  const scoreValue = studentScoreByAssessmentId[assessment.id] ?? "";
+                                  const scoreValue =
+                                    studentScoreByAssessmentId[assessment.id] ??
+                                    "";
                                   const trimmedScore = scoreValue.trim();
-                                  const numericScore = trimmedScore ? Number(trimmedScore) : null;
+                                  const numericScore = trimmedScore
+                                    ? Number(trimmedScore)
+                                    : null;
                                   const percent =
-                                    numericScore === null || !Number.isFinite(numericScore)
+                                    numericScore === null ||
+                                    !Number.isFinite(numericScore)
                                       ? assessment.percent
-                                      : round1((numericScore / assessment.maxScore) * 100);
+                                      : round1(
+                                          (numericScore / assessment.maxScore) *
+                                            100,
+                                        );
 
                                   return (
-                                    <tr className="align-top hover:bg-slate-50" key={assessment.id}>
+                                    <tr
+                                      className="align-top hover:bg-slate-50"
+                                      key={assessment.id}
+                                    >
                                       <td className="px-4 py-4">
                                         <p className="font-medium text-slate-900">
                                           {assessment.title}
@@ -2024,7 +2323,9 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                                         {assessment.assessmentType.name}
                                       </td>
                                       <td className="px-4 py-4 text-slate-600">
-                                        {assessment.dueAt ? formatDateOnly(assessment.dueAt) : "—"}
+                                        {assessment.dueAt
+                                          ? formatDateOnly(assessment.dueAt)
+                                          : "—"}
                                       </td>
                                       <td className="px-4 py-4 text-slate-600">
                                         {assessment.weight}
@@ -2032,10 +2333,14 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                                       <td className="px-4 py-4">
                                         <Badge
                                           variant={
-                                            assessment.isPublishedToParents ? "success" : "neutral"
+                                            assessment.isPublishedToParents
+                                              ? "success"
+                                              : "neutral"
                                           }
                                         >
-                                          {assessment.isPublishedToParents ? "Visible" : "Hidden"}
+                                          {assessment.isPublishedToParents
+                                            ? "Visible"
+                                            : "Hidden"}
                                         </Badge>
                                       </td>
                                       <td className="px-4 py-4 text-slate-900">
@@ -2044,29 +2349,42 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                                       <td className="px-4 py-4">
                                         <Input
                                           className="h-9 w-28 rounded-lg px-2 text-right tabular-nums"
-                                          disabled={isLocked || isSavingStudentDetail}
+                                          disabled={
+                                            isLocked || isSavingStudentDetail
+                                          }
                                           max={assessment.maxScore}
                                           min={0}
                                           onBlur={(event) => {
                                             if (!event.target.value.trim()) {
-                                              setStudentScoreByAssessmentId((current) => {
-                                                if (!(assessment.id in current)) {
-                                                  return current;
-                                                }
+                                              setStudentScoreByAssessmentId(
+                                                (current) => {
+                                                  if (
+                                                    !(assessment.id in current)
+                                                  ) {
+                                                    return current;
+                                                  }
 
-                                                const next = { ...current };
-                                                delete next[assessment.id];
-                                                return next;
-                                              });
+                                                  const next = { ...current };
+                                                  delete next[assessment.id];
+                                                  return next;
+                                                },
+                                              );
                                             }
                                           }}
                                           onChange={(event) =>
-                                            setStudentScoreByAssessmentId((current) => ({
-                                              ...current,
-                                              [assessment.id]: event.target.value,
-                                            }))
+                                            setStudentScoreByAssessmentId(
+                                              (current) => ({
+                                                ...current,
+                                                [assessment.id]:
+                                                  event.target.value,
+                                              }),
+                                            )
                                           }
-                                          placeholder={isLocked ? "Locked" : `0 - ${assessment.maxScore}`}
+                                          placeholder={
+                                            isLocked
+                                              ? "Locked"
+                                              : `0 - ${assessment.maxScore}`
+                                          }
                                           step="0.5"
                                           type="number"
                                           value={scoreValue}
@@ -2075,16 +2393,29 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                                       <td className="px-4 py-4">
                                         <Textarea
                                           className="h-9 min-h-[2.25rem] rounded-lg px-2 py-1 text-xs"
-                                          disabled={isLocked || isSavingStudentDetail}
-                                          onChange={(event) =>
-                                            setStudentCommentByAssessmentId((current) => ({
-                                              ...current,
-                                              [assessment.id]: event.target.value,
-                                            }))
+                                          disabled={
+                                            isLocked || isSavingStudentDetail
                                           }
-                                          placeholder={isLocked ? "Locked" : "Optional comment"}
+                                          onChange={(event) =>
+                                            setStudentCommentByAssessmentId(
+                                              (current) => ({
+                                                ...current,
+                                                [assessment.id]:
+                                                  event.target.value,
+                                              }),
+                                            )
+                                          }
+                                          placeholder={
+                                            isLocked
+                                              ? "Locked"
+                                              : "Optional comment"
+                                          }
                                           rows={1}
-                                          value={studentCommentByAssessmentId[assessment.id] ?? ""}
+                                          value={
+                                            studentCommentByAssessmentId[
+                                              assessment.id
+                                            ] ?? ""
+                                          }
                                         />
                                       </td>
                                     </tr>
@@ -2115,7 +2446,12 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
             </CardDescription>
           </div>
           <Button
-            disabled={!selectedAssessment || isSaving || isLoadingGrades || selectedAssessmentIsLocked}
+            disabled={
+              !selectedAssessment ||
+              isSaving ||
+              isLoadingGrades ||
+              selectedAssessmentIsLocked
+            }
             onClick={() => {
               void handleSaveGrades();
             }}
@@ -2127,7 +2463,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
         <CardContent>
           {selectedAssessment && selectedAssessmentIsLocked ? (
             <Notice tone="info">
-              This assessment is in a locked reporting period, so grade entry is read-only.
+              This assessment is in a locked reporting period, so grade entry is
+              read-only.
             </Notice>
           ) : null}
           {!selectedAssessment ? (
@@ -2148,19 +2485,33 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Score</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Comment</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Student
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Score
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Comment
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {gradeRows.map((row) => (
-                      <tr className="align-top hover:bg-slate-50" key={row.student.id}>
+                      <tr
+                        className="align-top hover:bg-slate-50"
+                        key={row.student.id}
+                      >
                         <td className="px-4 py-4">
                           <p className="font-medium text-slate-900">
-                            {getFullName(row.student.firstName, row.student.lastName)}
+                            {getFullName(
+                              row.student.firstName,
+                              row.student.lastName,
+                            )}
                           </p>
-                          <p className="mt-1 text-xs text-slate-500">@{row.student.username}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            @{row.student.username}
+                          </p>
                         </td>
                         <td className="px-4 py-4">
                           <Input
@@ -2208,7 +2559,8 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
           <div>
             <CardTitle>Class Summary</CardTitle>
             <CardDescription>
-              Simple average-based summaries across all assessments in the selected class.
+              Simple average-based summaries across all assessments in the
+              selected class.
             </CardDescription>
           </div>
           <Button
@@ -2268,18 +2620,32 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                   <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                     <thead className="bg-slate-50/80">
                       <tr>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Graded</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Average</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Grade</th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Student
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Graded
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Average
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Grade
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white">
                       {summary.students.map((entry) => (
-                        <tr className="align-top hover:bg-slate-50" key={entry.student.id}>
+                        <tr
+                          className="align-top hover:bg-slate-50"
+                          key={entry.student.id}
+                        >
                           <td className="px-4 py-4">
                             <p className="font-medium text-slate-900">
-                              {getFullName(entry.student.firstName, entry.student.lastName)}
+                              {getFullName(
+                                entry.student.firstName,
+                                entry.student.lastName,
+                              )}
                             </p>
                           </td>
                           <td className="px-4 py-4 text-slate-600">

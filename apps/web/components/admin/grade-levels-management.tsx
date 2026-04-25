@@ -72,10 +72,14 @@ export function GradeLevelsManagement({
   selectedSchoolName,
 }: GradeLevelsManagementProps) {
   const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
-  const [createForm, setCreateForm] = useState<GradeLevelFormState>(buildCreateForm());
-  const [editingGradeLevel, setEditingGradeLevel] = useState<GradeLevel | null>(null);
+  const [createForm, setCreateForm] =
+    useState<GradeLevelFormState>(buildCreateForm());
+  const [editingGradeLevel, setEditingGradeLevel] = useState<GradeLevel | null>(
+    null,
+  );
   const [editForm, setEditForm] = useState<GradeLevelFormState | null>(null);
-  const [actionTarget, setActionTarget] = useState<GradeLevelActionTarget | null>(null);
+  const [actionTarget, setActionTarget] =
+    useState<GradeLevelActionTarget | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -184,8 +188,9 @@ export function GradeLevelsManagement({
 
       const updatedGradeLevels = await refreshGradeLevels();
       const updatedGradeLevel =
-        updatedGradeLevels.find((gradeLevel) => gradeLevel.id === editingGradeLevel.id) ??
-        null;
+        updatedGradeLevels.find(
+          (gradeLevel) => gradeLevel.id === editingGradeLevel.id,
+        ) ?? null;
 
       setEditingGradeLevel(updatedGradeLevel);
       setEditForm(updatedGradeLevel ? buildEditForm(updatedGradeLevel) : null);
@@ -223,11 +228,17 @@ export function GradeLevelsManagement({
 
       const updatedGradeLevels = await refreshGradeLevels();
       const updatedEditingGradeLevel = editingGradeLevel
-        ? updatedGradeLevels.find((gradeLevel) => gradeLevel.id === editingGradeLevel.id) ?? null
+        ? (updatedGradeLevels.find(
+            (gradeLevel) => gradeLevel.id === editingGradeLevel.id,
+          ) ?? null)
         : null;
 
       setEditingGradeLevel(updatedEditingGradeLevel);
-      setEditForm(updatedEditingGradeLevel ? buildEditForm(updatedEditingGradeLevel) : null);
+      setEditForm(
+        updatedEditingGradeLevel
+          ? buildEditForm(updatedEditingGradeLevel)
+          : null,
+      );
       setActionTarget(null);
       if (actionTarget.action === "delete") {
         setSuccessMessage(
@@ -280,7 +291,10 @@ export function GradeLevelsManagement({
                   className="grid gap-4 rounded-xl border border-slate-200 p-4 md:grid-cols-2"
                   onSubmit={handleCreateGradeLevel}
                 >
-                  <Field htmlFor="create-grade-level-name" label="Grade level name">
+                  <Field
+                    htmlFor="create-grade-level-name"
+                    label="Grade level name"
+                  >
                     <Input
                       id="create-grade-level-name"
                       onChange={(event) =>
@@ -294,7 +308,10 @@ export function GradeLevelsManagement({
                     />
                   </Field>
 
-                  <Field htmlFor="create-grade-level-sort-order" label="Display order">
+                  <Field
+                    htmlFor="create-grade-level-sort-order"
+                    label="Display order"
+                  >
                     <Input
                       id="create-grade-level-sort-order"
                       inputMode="numeric"
@@ -336,7 +353,9 @@ export function GradeLevelsManagement({
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <CardTitle>Edit Grade Level</CardTitle>
-                <CardDescription>Updating {editingGradeLevel.name}.</CardDescription>
+                <CardDescription>
+                  Updating {editingGradeLevel.name}.
+                </CardDescription>
               </div>
               <Button
                 onClick={() => {
@@ -350,7 +369,10 @@ export function GradeLevelsManagement({
               </Button>
             </CardHeader>
             <CardContent>
-              <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSaveGradeLevel}>
+              <form
+                className="grid gap-4 md:grid-cols-2"
+                onSubmit={handleSaveGradeLevel}
+              >
                 <Field htmlFor="edit-grade-level-name" label="Grade level name">
                   <Input
                     id="edit-grade-level-name"
@@ -368,7 +390,10 @@ export function GradeLevelsManagement({
                   />
                 </Field>
 
-                <Field htmlFor="edit-grade-level-sort-order" label="Display order">
+                <Field
+                  htmlFor="edit-grade-level-sort-order"
+                  label="Display order"
+                >
                   <Input
                     id="edit-grade-level-sort-order"
                     inputMode="numeric"
@@ -399,8 +424,8 @@ export function GradeLevelsManagement({
             <CardHeader>
               <CardTitle>Grade Level Rules</CardTitle>
               <CardDescription>
-                Inactive grade levels stay valid for already-assigned students but are
-                hidden from normal student edit dropdowns.
+                Inactive grade levels stay valid for already-assigned students
+                but are hidden from normal student edit dropdowns.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-slate-600">
@@ -417,11 +442,14 @@ export function GradeLevelsManagement({
           <div>
             <CardTitle>Grade Level Options</CardTitle>
             <CardDescription>
-              Review active and archived options in the order shown to administrators.
+              Review active and archived options in the order shown to
+              administrators.
             </CardDescription>
           </div>
           <Badge variant="neutral">
-            {isLoading ? "Loading grade levels..." : `${gradeLevels.length} records`}
+            {isLoading
+              ? "Loading grade levels..."
+              : `${gradeLevels.length} records`}
           </Badge>
         </CardHeader>
         <CardContent>
@@ -431,25 +459,44 @@ export function GradeLevelsManagement({
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Name</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Order</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Students</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Name
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Order
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Students
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {gradeLevels.map((gradeLevel) => (
-                      <tr className="align-top hover:bg-slate-50" key={gradeLevel.id}>
+                      <tr
+                        className="align-top hover:bg-slate-50"
+                        key={gradeLevel.id}
+                      >
                         <td className="px-4 py-4 font-medium text-slate-900">
                           {gradeLevel.name}
                         </td>
-                        <td className="px-4 py-4 text-slate-600">{gradeLevel.sortOrder}</td>
+                        <td className="px-4 py-4 text-slate-600">
+                          {gradeLevel.sortOrder}
+                        </td>
                         <td className="px-4 py-4 text-slate-600">
                           {gradeLevel._count.students}
                         </td>
                         <td className="px-4 py-4">
-                          <Badge variant={gradeLevel.isActive ? "success" : "neutral"}>
+                          <Badge
+                            variant={
+                              gradeLevel.isActive ? "success" : "neutral"
+                            }
+                          >
                             {gradeLevel.isActive ? "Active" : "Archived"}
                           </Badge>
                         </td>
@@ -474,7 +521,9 @@ export function GradeLevelsManagement({
                                 onClick={() => {
                                   setActionTarget({
                                     id: gradeLevel.id,
-                                    action: gradeLevel.isActive ? "archive" : "activate",
+                                    action: gradeLevel.isActive
+                                      ? "archive"
+                                      : "activate",
                                     label: gradeLevel.name,
                                     studentCount: gradeLevel._count.students,
                                   });
@@ -482,7 +531,9 @@ export function GradeLevelsManagement({
                                   setSuccessMessage(null);
                                 }}
                                 type="button"
-                                variant={gradeLevel.isActive ? "danger" : "primary"}
+                                variant={
+                                  gradeLevel.isActive ? "danger" : "primary"
+                                }
                               >
                                 {gradeLevel.isActive ? "Archive" : "Unarchive"}
                               </Button>
@@ -505,7 +556,9 @@ export function GradeLevelsManagement({
                               </Button>
                             </div>
                           ) : (
-                            <span className="text-xs text-slate-500">Read-only</span>
+                            <span className="text-xs text-slate-500">
+                              Read-only
+                            </span>
                           )}
                         </td>
                       </tr>

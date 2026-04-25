@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import {
   ChargeStatus,
   LibraryFineReason,
@@ -16,7 +16,9 @@ describe('LibraryService fines', () => {
     user: { findUnique: jest.Mock };
     libraryLoan: { findUnique: jest.Mock; findMany: jest.Mock };
     libraryFine: { findUnique: jest.Mock; findMany: jest.Mock };
+    libraryHold: { findMany: jest.Mock; findFirst: jest.Mock; findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
     libraryItem: { findFirst: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
+    studentParentLink: { findUnique: jest.Mock };
     billingCategory: { upsert: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -43,6 +45,18 @@ describe('LibraryService fines', () => {
   const staffActor = {
     id: 'staff-1',
     role: UserRole.STAFF,
+    memberships: [{ schoolId: 'school-1', isActive: true }],
+  } as const;
+
+  const studentActor = {
+    id: 'student-1',
+    role: UserRole.STUDENT,
+    memberships: [{ schoolId: 'school-1', isActive: true }],
+  } as const;
+
+  const parentActor = {
+    id: 'parent-1',
+    role: UserRole.PARENT,
     memberships: [{ schoolId: 'school-1', isActive: true }],
   } as const;
 
@@ -198,6 +212,53 @@ describe('LibraryService fines', () => {
     };
   }
 
+  function buildHoldRecord(overrides?: Partial<Record<string, unknown>>) {
+    return {
+      id: 'hold-1',
+      schoolId: 'school-1',
+      itemId: 'item-1',
+      studentId: 'student-1',
+      createdByUserId: 'student-1',
+      status: 'ACTIVE',
+      notes: null,
+      resolvedAt: null,
+      resolvedByUserId: null,
+      createdAt: new Date('2026-04-15T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-15T00:00:00.000Z'),
+      school: {
+        id: 'school-1',
+        name: 'Main School',
+        shortName: 'MS',
+      },
+      item: {
+        id: 'item-1',
+        title: 'Algebra Book',
+        author: 'Author',
+        isbn: 'ISBN-1',
+        barcode: 'BC-1',
+        category: 'Textbook',
+        status: 'CHECKED_OUT',
+        availableCopies: 0,
+        totalCopies: 1,
+      },
+      student: {
+        id: 'student-1',
+        firstName: 'Test',
+        lastName: 'Student',
+        username: 'student01',
+        email: 'student@test.local',
+      },
+      createdBy: {
+        id: 'student-1',
+        firstName: 'Test',
+        lastName: 'Student',
+        username: 'student01',
+      },
+      resolvedBy: null,
+      ...overrides,
+    };
+  }
+
   beforeEach(() => {
     tx = {
       billingCharge: { create: jest.fn(), update: jest.fn() },
@@ -212,7 +273,9 @@ describe('LibraryService fines', () => {
       user: { findUnique: jest.fn() },
       libraryLoan: { findUnique: jest.fn(), findMany: jest.fn() },
       libraryFine: { findUnique: jest.fn(), findMany: jest.fn() },
+      libraryHold: { findMany: jest.fn(), findFirst: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
       libraryItem: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+      studentParentLink: { findUnique: jest.fn() },
       billingCategory: { upsert: jest.fn() },
       $transaction: jest.fn().mockImplementation(async (arg: unknown) => {
         if (typeof arg === 'function') {
@@ -224,6 +287,7 @@ describe('LibraryService fines', () => {
     };
 
     service = new LibraryService(prisma as never, notificationsService as never);
+    prisma.libraryLoan.findMany.mockResolvedValue([]);
   });
 
   it('allows OWNER to update fine settings', async () => {
@@ -417,6 +481,7 @@ describe('LibraryService fines', () => {
       availableCopies: 3,
       status: 'AVAILABLE',
     });
+    prisma.libraryLoan.findMany.mockResolvedValueOnce([]);
     prisma.libraryItem.update.mockResolvedValue(buildItemRecord({ title: 'Updated Title' }));
 
     const updated = await service.updateItem(adminActor as never, 'item-1', {
@@ -426,6 +491,54 @@ describe('LibraryService fines', () => {
 
     expect(prisma.libraryItem.update).toHaveBeenCalledTimes(1);
     expect(updated.title).toBe('Updated Title');
+  });
+
+  it('allows direct manual status override independent of availableCopies', async () => {
+    prisma.libraryItem.findUnique.mockResolvedValueOnce({
+      id: 'item-1',
+      schoolId: 'school-1',
+      title: 'Algebra Book',
+      totalCopies: 5,
+      availableCopies: 3,
+      status: 'AVAILABLE',
+    });
+    prisma.libraryLoan.findMany.mockResolvedValueOnce([]);
+    prisma.libraryItem.update.mockResolvedValue(
+      buildItemRecord({ status: 'CHECKED_OUT' }),
+    );
+
+    const updated = await service.updateItem(adminActor as never, 'item-1', {
+      status: 'CHECKED_OUT',
+    });
+
+    expect(prisma.libraryItem.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'CHECKED_OUT',
+        }),
+      }),
+    );
+    expect(updated.status).toBe('CHECKED_OUT');
+  });
+
+  it('blocks reducing total copies below active checkout count', async () => {
+    prisma.libraryItem.findUnique.mockResolvedValueOnce({
+      id: 'item-1',
+      schoolId: 'school-1',
+      title: 'Algebra Book',
+      totalCopies: 5,
+      availableCopies: 3,
+      status: 'AVAILABLE',
+    });
+    prisma.libraryLoan.findMany.mockResolvedValueOnce([{ id: 'loan-1' }, { id: 'loan-2' }]);
+
+    await expect(
+      service.updateItem(adminActor as never, 'item-1', {
+        totalCopies: 1,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prisma.libraryItem.update).not.toHaveBeenCalled();
   });
 
   it('blocks cross-school item edit', async () => {
@@ -509,5 +622,135 @@ describe('LibraryService fines', () => {
     expect(tx.libraryFine.update).not.toHaveBeenCalled();
     expect(result.fineRequiresReview).toBe(true);
     expect(result.lostFine?.id).toBe('fine-1');
+  });
+
+  it('allows student to create hold for self', async () => {
+    prisma.libraryItem.findUnique.mockResolvedValue({
+      id: 'item-1',
+      schoolId: 'school-1',
+      status: 'CHECKED_OUT',
+      availableCopies: 0,
+    });
+    prisma.libraryHold.findFirst.mockResolvedValue(null);
+    prisma.libraryHold.create.mockResolvedValue(buildHoldRecord());
+
+    const created = await service.createStudentHold(studentActor as never, {
+      itemId: 'item-1',
+    });
+
+    expect(prisma.libraryHold.create).toHaveBeenCalledTimes(1);
+    expect(created.studentId).toBe(studentActor.id);
+    expect(created.status).toBe('ACTIVE');
+  });
+
+  it('prevents duplicate active hold creation', async () => {
+    prisma.libraryItem.findUnique.mockResolvedValue({
+      id: 'item-1',
+      schoolId: 'school-1',
+      status: 'CHECKED_OUT',
+      availableCopies: 0,
+    });
+    prisma.libraryHold.findFirst.mockResolvedValue({ id: 'hold-existing' });
+
+    await expect(
+      service.createStudentHold(studentActor as never, {
+        itemId: 'item-1',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('blocks parent from placing holds', async () => {
+    await expect(
+      service.createStudentHold(parentActor as never, {
+        itemId: 'item-1',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('allows parent to place hold for a linked child', async () => {
+    prisma.studentParentLink.findUnique.mockResolvedValue({
+      student: {
+        id: 'student-1',
+        role: UserRole.STUDENT,
+        schoolId: 'school-1',
+        memberships: [{ schoolId: 'school-1', isActive: true }],
+      },
+    });
+    prisma.libraryItem.findUnique.mockResolvedValue({
+      id: 'item-1',
+      schoolId: 'school-1',
+      status: 'CHECKED_OUT',
+      availableCopies: 0,
+    });
+    prisma.libraryHold.findFirst.mockResolvedValue(null);
+    prisma.libraryHold.create.mockResolvedValue(
+      buildHoldRecord({
+        studentId: 'student-1',
+        createdByUserId: 'parent-1',
+      }),
+    );
+
+    const created = await service.createParentStudentHold(
+      parentActor as never,
+      'student-1',
+      {
+        itemId: 'item-1',
+      },
+    );
+
+    expect(created.studentId).toBe('student-1');
+    expect(created.createdByUserId).toBe('parent-1');
+  });
+
+  it('blocks parent hold creation for unrelated child', async () => {
+    prisma.studentParentLink.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.createParentStudentHold(parentActor as never, 'student-2', {
+        itemId: 'item-1',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('prevents duplicate active child hold creation from parent flow', async () => {
+    prisma.studentParentLink.findUnique.mockResolvedValue({
+      student: {
+        id: 'student-1',
+        role: UserRole.STUDENT,
+        schoolId: 'school-1',
+        memberships: [{ schoolId: 'school-1', isActive: true }],
+      },
+    });
+    prisma.libraryItem.findUnique.mockResolvedValue({
+      id: 'item-1',
+      schoolId: 'school-1',
+      status: 'CHECKED_OUT',
+      availableCopies: 0,
+    });
+    prisma.libraryHold.findFirst.mockResolvedValue({ id: 'hold-existing' });
+
+    await expect(
+      service.createParentStudentHold(parentActor as never, 'student-1', {
+        itemId: 'item-1',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('allows parent to view linked child holds only', async () => {
+    prisma.studentParentLink.findUnique.mockResolvedValueOnce({
+      student: {
+        id: 'student-1',
+        role: UserRole.STUDENT,
+      },
+    });
+    prisma.libraryHold.findMany.mockResolvedValue([buildHoldRecord()]);
+
+    const linkedResult = await service.listParentStudentHolds(parentActor as never, 'student-1');
+    expect(linkedResult.holds).toHaveLength(1);
+
+    prisma.studentParentLink.findUnique.mockResolvedValueOnce(null);
+    await expect(
+      service.listParentStudentHolds(parentActor as never, 'student-2'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

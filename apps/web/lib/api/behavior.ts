@@ -229,27 +229,30 @@ function normalizeBehaviorRecord(record: BehaviorRecord): BehaviorRecord {
 }
 
 export function createBehaviorRecord(input: CreateBehaviorRecordInput) {
-  return apiFetch<BehaviorRecord>(`/students/${input.studentId}/behavior-records`, {
-    method: "POST",
-    json: {
-      incidentAt: input.incidentAt,
-      categoryOptionId: input.categoryOptionId,
-      incidentLevel: input.incidentLevel,
-      title: input.title,
-      description: input.description,
-      actionTaken: input.actionTaken,
-      followUpRequired: input.followUpRequired,
-      parentContacted: input.parentContacted,
-      status: input.status,
-      incidentReport: input.incidentReport,
+  return apiFetch<BehaviorRecord>(
+    `/students/${input.studentId}/behavior-records`,
+    {
+      method: "POST",
+      json: {
+        incidentAt: input.incidentAt,
+        categoryOptionId: input.categoryOptionId,
+        incidentLevel: input.incidentLevel,
+        title: input.title,
+        description: input.description,
+        actionTaken: input.actionTaken,
+        followUpRequired: input.followUpRequired,
+        parentContacted: input.parentContacted,
+        status: input.status,
+        incidentReport: input.incidentReport,
+      },
     },
-  }).then(normalizeBehaviorRecord);
+  ).then(normalizeBehaviorRecord);
 }
 
 export function listBehaviorRecordsForStudent(studentId: string) {
-  return apiFetch<BehaviorRecord[]>(`/students/${studentId}/behavior-records`).then(
-    (records) => records.map(normalizeBehaviorRecord),
-  );
+  return apiFetch<BehaviorRecord[]>(
+    `/students/${studentId}/behavior-records`,
+  ).then((records) => records.map(normalizeBehaviorRecord));
 }
 
 export function listBehaviorRecords(filters?: {
@@ -263,7 +266,8 @@ export function listBehaviorRecords(filters?: {
   const params = new URLSearchParams();
   if (filters?.studentId) params.set("studentId", filters.studentId);
   if (filters?.status) params.set("status", filters.status);
-  if (filters?.incidentLevel) params.set("incidentLevel", filters.incidentLevel);
+  if (filters?.incidentLevel)
+    params.set("incidentLevel", filters.incidentLevel);
   if (filters?.category) params.set("category", filters.category);
   if (filters?.startDate) params.set("startDate", filters.startDate);
   if (filters?.endDate) params.set("endDate", filters.endDate);
@@ -279,7 +283,10 @@ export function getBehaviorRecord(recordId: string) {
   );
 }
 
-export function updateBehaviorRecord(recordId: string, input: UpdateBehaviorRecordInput) {
+export function updateBehaviorRecord(
+  recordId: string,
+  input: UpdateBehaviorRecordInput,
+) {
   return apiFetch<BehaviorRecord>(`/behavior-records/${recordId}`, {
     method: "PATCH",
     json: input,
@@ -294,7 +301,8 @@ export function listBehaviorStudents(options?: {
   const params = new URLSearchParams();
   if (options?.query) params.set("query", options.query);
   if (options?.schoolId) params.set("schoolId", options.schoolId);
-  if (typeof options?.limit === "number") params.set("limit", `${options.limit}`);
+  if (typeof options?.limit === "number")
+    params.set("limit", `${options.limit}`);
 
   return apiFetch<BehaviorStudentLookup[]>(
     `/behavior/students${params.size ? `?${params.toString()}` : ""}`,
@@ -308,7 +316,8 @@ export function getBehaviorStudentPrefill(studentId: string) {
     ...prefill,
     student: {
       ...prefill.student,
-      dateOfBirth: normalizeDateOnlyPayload(prefill.student.dateOfBirth) || null,
+      dateOfBirth:
+        normalizeDateOnlyPayload(prefill.student.dateOfBirth) || null,
     },
   }));
 }
@@ -357,32 +366,46 @@ export function updateBehaviorCategory(
 }
 
 export function activateBehaviorCategory(id: string) {
-  return apiFetch<BehaviorCategoryOption>(`/behavior-categories/${id}/activate`, {
-    method: "PATCH",
-  });
+  return apiFetch<BehaviorCategoryOption>(
+    `/behavior-categories/${id}/activate`,
+    {
+      method: "PATCH",
+    },
+  );
 }
 
 export function deactivateBehaviorCategory(id: string) {
-  return apiFetch<BehaviorCategoryOption>(`/behavior-categories/${id}/deactivate`, {
-    method: "PATCH",
-  });
+  return apiFetch<BehaviorCategoryOption>(
+    `/behavior-categories/${id}/deactivate`,
+    {
+      method: "PATCH",
+    },
+  );
 }
 
 export function uploadBehaviorAttachment(recordId: string, file: File) {
   const formData = new FormData();
   formData.append("file", file);
 
-  return apiFetch<BehaviorAttachment>(`/behavior-records/${recordId}/attachments`, {
-    method: "POST",
-    body: formData,
-  });
+  return apiFetch<BehaviorAttachment>(
+    `/behavior-records/${recordId}/attachments`,
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
 }
 
 export function listBehaviorAttachments(recordId: string) {
-  return apiFetch<BehaviorAttachment[]>(`/behavior-records/${recordId}/attachments`);
+  return apiFetch<BehaviorAttachment[]>(
+    `/behavior-records/${recordId}/attachments`,
+  );
 }
 
-export function deleteBehaviorAttachment(recordId: string, attachmentId: string) {
+export function deleteBehaviorAttachment(
+  recordId: string,
+  attachmentId: string,
+) {
   return apiFetch<{ success: boolean; id: string }>(
     `/behavior-records/${recordId}/attachments/${attachmentId}`,
     {
@@ -391,7 +414,10 @@ export function deleteBehaviorAttachment(recordId: string, attachmentId: string)
   );
 }
 
-export async function downloadBehaviorAttachment(recordId: string, attachmentId: string) {
+export async function downloadBehaviorAttachment(
+  recordId: string,
+  attachmentId: string,
+) {
   const token = getStoredSessionSnapshot()?.accessToken;
   if (!token) {
     throw new Error("Unauthorized");

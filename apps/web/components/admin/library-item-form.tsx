@@ -5,17 +5,27 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonClassName } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CheckboxField, Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
+import { Select } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth/auth-context";
 import {
   getLibraryItem,
+  listLibraryHolds,
+  listLibraryLoans,
   updateLibraryItem,
   type LibraryItem,
+  type LibraryItemStatus,
 } from "@/lib/api/library";
 
 const manageRoles = new Set(["OWNER", "SUPER_ADMIN", "ADMIN", "STAFF"]);
@@ -26,7 +36,8 @@ type LibraryItemFormState = {
   isbn: string;
   barcode: string;
   category: string;
-  isArchived: boolean;
+  totalCopies: string;
+  status: LibraryItemStatus;
 };
 
 function toFormState(item: LibraryItem): LibraryItemFormState {
@@ -36,8 +47,25 @@ function toFormState(item: LibraryItem): LibraryItemFormState {
     isbn: item.isbn ?? "",
     barcode: item.barcode ?? "",
     category: item.category ?? "",
-    isArchived: item.status === "ARCHIVED",
+    totalCopies: String(item.totalCopies),
+    status: item.status,
   };
+}
+
+function statusLabel(status: LibraryItemStatus) {
+  if (status === "AVAILABLE") {
+    return "Available";
+  }
+
+  if (status === "CHECKED_OUT") {
+    return "Checked out";
+  }
+
+  if (status === "ARCHIVED") {
+    return "Archived";
+  }
+
+  return "Lost";
 }
 
 export function LibraryItemForm({ itemId }: { itemId: string }) {
@@ -50,6 +78,10 @@ export function LibraryItemForm({ itemId }: { itemId: string }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [activeLoanCount, setActiveLoanCount] = useState(0);
+  const [activeHoldCount, setActiveHoldCount] = useState(0);
+  const [confirmOverrideConflict, setConfirmOverrideConflict] = useState(false);
 
   useEffect(() => {
     async function loadItem() {
@@ -59,14 +91,23 @@ export function LibraryItemForm({ itemId }: { itemId: string }) {
 
       setIsLoading(true);
       setError(null);
+      setSuccessMessage(null);
 
       try {
-        const response = await getLibraryItem(itemId);
+        const [response, activeLoans, activeHolds] = await Promise.all([
+          getLibraryItem(itemId),
+          listLibraryLoans({ itemId, activeOnly: true }),
+          listLibraryHolds({ itemId, status: "ACTIVE" }),
+        ]);
         setItem(response);
         setForm(toFormState(response));
+        setActiveLoanCount(activeLoans.length);
+        setActiveHoldCount(activeHolds.length);
       } catch (loadError) {
         setError(
-          loadError instanceof Error ? loadError.message : "Unable to load library item.",
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load library item.",
         );
       } finally {
         setIsLoading(false);
@@ -75,6 +116,23 @@ export function LibraryItemForm({ itemId }: { itemId: string }) {
 
     void loadItem();
   }, [itemId, role]);
+
+  const parsedTotalCopies = Number(form?.totalCopies ?? "0");
+  const isValidTotalCopies =
+    Number.isInteger(parsedTotalCopies) && parsedTotalCopies > 0;
+  const copyCountConflict =
+    isValidTotalCopies && parsedTotalCopies < activeLoanCount;
+  const statusConflict = Boolean(
+    form &&
+    ((form.status === "AVAILABLE" && activeLoanCount > 0) ||
+      (form.status === "CHECKED_OUT" && activeLoanCount === 0) ||
+      ((form.status === "LOST" || form.status === "ARCHIVED") &&
+        (activeLoanCount > 0 || activeHoldCount > 0))),
+  );
+
+  useEffect(() => {
+    setConfirmOverrideConflict(false);
+  }, [statusConflict, copyCountConflict, form?.status, form?.totalCopies]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,26 +146,49 @@ export function LibraryItemForm({ itemId }: { itemId: string }) {
       return;
     }
 
+    if (!isValidTotalCopies) {
+      setError("Total copies must be a positive whole number.");
+      return;
+    }
+
+    if (copyCountConflict) {
+      setError(
+        `Total copies cannot be less than active checkouts (${activeLoanCount}).`,
+      );
+      return;
+    }
+
+    if (statusConflict && !confirmOverrideConflict) {
+      setError("Please confirm the status override conflict before saving.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
-      const nextStatus = form.isArchived
-        ? "ARCHIVED"
-        : item.status === "ARCHIVED"
-          ? "AVAILABLE"
-          : item.status;
-
       await updateLibraryItem(item.id, {
         title: form.title.trim(),
         author: form.author.trim() || null,
         isbn: form.isbn.trim() || null,
         barcode: form.barcode.trim() || null,
         category: form.category.trim() || null,
-        status: nextStatus,
+        totalCopies: parsedTotalCopies,
+        status: form.status,
       });
 
-      router.push("/admin/library/items?updated=1");
+      const [refreshedItem, activeLoans, activeHolds] = await Promise.all([
+        getLibraryItem(item.id),
+        listLibraryLoans({ itemId: item.id, activeOnly: true }),
+        listLibraryHolds({ itemId: item.id, status: "ACTIVE" }),
+      ]);
+
+      setItem(refreshedItem);
+      setForm(toFormState(refreshedItem));
+      setActiveLoanCount(activeLoans.length);
+      setActiveHoldCount(activeHolds.length);
+      setSuccessMessage("Library item overrides saved.");
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -151,21 +232,51 @@ export function LibraryItemForm({ itemId }: { itemId: string }) {
     <div className="space-y-6">
       <PageHeader
         title="Edit Library Item"
-        description="Update basic library metadata while preserving school scope and loan history."
+        description="Update item metadata, status overrides, and copy counts while preserving history."
         actions={
-          <Link className={buttonClassName({ variant: "secondary" })} href="/admin/library/items">
-            Back to items
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/admin/library/items"
+            >
+              Back to items
+            </Link>
+            <Button
+              onClick={() => router.push("/admin/library/items?updated=1")}
+              type="button"
+              variant="secondary"
+            >
+              Done
+            </Button>
+          </div>
         }
         meta={<Badge variant="neutral">{item.school.name}</Badge>}
       />
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      {successMessage ? <Notice tone="success">{successMessage}</Notice> : null}
+
+      {copyCountConflict ? (
+        <Notice tone="warning" title="Copy count conflict">
+          This item currently has {activeLoanCount} active checkout(s). Total
+          copies cannot be set below that count.
+        </Notice>
+      ) : null}
+
+      {statusConflict ? (
+        <Notice tone="warning" title="Status override conflict">
+          The selected status may conflict with active records (
+          {activeLoanCount} active checkout(s), {activeHoldCount} active
+          hold(s)). Confirm below to continue.
+        </Notice>
+      ) : null}
 
       <Card>
         <CardHeader>
           <CardTitle>Item details</CardTitle>
-          <CardDescription>Edit safe metadata fields for this item.</CardDescription>
+          <CardDescription>
+            Adjust metadata and apply manual status/copy overrides when needed.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
@@ -174,7 +285,9 @@ export function LibraryItemForm({ itemId }: { itemId: string }) {
                 id="library-item-title"
                 onChange={(event) =>
                   setForm((current) =>
-                    current ? { ...current, title: event.target.value } : current,
+                    current
+                      ? { ...current, title: event.target.value }
+                      : current,
                   )
                 }
                 value={form.title}
@@ -186,7 +299,9 @@ export function LibraryItemForm({ itemId }: { itemId: string }) {
                 id="library-item-author"
                 onChange={(event) =>
                   setForm((current) =>
-                    current ? { ...current, author: event.target.value } : current,
+                    current
+                      ? { ...current, author: event.target.value }
+                      : current,
                   )
                 }
                 value={form.author}
@@ -198,7 +313,9 @@ export function LibraryItemForm({ itemId }: { itemId: string }) {
                 id="library-item-isbn"
                 onChange={(event) =>
                   setForm((current) =>
-                    current ? { ...current, isbn: event.target.value } : current,
+                    current
+                      ? { ...current, isbn: event.target.value }
+                      : current,
                   )
                 }
                 value={form.isbn}
@@ -210,7 +327,9 @@ export function LibraryItemForm({ itemId }: { itemId: string }) {
                 id="library-item-barcode"
                 onChange={(event) =>
                   setForm((current) =>
-                    current ? { ...current, barcode: event.target.value } : current,
+                    current
+                      ? { ...current, barcode: event.target.value }
+                      : current,
                   )
                 }
                 value={form.barcode}
@@ -222,34 +341,80 @@ export function LibraryItemForm({ itemId }: { itemId: string }) {
                 id="library-item-category"
                 onChange={(event) =>
                   setForm((current) =>
-                    current ? { ...current, category: event.target.value } : current,
+                    current
+                      ? { ...current, category: event.target.value }
+                      : current,
                   )
                 }
                 value={form.category}
               />
             </Field>
 
+            <Field htmlFor="library-item-status" label="Item status override">
+              <Select
+                id="library-item-status"
+                value={form.status}
+                onChange={(event) =>
+                  setForm((current) =>
+                    current
+                      ? {
+                          ...current,
+                          status: event.target.value as LibraryItemStatus,
+                        }
+                      : current,
+                  )
+                }
+              >
+                <option value="AVAILABLE">Available</option>
+                <option value="CHECKED_OUT">Checked out</option>
+                <option value="LOST">Lost</option>
+                <option value="ARCHIVED">Archived</option>
+              </Select>
+            </Field>
+
+            <Field htmlFor="library-item-total-copies" label="Total copies">
+              <Input
+                id="library-item-total-copies"
+                min={1}
+                step={1}
+                type="number"
+                onChange={(event) =>
+                  setForm((current) =>
+                    current
+                      ? { ...current, totalCopies: event.target.value }
+                      : current,
+                  )
+                }
+                value={form.totalCopies}
+              />
+            </Field>
+
             <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
               <p>
-                Copies: {item.availableCopies} available / {item.totalCopies} total
+                Copies: {item.availableCopies} available / {item.totalCopies}{" "}
+                total
               </p>
-              <p>Status: {item.status.replace("_", " ")}</p>
+              <p>Status: {statusLabel(item.status)}</p>
+              <p>Active checkouts: {activeLoanCount}</p>
+              <p>Active holds: {activeHoldCount}</p>
             </div>
 
             <div className="md:col-span-2">
               <CheckboxField
-                checked={form.isArchived}
-                label="Archive this item (inactive)"
+                checked={confirmOverrideConflict}
+                label="I understand and want to apply this override despite active record conflicts"
+                disabled={!statusConflict}
                 onChange={(event) =>
-                  setForm((current) =>
-                    current ? { ...current, isArchived: event.target.checked } : current,
-                  )
+                  setConfirmOverrideConflict(event.target.checked)
                 }
               />
             </div>
 
             <div className="md:col-span-2 flex justify-end gap-2">
-              <Link className={buttonClassName({ variant: "secondary" })} href="/admin/library/items">
+              <Link
+                className={buttonClassName({ variant: "secondary" })}
+                href="/admin/library/items"
+              >
                 Cancel
               </Link>
               <Button disabled={isSubmitting} type="submit">

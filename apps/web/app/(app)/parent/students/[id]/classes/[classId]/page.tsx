@@ -8,4 +8,3 @@ export default function ParentStudentClassDetailPage() {
 
   return <ParentClassDetail classId={params.classId} studentId={params.id} />;
 }
-

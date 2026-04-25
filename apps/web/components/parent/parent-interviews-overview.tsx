@@ -5,7 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { buttonClassName } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -21,7 +27,10 @@ import {
   type InterviewEvent,
   type InterviewSlotParent,
 } from "@/lib/api/interviews";
-import { listMyParentStudents, type ParentStudentLink } from "@/lib/api/students";
+import {
+  listMyParentStudents,
+  type ParentStudentLink,
+} from "@/lib/api/students";
 import { formatDateTimeLabel } from "@/lib/utils";
 
 export function ParentInterviewsOverview() {
@@ -55,13 +64,18 @@ export function ParentInterviewsOverview() {
 
         const requestedStudentId = searchParams.get("studentId") ?? "";
         const resolvedStudentId =
-          requestedStudentId && response.some((entry) => entry.studentId === requestedStudentId)
+          requestedStudentId &&
+          response.some((entry) => entry.studentId === requestedStudentId)
             ? requestedStudentId
-            : response[0]?.studentId ?? "";
+            : (response[0]?.studentId ?? "");
 
         setSelectedStudentId((current) => current || resolvedStudentId);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load linked students.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load linked students.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -91,7 +105,11 @@ export function ParentInterviewsOverview() {
     } catch (loadError) {
       setEvents([]);
       setBookings([]);
-      setError(loadError instanceof Error ? loadError.message : "Unable to load interviews.");
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load interviews.",
+      );
     } finally {
       setIsLoadingData(false);
     }
@@ -126,7 +144,8 @@ export function ParentInterviewsOverview() {
     }
 
     return bookings.filter((slot) => {
-      const teacher = `${slot.teacher.firstName} ${slot.teacher.lastName}`.toLowerCase();
+      const teacher =
+        `${slot.teacher.firstName} ${slot.teacher.lastName}`.toLowerCase();
       const eventTitle = slot.interviewEvent.title.toLowerCase();
       return teacher.includes(query) || eventTitle.includes(query);
     });
@@ -141,7 +160,11 @@ export function ParentInterviewsOverview() {
       setSuccessMessage("Booking cancelled.");
       await reloadForStudent(selectedStudentId);
     } catch (cancelError) {
-      setError(cancelError instanceof Error ? cancelError.message : "Unable to cancel booking.");
+      setError(
+        cancelError instanceof Error
+          ? cancelError.message
+          : "Unable to cancel booking.",
+      );
     }
   }
 
@@ -151,7 +174,10 @@ export function ParentInterviewsOverview() {
         title="Parent-Teacher Interviews"
         description="Book and manage your interview appointments."
         actions={
-          <Link className={buttonClassName({ variant: "secondary" })} href="/parent">
+          <Link
+            className={buttonClassName({ variant: "secondary" })}
+            href="/parent"
+          >
             Back to parent portal
           </Link>
         }
@@ -196,7 +222,9 @@ export function ParentInterviewsOverview() {
               <Field htmlFor="parent-interview-student" label="Student">
                 <Select
                   id="parent-interview-student"
-                  onChange={(changeEvent) => setSelectedStudentId(changeEvent.target.value)}
+                  onChange={(changeEvent) =>
+                    setSelectedStudentId(changeEvent.target.value)
+                  }
                   value={selectedStudentId}
                 >
                   {links.map((link) => (
@@ -223,7 +251,9 @@ export function ParentInterviewsOverview() {
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Available events</CardTitle>
-                  <CardDescription>Book open slots for this student</CardDescription>
+                  <CardDescription>
+                    Book open slots for this student
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="text-sm font-semibold text-slate-900">
                   {events.length}
@@ -250,21 +280,32 @@ export function ParentInterviewsOverview() {
             </CardHeader>
             <CardContent>
               <div className="mb-4">
-                <Field htmlFor="parent-interview-event-query" label="Search events">
+                <Field
+                  htmlFor="parent-interview-event-query"
+                  label="Search events"
+                >
                   <Input
                     id="parent-interview-event-query"
-                    onChange={(changeEvent) => setEventQuery(changeEvent.target.value)}
+                    onChange={(changeEvent) =>
+                      setEventQuery(changeEvent.target.value)
+                    }
                     placeholder="Search by event title or description"
                     value={eventQuery}
                   />
                 </Field>
               </div>
               {isLoadingData ? (
-                <p className="text-sm text-slate-500">Loading interview events...</p>
+                <p className="text-sm text-slate-500">
+                  Loading interview events...
+                </p>
               ) : filteredEvents.length === 0 ? (
                 <EmptyState
                   compact
-                  title={events.length === 0 ? "No active events" : "No matching events"}
+                  title={
+                    events.length === 0
+                      ? "No active events"
+                      : "No matching events"
+                  }
                   description={
                     events.length === 0
                       ? "No interview events are currently available for this student."
@@ -277,34 +318,60 @@ export function ParentInterviewsOverview() {
                     <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                       <thead className="bg-slate-50/80">
                         <tr>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Event</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Booking Window</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Event Dates</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Action</th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Event
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Booking Window
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Event Dates
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Action
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 bg-white">
                         {filteredEvents.map((event) => (
-                          <tr className="align-top hover:bg-slate-50" key={event.id}>
+                          <tr
+                            className="align-top hover:bg-slate-50"
+                            key={event.id}
+                          >
                             <td className="px-4 py-3">
-                              <p className="font-medium text-slate-900">{event.title}</p>
+                              <p className="font-medium text-slate-900">
+                                {event.title}
+                              </p>
                               {event.description ? (
-                                <p className="mt-1 text-xs text-slate-500">{event.description}</p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {event.description}
+                                </p>
                               ) : null}
                             </td>
                             <td className="px-4 py-3 text-slate-600">
-                              <p>{event.bookingOpensAt ? formatDateTimeLabel(event.bookingOpensAt) : "No open date"}</p>
+                              <p>
+                                {event.bookingOpensAt
+                                  ? formatDateTimeLabel(event.bookingOpensAt)
+                                  : "No open date"}
+                              </p>
                               <p className="mt-1">
-                                {event.bookingClosesAt ? formatDateTimeLabel(event.bookingClosesAt) : "No close date"}
+                                {event.bookingClosesAt
+                                  ? formatDateTimeLabel(event.bookingClosesAt)
+                                  : "No close date"}
                               </p>
                             </td>
                             <td className="px-4 py-3 text-slate-600">
                               <p>{formatDateTimeLabel(event.startsAt)}</p>
-                              <p className="mt-1">{formatDateTimeLabel(event.endsAt)}</p>
+                              <p className="mt-1">
+                                {formatDateTimeLabel(event.endsAt)}
+                              </p>
                             </td>
                             <td className="px-4 py-3">
                               <Link
-                                className={buttonClassName({ size: "sm", variant: "secondary" })}
+                                className={buttonClassName({
+                                  size: "sm",
+                                  variant: "secondary",
+                                })}
                                 href={`/parent/interviews/${encodeURIComponent(event.id)}?studentId=${encodeURIComponent(selectedStudentId)}`}
                               >
                                 View slots
@@ -323,14 +390,21 @@ export function ParentInterviewsOverview() {
           <Card>
             <CardHeader>
               <CardTitle>My Bookings</CardTitle>
-              <CardDescription>Booked slots for the selected student.</CardDescription>
+              <CardDescription>
+                Booked slots for the selected student.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="mb-4">
-                <Field htmlFor="parent-interview-booking-query" label="Search bookings">
+                <Field
+                  htmlFor="parent-interview-booking-query"
+                  label="Search bookings"
+                >
                   <Input
                     id="parent-interview-booking-query"
-                    onChange={(changeEvent) => setBookingQuery(changeEvent.target.value)}
+                    onChange={(changeEvent) =>
+                      setBookingQuery(changeEvent.target.value)
+                    }
                     placeholder="Search by teacher or event"
                     value={bookingQuery}
                   />
@@ -341,7 +415,11 @@ export function ParentInterviewsOverview() {
               ) : filteredBookings.length === 0 ? (
                 <EmptyState
                   compact
-                  title={bookings.length === 0 ? "No bookings" : "No matching bookings"}
+                  title={
+                    bookings.length === 0
+                      ? "No bookings"
+                      : "No matching bookings"
+                  }
                   description={
                     bookings.length === 0
                       ? "No interview slots are booked for this student."
@@ -354,31 +432,55 @@ export function ParentInterviewsOverview() {
                     <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                       <thead className="bg-slate-50/80">
                         <tr>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Event</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Teacher</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Time</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Action</th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Event
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Teacher
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Time
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Status
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Action
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 bg-white">
                         {filteredBookings.map((slot) => (
-                          <tr className="align-top hover:bg-slate-50" key={slot.id}>
-                            <td className="px-4 py-3 text-slate-900">{slot.interviewEvent.title}</td>
+                          <tr
+                            className="align-top hover:bg-slate-50"
+                            key={slot.id}
+                          >
+                            <td className="px-4 py-3 text-slate-900">
+                              {slot.interviewEvent.title}
+                            </td>
                             <td className="px-4 py-3 text-slate-600">
                               {slot.teacher.firstName} {slot.teacher.lastName}
                             </td>
                             <td className="px-4 py-3 text-slate-600">
                               <p>{formatDateTimeLabel(slot.startTime)}</p>
-                              <p className="mt-1">{formatDateTimeLabel(slot.endTime)}</p>
+                              <p className="mt-1">
+                                {formatDateTimeLabel(slot.endTime)}
+                              </p>
                             </td>
                             <td className="px-4 py-3">
-                              <Badge variant="warning">{formatInterviewSlotStatusLabel(slot.status)}</Badge>
+                              <Badge variant="warning">
+                                {formatInterviewSlotStatusLabel(slot.status)}
+                              </Badge>
                             </td>
                             <td className="px-4 py-3">
                               <button
-                                className={buttonClassName({ size: "sm", variant: "secondary" })}
-                                onClick={() => void handleCancelBooking(slot.id)}
+                                className={buttonClassName({
+                                  size: "sm",
+                                  variant: "secondary",
+                                })}
+                                onClick={() =>
+                                  void handleCancelBooking(slot.id)
+                                }
                                 type="button"
                               >
                                 Cancel booking

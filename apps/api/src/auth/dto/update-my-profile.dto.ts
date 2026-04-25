@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 function toOptionalTrimmedString(value: unknown) {
   if (typeof value !== 'string') {
@@ -22,4 +22,10 @@ export class UpdateMyProfileDto {
   @IsString()
   @MinLength(1)
   lastName?: string;
+
+  @Transform(({ value }) => toOptionalTrimmedString(value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
 }

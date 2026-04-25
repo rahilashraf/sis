@@ -29,7 +29,12 @@ import {
 } from "@/lib/api/billing";
 import { listClasses, type SchoolClass } from "@/lib/api/classes";
 import { listGradeLevels, type GradeLevel } from "@/lib/api/grade-levels";
-import { listSchools, listSchoolYears, type School, type SchoolYear } from "@/lib/api/schools";
+import {
+  listSchools,
+  listSchoolYears,
+  type School,
+  type SchoolYear,
+} from "@/lib/api/schools";
 import { listUsers, type ManagedUser } from "@/lib/api/users";
 
 const manageRoles = new Set(["OWNER", "SUPER_ADMIN", "ADMIN"]);
@@ -97,7 +102,9 @@ function userBelongsToSchool(user: ManagedUser, schoolId: string) {
     return true;
   }
 
-  return user.memberships.some((membership) => membership.schoolId === schoolId);
+  return user.memberships.some(
+    (membership) => membership.schoolId === schoolId,
+  );
 }
 
 function validate(form: BulkChargeFormState): FieldErrors {
@@ -157,17 +164,21 @@ export function BillingChargeBulkForm() {
   const [result, setResult] = useState<BulkBillingChargeResult | null>(null);
 
   const filteredStudents = useMemo(
-    () => students.filter((student) => userBelongsToSchool(student, form.schoolId)),
+    () =>
+      students.filter((student) => userBelongsToSchool(student, form.schoolId)),
     [students, form.schoolId],
   );
 
   const filteredClasses = useMemo(
-    () => classes.filter((schoolClass) => schoolClass.schoolId === form.schoolId),
+    () =>
+      classes.filter((schoolClass) => schoolClass.schoolId === form.schoolId),
     [classes, form.schoolId],
   );
 
   const selectedClass = useMemo(
-    () => filteredClasses.find((schoolClass) => schoolClass.id === form.classId) ?? null,
+    () =>
+      filteredClasses.find((schoolClass) => schoolClass.id === form.classId) ??
+      null,
     [filteredClasses, form.classId],
   );
 
@@ -193,27 +204,38 @@ export function BillingChargeBulkForm() {
       setError(null);
 
       try {
-        const [schoolResponse, userResponse, classResponse] = await Promise.all([
-          listSchools({ includeInactive: false }),
-          listUsers({ role: "STUDENT" }),
-          listClasses({ includeInactive: false }),
-        ]);
+        const [schoolResponse, userResponse, classResponse] = await Promise.all(
+          [
+            listSchools({ includeInactive: false }),
+            listUsers({ role: "STUDENT" }),
+            listClasses({ includeInactive: false }),
+          ],
+        );
 
         setSchools(schoolResponse);
         setStudents(userResponse);
         setClasses(classResponse);
 
-        const defaultSchoolId = getDefaultSchoolContextId(session?.user) ?? schoolResponse[0]?.id ?? "";
+        const defaultSchoolId =
+          getDefaultSchoolContextId(session?.user) ??
+          schoolResponse[0]?.id ??
+          "";
 
         const schoolId =
-          schoolResponse.find((school) => school.id === defaultSchoolId)?.id ?? schoolResponse[0]?.id ?? "";
+          schoolResponse.find((school) => school.id === defaultSchoolId)?.id ??
+          schoolResponse[0]?.id ??
+          "";
 
         setForm((current) => ({
           ...current,
           schoolId,
         }));
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load form options.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load form options.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -234,11 +256,12 @@ export function BillingChargeBulkForm() {
       setIsLoadingSchoolMeta(true);
 
       try {
-        const [categoryResponse, schoolYearResponse, gradeLevelResponse] = await Promise.all([
-          listBillingCategories({ schoolId: form.schoolId }),
-          listSchoolYears(form.schoolId, { includeInactive: false }),
-          listGradeLevels(form.schoolId, { includeInactive: false }),
-        ]);
+        const [categoryResponse, schoolYearResponse, gradeLevelResponse] =
+          await Promise.all([
+            listBillingCategories({ schoolId: form.schoolId }),
+            listSchoolYears(form.schoolId, { includeInactive: false }),
+            listGradeLevels(form.schoolId, { includeInactive: false }),
+          ]);
 
         setCategories(categoryResponse);
         setSchoolYears(schoolYearResponse);
@@ -247,13 +270,17 @@ export function BillingChargeBulkForm() {
         setForm((current) => ({
           ...current,
           categoryId:
-            categoryResponse.find((entry) => entry.id === current.categoryId)?.id ??
+            categoryResponse.find((entry) => entry.id === current.categoryId)
+              ?.id ??
             categoryResponse[0]?.id ??
             "",
           schoolYearId:
-            schoolYearResponse.find((entry) => entry.id === current.schoolYearId)?.id ?? "",
+            schoolYearResponse.find(
+              (entry) => entry.id === current.schoolYearId,
+            )?.id ?? "",
           gradeLevel:
-            gradeLevelResponse.find((entry) => entry.id === current.gradeLevel)?.id ?? "",
+            gradeLevelResponse.find((entry) => entry.id === current.gradeLevel)
+              ?.id ?? "",
         }));
       } catch (loadError) {
         setError(
@@ -273,13 +300,19 @@ export function BillingChargeBulkForm() {
   }, [form.schoolId, role]);
 
   useEffect(() => {
-    const validStudentIds = new Set(filteredStudents.map((student) => student.id));
+    const validStudentIds = new Set(
+      filteredStudents.map((student) => student.id),
+    );
 
     setForm((current) => ({
       ...current,
-      studentIds: current.studentIds.filter((studentId) => validStudentIds.has(studentId)),
+      studentIds: current.studentIds.filter((studentId) =>
+        validStudentIds.has(studentId),
+      ),
       classId:
-        filteredClasses.find((schoolClass) => schoolClass.id === current.classId)?.id ?? "",
+        filteredClasses.find(
+          (schoolClass) => schoolClass.id === current.classId,
+        )?.id ?? "",
     }));
   }, [filteredStudents, filteredClasses]);
 
@@ -313,7 +346,8 @@ export function BillingChargeBulkForm() {
         dueDate: form.dueDate || undefined,
         sourceType: form.sourceType,
         targetMode: form.targetMode,
-        studentIds: form.targetMode === "SELECTED" ? form.studentIds : undefined,
+        studentIds:
+          form.targetMode === "SELECTED" ? form.studentIds : undefined,
         classId: form.targetMode === "CLASS" ? form.classId : undefined,
         gradeLevel: form.targetMode === "GRADE" ? form.gradeLevel : undefined,
         sendNotifications: form.sendNotifications,
@@ -321,7 +355,11 @@ export function BillingChargeBulkForm() {
 
       setResult(response);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Unable to bulk create charges.");
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Unable to bulk create charges.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -371,10 +409,16 @@ export function BillingChargeBulkForm() {
         description="Assign the same non-tuition charge to many students in one action."
         actions={
           <div className="flex items-center gap-2">
-            <Link className={buttonClassName({ variant: "secondary" })} href="/admin/billing/charges">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/admin/billing/charges"
+            >
               Back to charges
             </Link>
-            <Link className={buttonClassName({ variant: "secondary" })} href="/admin/billing/charges/new">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/admin/billing/charges/new"
+            >
               Single charge
             </Link>
           </div>
@@ -392,7 +436,8 @@ export function BillingChargeBulkForm() {
 
       {result ? (
         <Notice tone="success">
-          Bulk charge completed. Targeted: {result.totalTargeted}, Created: {result.createdCount}, Skipped: {result.skippedCount}.
+          Bulk charge completed. Targeted: {result.totalTargeted}, Created:{" "}
+          {result.createdCount}, Skipped: {result.skippedCount}.
         </Notice>
       ) : null}
 
@@ -400,7 +445,8 @@ export function BillingChargeBulkForm() {
         <CardHeader>
           <CardTitle>Bulk charge details</CardTitle>
           <CardDescription>
-            Choose a target mode, set shared charge fields, then create charges in bulk.
+            Choose a target mode, set shared charge fields, then create charges
+            in bulk.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -429,7 +475,11 @@ export function BillingChargeBulkForm() {
                   </option>
                 ))}
               </Select>
-              {fieldErrors.schoolId ? <p className="mt-1 text-xs text-rose-600">{fieldErrors.schoolId}</p> : null}
+              {fieldErrors.schoolId ? (
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.schoolId}
+                </p>
+              ) : null}
             </Field>
 
             <Field htmlFor="bulk-charge-target-mode" label="Target mode">
@@ -459,7 +509,10 @@ export function BillingChargeBulkForm() {
                   disabled={!form.schoolId}
                   id="bulk-charge-class"
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, classId: event.target.value }))
+                    setForm((current) => ({
+                      ...current,
+                      classId: event.target.value,
+                    }))
                   }
                   value={form.classId}
                 >
@@ -470,7 +523,11 @@ export function BillingChargeBulkForm() {
                     </option>
                   ))}
                 </Select>
-                {fieldErrors.classId ? <p className="mt-1 text-xs text-rose-600">{fieldErrors.classId}</p> : null}
+                {fieldErrors.classId ? (
+                  <p className="mt-1 text-xs text-rose-600">
+                    {fieldErrors.classId}
+                  </p>
+                ) : null}
               </Field>
             ) : null}
 
@@ -481,7 +538,10 @@ export function BillingChargeBulkForm() {
                   disabled={!form.schoolId || isLoadingSchoolMeta}
                   id="bulk-charge-grade-level"
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, gradeLevel: event.target.value }))
+                    setForm((current) => ({
+                      ...current,
+                      gradeLevel: event.target.value,
+                    }))
                   }
                   value={form.gradeLevel}
                 >
@@ -493,7 +553,9 @@ export function BillingChargeBulkForm() {
                   ))}
                 </Select>
                 {fieldErrors.gradeLevel ? (
-                  <p className="mt-1 text-xs text-rose-600">{fieldErrors.gradeLevel}</p>
+                  <p className="mt-1 text-xs text-rose-600">
+                    {fieldErrors.gradeLevel}
+                  </p>
                 ) : null}
               </Field>
             ) : null}
@@ -504,7 +566,10 @@ export function BillingChargeBulkForm() {
                 disabled={!form.schoolId || isLoadingSchoolMeta}
                 id="bulk-charge-category"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, categoryId: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    categoryId: event.target.value,
+                  }))
                 }
                 value={form.categoryId}
               >
@@ -516,16 +581,24 @@ export function BillingChargeBulkForm() {
                 ))}
               </Select>
               {fieldErrors.categoryId ? (
-                <p className="mt-1 text-xs text-rose-600">{fieldErrors.categoryId}</p>
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.categoryId}
+                </p>
               ) : null}
             </Field>
 
-            <Field htmlFor="bulk-charge-school-year" label="School year (optional)">
+            <Field
+              htmlFor="bulk-charge-school-year"
+              label="School year (optional)"
+            >
               <Select
                 disabled={!form.schoolId || isLoadingSchoolMeta}
                 id="bulk-charge-school-year"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, schoolYearId: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    schoolYearId: event.target.value,
+                  }))
                 }
                 value={form.schoolYearId}
               >
@@ -543,12 +616,19 @@ export function BillingChargeBulkForm() {
                 className={fieldClassName("title")}
                 id="bulk-charge-title"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, title: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
                 }
                 placeholder="Lab materials fee"
                 value={form.title}
               />
-              {fieldErrors.title ? <p className="mt-1 text-xs text-rose-600">{fieldErrors.title}</p> : null}
+              {fieldErrors.title ? (
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.title}
+                </p>
+              ) : null}
             </Field>
 
             <Field htmlFor="bulk-charge-amount" label="Amount">
@@ -557,19 +637,29 @@ export function BillingChargeBulkForm() {
                 id="bulk-charge-amount"
                 inputMode="decimal"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, amount: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    amount: event.target.value,
+                  }))
                 }
                 placeholder="125.00"
                 value={form.amount}
               />
-              {fieldErrors.amount ? <p className="mt-1 text-xs text-rose-600">{fieldErrors.amount}</p> : null}
+              {fieldErrors.amount ? (
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.amount}
+                </p>
+              ) : null}
             </Field>
 
             <Field htmlFor="bulk-charge-due-date" label="Due date (optional)">
               <Input
                 id="bulk-charge-due-date"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, dueDate: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    dueDate: event.target.value,
+                  }))
                 }
                 type="date"
                 value={form.dueDate}
@@ -592,11 +682,18 @@ export function BillingChargeBulkForm() {
               </Select>
             </Field>
 
-            <Field className="md:col-span-2" htmlFor="bulk-charge-description" label="Description (optional)">
+            <Field
+              className="md:col-span-2"
+              htmlFor="bulk-charge-description"
+              label="Description (optional)"
+            >
               <Input
                 id="bulk-charge-description"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, description: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
                 }
                 placeholder="Optional internal or parent-facing note"
                 value={form.description}
@@ -604,14 +701,26 @@ export function BillingChargeBulkForm() {
             </Field>
 
             {form.targetMode === "SELECTED" ? (
-              <Field className="md:col-span-2" htmlFor="bulk-charge-students" label="Students">
-                <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 p-3" id="bulk-charge-students">
+              <Field
+                className="md:col-span-2"
+                htmlFor="bulk-charge-students"
+                label="Students"
+              >
+                <div
+                  className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 p-3"
+                  id="bulk-charge-students"
+                >
                   {filteredStudents.length === 0 ? (
-                    <p className="text-sm text-slate-500">No students found for this school.</p>
+                    <p className="text-sm text-slate-500">
+                      No students found for this school.
+                    </p>
                   ) : (
                     <div className="space-y-2">
                       {filteredStudents.map((student) => (
-                        <label key={student.id} className="flex items-center gap-2 text-sm text-slate-700">
+                        <label
+                          key={student.id}
+                          className="flex items-center gap-2 text-sm text-slate-700"
+                        >
                           <input
                             checked={form.studentIds.includes(student.id)}
                             className="h-4 w-4 rounded border-slate-300"
@@ -627,7 +736,9 @@ export function BillingChargeBulkForm() {
                   )}
                 </div>
                 {fieldErrors.studentIds ? (
-                  <p className="mt-1 text-xs text-rose-600">{fieldErrors.studentIds}</p>
+                  <p className="mt-1 text-xs text-rose-600">
+                    {fieldErrors.studentIds}
+                  </p>
                 ) : null}
               </Field>
             ) : null}
@@ -635,7 +746,12 @@ export function BillingChargeBulkForm() {
             <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
               <p className="text-sm font-medium text-slate-700">Preview</p>
               <p className="mt-1 text-sm text-slate-600">
-                Mode: {form.targetMode === "SELECTED" ? "Selected students" : form.targetMode === "CLASS" ? "Class" : "Grade level"}
+                Mode:{" "}
+                {form.targetMode === "SELECTED"
+                  ? "Selected students"
+                  : form.targetMode === "CLASS"
+                    ? "Class"
+                    : "Grade level"}
               </p>
               <p className="text-sm text-slate-600">
                 Target count: {previewTargetCount ?? "—"}
@@ -648,7 +764,10 @@ export function BillingChargeBulkForm() {
               label="Notify parents for created charges"
               checked={form.sendNotifications}
               onChange={(event) =>
-                setForm((current) => ({ ...current, sendNotifications: event.target.checked }))
+                setForm((current) => ({
+                  ...current,
+                  sendNotifications: event.target.checked,
+                }))
               }
             />
 
@@ -680,11 +799,16 @@ export function BillingChargeBulkForm() {
             <ul className="space-y-2 text-sm text-slate-700">
               {result.skipped.slice(0, 20).map((item) => (
                 <li key={`${item.studentId}-${item.reason}`}>
-                  <span className="font-mono text-xs text-slate-500">{item.studentId}</span> — {item.reason}
+                  <span className="font-mono text-xs text-slate-500">
+                    {item.studentId}
+                  </span>{" "}
+                  — {item.reason}
                 </li>
               ))}
               {result.skipped.length > 20 ? (
-                <li className="text-slate-500">+ {result.skipped.length - 20} more</li>
+                <li className="text-slate-500">
+                  + {result.skipped.length - 20} more
+                </li>
               ) : null}
             </ul>
           </CardContent>

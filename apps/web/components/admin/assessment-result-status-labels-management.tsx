@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -69,8 +75,10 @@ export function AssessmentResultStatusLabelsManagement() {
   const [includeInactive, setIncludeInactive] = useState(true);
   const [labels, setLabels] = useState<AssessmentResultStatusLabel[]>([]);
 
-  const [createForm, setCreateForm] = useState<CreateFormState>(buildCreateForm());
-  const [editingLabel, setEditingLabel] = useState<AssessmentResultStatusLabel | null>(null);
+  const [createForm, setCreateForm] =
+    useState<CreateFormState>(buildCreateForm());
+  const [editingLabel, setEditingLabel] =
+    useState<AssessmentResultStatusLabel | null>(null);
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -93,7 +101,11 @@ export function AssessmentResultStatusLabelsManagement() {
         setSchools(response);
         setSelectedSchoolId((current) => current || response[0]?.id || "");
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load schools.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load schools.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -118,7 +130,11 @@ export function AssessmentResultStatusLabelsManagement() {
         });
         setLabels(response);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load status labels.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load status labels.",
+        );
         setLabels([]);
       }
     }
@@ -169,7 +185,11 @@ export function AssessmentResultStatusLabelsManagement() {
       setCreateForm(buildCreateForm());
       setSuccessMessage("Status label created.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to create status label.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to create status label.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -200,12 +220,17 @@ export function AssessmentResultStatusLabelsManagement() {
       });
 
       const next = await refreshLabels();
-      const updated = next.find((entry) => entry.id === editingLabel.id) ?? null;
+      const updated =
+        next.find((entry) => entry.id === editingLabel.id) ?? null;
       setEditingLabel(updated);
       setEditForm(updated ? buildEditForm(updated) : null);
       setSuccessMessage("Status label updated.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update status label.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update status label.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -251,7 +276,9 @@ export function AssessmentResultStatusLabelsManagement() {
       <Card>
         <CardHeader>
           <CardTitle>School Context</CardTitle>
-          <CardDescription>Select the school to manage grade entry codes.</CardDescription>
+          <CardDescription>
+            Select the school to manage grade entry codes.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <Field htmlFor="status-label-school" label="School">
@@ -284,14 +311,21 @@ export function AssessmentResultStatusLabelsManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Create Custom Label</CardTitle>
-          <CardDescription>Create new grade entry codes for the selected school.</CardDescription>
+          <CardDescription>
+            Create new grade entry codes for the selected school.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-4" onSubmit={handleCreate}>
             <Field htmlFor="status-label-key" label="Key (optional)">
               <Input
                 id="status-label-key"
-                onChange={(event) => setCreateForm((current) => ({ ...current, key: event.target.value }))}
+                onChange={(event) =>
+                  setCreateForm((current) => ({
+                    ...current,
+                    key: event.target.value,
+                  }))
+                }
                 placeholder="e.g. MISSING"
                 value={createForm.key}
               />
@@ -299,7 +333,12 @@ export function AssessmentResultStatusLabelsManagement() {
             <Field htmlFor="status-label-label" label="Label">
               <Input
                 id="status-label-label"
-                onChange={(event) => setCreateForm((current) => ({ ...current, label: event.target.value }))}
+                onChange={(event) =>
+                  setCreateForm((current) => ({
+                    ...current,
+                    label: event.target.value,
+                  }))
+                }
                 required
                 value={createForm.label}
               />
@@ -308,12 +347,17 @@ export function AssessmentResultStatusLabelsManagement() {
               <Select
                 id="status-label-behavior"
                 onChange={(event) =>
-                  setCreateForm((current) => ({ ...current, behavior: event.target.value as CreateFormState["behavior"] }))
+                  setCreateForm((current) => ({
+                    ...current,
+                    behavior: event.target.value as CreateFormState["behavior"],
+                  }))
                 }
                 value={createForm.behavior}
               >
                 <option value="COUNT_AS_ZERO">COUNT_AS_ZERO</option>
-                <option value="EXCLUDE_FROM_CALCULATION">EXCLUDE_FROM_CALCULATION</option>
+                <option value="EXCLUDE_FROM_CALCULATION">
+                  EXCLUDE_FROM_CALCULATION
+                </option>
                 <option value="INFORMATION_ONLY">INFORMATION_ONLY</option>
               </Select>
             </Field>
@@ -321,7 +365,12 @@ export function AssessmentResultStatusLabelsManagement() {
               <Input
                 id="status-label-sort"
                 inputMode="numeric"
-                onChange={(event) => setCreateForm((current) => ({ ...current, sortOrder: event.target.value }))}
+                onChange={(event) =>
+                  setCreateForm((current) => ({
+                    ...current,
+                    sortOrder: event.target.value,
+                  }))
+                }
                 value={createForm.sortOrder}
               />
             </Field>
@@ -337,7 +386,9 @@ export function AssessmentResultStatusLabelsManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Existing Labels</CardTitle>
-          <CardDescription>System labels are created automatically per school.</CardDescription>
+          <CardDescription>
+            System labels are created automatically per school.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {labels.length === 0 ? (
@@ -351,27 +402,52 @@ export function AssessmentResultStatusLabelsManagement() {
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Key</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Label</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Behavior</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Type</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Active</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Edit</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Key
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Label
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Behavior
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Type
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Active
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Edit
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {labels.map((record) => (
-                      <tr className="align-top hover:bg-slate-50" key={record.id}>
-                        <td className="px-4 py-3 text-slate-700">{record.key}</td>
-                        <td className="px-4 py-3 text-slate-900">{record.label}</td>
-                        <td className="px-4 py-3 text-slate-700">{record.behavior}</td>
+                      <tr
+                        className="align-top hover:bg-slate-50"
+                        key={record.id}
+                      >
+                        <td className="px-4 py-3 text-slate-700">
+                          {record.key}
+                        </td>
+                        <td className="px-4 py-3 text-slate-900">
+                          {record.label}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {record.behavior}
+                        </td>
                         <td className="px-4 py-3">
-                          <Badge variant={record.isSystem ? "neutral" : "success"}>
+                          <Badge
+                            variant={record.isSystem ? "neutral" : "success"}
+                          >
                             {record.isSystem ? "System" : "Custom"}
                           </Badge>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge variant={record.isActive ? "success" : "neutral"}>
+                          <Badge
+                            variant={record.isActive ? "success" : "neutral"}
+                          >
                             {record.isActive ? "Active" : "Inactive"}
                           </Badge>
                         </td>
@@ -406,15 +482,25 @@ export function AssessmentResultStatusLabelsManagement() {
           <CardHeader>
             <CardTitle>Edit Label</CardTitle>
             <CardDescription>
-              Update the label text and calculation behavior. Key: {editingLabel.key}
+              Update the label text and calculation behavior. Key:{" "}
+              {editingLabel.key}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form className="grid gap-4 md:grid-cols-4" onSubmit={handleSaveEdit}>
+            <form
+              className="grid gap-4 md:grid-cols-4"
+              onSubmit={handleSaveEdit}
+            >
               <Field htmlFor="edit-status-label" label="Label">
                 <Input
                   id="edit-status-label"
-                  onChange={(event) => setEditForm((current) => (current ? { ...current, label: event.target.value } : current))}
+                  onChange={(event) =>
+                    setEditForm((current) =>
+                      current
+                        ? { ...current, label: event.target.value }
+                        : current,
+                    )
+                  }
                   value={editForm.label}
                 />
               </Field>
@@ -422,12 +508,22 @@ export function AssessmentResultStatusLabelsManagement() {
                 <Select
                   id="edit-status-behavior"
                   onChange={(event) =>
-                    setEditForm((current) => (current ? { ...current, behavior: event.target.value as EditFormState["behavior"] } : current))
+                    setEditForm((current) =>
+                      current
+                        ? {
+                            ...current,
+                            behavior: event.target
+                              .value as EditFormState["behavior"],
+                          }
+                        : current,
+                    )
                   }
                   value={editForm.behavior}
                 >
                   <option value="COUNT_AS_ZERO">COUNT_AS_ZERO</option>
-                  <option value="EXCLUDE_FROM_CALCULATION">EXCLUDE_FROM_CALCULATION</option>
+                  <option value="EXCLUDE_FROM_CALCULATION">
+                    EXCLUDE_FROM_CALCULATION
+                  </option>
                   <option value="INFORMATION_ONLY">INFORMATION_ONLY</option>
                 </Select>
               </Field>
@@ -435,14 +531,29 @@ export function AssessmentResultStatusLabelsManagement() {
                 <Input
                   id="edit-status-sort"
                   inputMode="numeric"
-                  onChange={(event) => setEditForm((current) => (current ? { ...current, sortOrder: event.target.value } : current))}
+                  onChange={(event) =>
+                    setEditForm((current) =>
+                      current
+                        ? { ...current, sortOrder: event.target.value }
+                        : current,
+                    )
+                  }
                   value={editForm.sortOrder}
                 />
               </Field>
               <Field htmlFor="edit-status-active" label="Active">
                 <Select
                   id="edit-status-active"
-                  onChange={(event) => setEditForm((current) => (current ? { ...current, isActive: event.target.value === "true" } : current))}
+                  onChange={(event) =>
+                    setEditForm((current) =>
+                      current
+                        ? {
+                            ...current,
+                            isActive: event.target.value === "true",
+                          }
+                        : current,
+                    )
+                  }
                   value={editForm.isActive ? "true" : "false"}
                 >
                   <option value="true">Active</option>
@@ -472,4 +583,3 @@ export function AssessmentResultStatusLabelsManagement() {
     </div>
   );
 }
-

@@ -23,7 +23,8 @@ const workspaceLinks = [
   {
     href: "/admin/schools",
     title: "Schools",
-    description: "Review school records and remove empty schools or school years safely.",
+    description:
+      "Review school records and remove empty schools or school years safely.",
   },
   {
     href: "/admin/classes",
@@ -38,7 +39,8 @@ const workspaceLinks = [
   {
     href: "/admin/gradebook",
     title: "Gradebook",
-    description: "Create assessments, enter grades, and control parent visibility.",
+    description:
+      "Create assessments, enter grades, and control parent visibility.",
   },
   {
     href: "/admin/attendance",
@@ -119,7 +121,9 @@ export function AdminOverview() {
                 {user ? `${user.firstName} ${user.lastName}` : "Unavailable"}
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                {user?.email ?? user?.username ?? "No account details available"}
+                {user?.email ??
+                  user?.username ??
+                  "No account details available"}
               </p>
             </div>
             <div>
@@ -134,7 +138,9 @@ export function AdminOverview() {
                     </p>
                   ))
                 ) : (
-                  <p className="text-sm text-slate-500">No school memberships assigned.</p>
+                  <p className="text-sm text-slate-500">
+                    No school memberships assigned.
+                  </p>
                 )}
               </div>
             </div>
@@ -150,9 +156,18 @@ export function AdminOverview() {
           </CardHeader>
           <CardContent>
             <ol className="space-y-3 text-sm leading-6 text-slate-700">
-              <li>1. Confirm users and role assignments before opening new workflows.</li>
-              <li>2. Review class structure and teacher assignment for the active school year.</li>
-              <li>3. Use attendance to verify current-day rosters and resolve missing records.</li>
+              <li>
+                1. Confirm users and role assignments before opening new
+                workflows.
+              </li>
+              <li>
+                2. Review class structure and teacher assignment for the active
+                school year.
+              </li>
+              <li>
+                3. Use attendance to verify current-day rosters and resolve
+                missing records.
+              </li>
             </ol>
           </CardContent>
         </Card>

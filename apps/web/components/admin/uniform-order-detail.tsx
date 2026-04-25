@@ -102,7 +102,11 @@ export function UniformOrderDetail({ orderId }: { orderId: string }) {
         setStatus(response.status);
         setInternalNotes(response.internalNotes ?? "");
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load order.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load order.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -177,7 +181,10 @@ export function UniformOrderDetail({ orderId }: { orderId: string }) {
         title={`Order #${order.id.slice(0, 8)}`}
         description="Review order lines and update fulfillment status."
         actions={
-          <Link className={buttonClassName({ variant: "secondary" })} href="/admin/uniform/orders">
+          <Link
+            className={buttonClassName({ variant: "secondary" })}
+            href="/admin/uniform/orders"
+          >
             Back to orders
           </Link>
         }
@@ -194,23 +201,30 @@ export function UniformOrderDetail({ orderId }: { orderId: string }) {
       <Card>
         <CardHeader>
           <CardTitle>Order summary</CardTitle>
-          <CardDescription>Submitted {formatDateTimeLabel(order.createdAt)}</CardDescription>
+          <CardDescription>
+            Submitted {formatDateTimeLabel(order.createdAt)}
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 text-sm text-slate-700 md:grid-cols-2">
           <p>
-            <span className="font-medium text-slate-900">School:</span> {order.school.name}
+            <span className="font-medium text-slate-900">School:</span>{" "}
+            {order.school.name}
           </p>
           <p>
-            <span className="font-medium text-slate-900">Student:</span> {getPersonLabel(order.student)}
+            <span className="font-medium text-slate-900">Student:</span>{" "}
+            {getPersonLabel(order.student)}
           </p>
           <p>
-            <span className="font-medium text-slate-900">Parent:</span> {getPersonLabel(order.parent)}
+            <span className="font-medium text-slate-900">Parent:</span>{" "}
+            {getPersonLabel(order.parent)}
           </p>
           <p>
-            <span className="font-medium text-slate-900">Total:</span> {formatUniformMoney(order.totalAmount)}
+            <span className="font-medium text-slate-900">Total:</span>{" "}
+            {formatUniformMoney(order.totalAmount)}
           </p>
           <p className="md:col-span-2">
-            <span className="font-medium text-slate-900">Parent notes:</span> {order.notes || "—"}
+            <span className="font-medium text-slate-900">Parent notes:</span>{" "}
+            {order.notes || "—"}
           </p>
         </CardContent>
       </Card>
@@ -226,27 +240,51 @@ export function UniformOrderDetail({ orderId }: { orderId: string }) {
               <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                 <thead className="bg-slate-50/80">
                   <tr>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Item</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Size</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Color</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Unit</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Qty</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Line total</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Item
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Size
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Color
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Unit
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Qty
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Line total
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {order.items.map((line) => (
                     <tr className="align-top" key={line.id}>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-slate-900">{line.itemNameSnapshot}</p>
+                        <p className="font-medium text-slate-900">
+                          {line.itemNameSnapshot}
+                        </p>
                         <p className="mt-1 text-xs text-slate-500">
-                          {line.itemSkuSnapshot ? `SKU: ${line.itemSkuSnapshot}` : "No SKU"}
+                          {line.itemSkuSnapshot
+                            ? `SKU: ${line.itemSkuSnapshot}`
+                            : "No SKU"}
                         </p>
                       </td>
-                      <td className="px-4 py-3 text-slate-700">{line.selectedSize || "—"}</td>
-                      <td className="px-4 py-3 text-slate-700">{line.selectedColor || "—"}</td>
-                      <td className="px-4 py-3 text-slate-700">{formatUniformMoney(line.unitPrice)}</td>
-                      <td className="px-4 py-3 text-slate-700">{line.quantity}</td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {line.selectedSize || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {line.selectedColor || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {formatUniformMoney(line.unitPrice)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {line.quantity}
+                      </td>
                       <td className="px-4 py-3 font-medium text-slate-900">
                         {formatUniformMoney(line.lineTotal)}
                       </td>
@@ -262,14 +300,18 @@ export function UniformOrderDetail({ orderId }: { orderId: string }) {
       <Card>
         <CardHeader>
           <CardTitle>Status workflow</CardTitle>
-          <CardDescription>Update fulfillment state and add optional internal notes.</CardDescription>
+          <CardDescription>
+            Update fulfillment state and add optional internal notes.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
             <Field htmlFor="uniform-order-status" label="Status">
               <Select
                 id="uniform-order-status"
-                onChange={(event) => setStatus(event.target.value as UniformOrderStatus)}
+                onChange={(event) =>
+                  setStatus(event.target.value as UniformOrderStatus)
+                }
                 value={status}
               >
                 {statusOptions.map((option) => (
@@ -294,7 +336,10 @@ export function UniformOrderDetail({ orderId }: { orderId: string }) {
             </Field>
 
             <div className="md:col-span-2 flex justify-end gap-2">
-              <Link className={buttonClassName({ variant: "secondary" })} href="/admin/uniform/orders">
+              <Link
+                className={buttonClassName({ variant: "secondary" })}
+                href="/admin/uniform/orders"
+              >
                 Cancel
               </Link>
               <Button disabled={isSubmitting} type="submit">

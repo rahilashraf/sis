@@ -51,7 +51,10 @@ export function createGradeLevel(input: CreateGradeLevelInput) {
   });
 }
 
-export function updateGradeLevel(gradeLevelId: string, input: UpdateGradeLevelInput) {
+export function updateGradeLevel(
+  gradeLevelId: string,
+  input: UpdateGradeLevelInput,
+) {
   return apiFetch<GradeLevel>(`/grade-levels/${gradeLevelId}`, {
     method: "PATCH",
     json: input,

@@ -10,8 +10,14 @@ import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { StudentProfileOverview } from "@/components/students/student-profile-overview";
 import { getStudentById, type StudentProfile } from "@/lib/api/students";
-import { getAttendanceStudentSummary, type AttendanceStudentSummary } from "@/lib/api/attendance";
-import { listStudentDocuments, type StudentDocument } from "@/lib/api/student-documents";
+import {
+  getAttendanceStudentSummary,
+  type AttendanceStudentSummary,
+} from "@/lib/api/attendance";
+import {
+  listStudentDocuments,
+  type StudentDocument,
+} from "@/lib/api/student-documents";
 import { dateOnlyFromDate } from "@/lib/date";
 import { formatDateLabel } from "@/lib/utils";
 
@@ -21,7 +27,8 @@ function toISODate(value: Date) {
 
 export function ParentStudentDetail({ studentId }: { studentId: string }) {
   const [student, setStudent] = useState<StudentProfile | null>(null);
-  const [attendanceSummary, setAttendanceSummary] = useState<AttendanceStudentSummary | null>(null);
+  const [attendanceSummary, setAttendanceSummary] =
+    useState<AttendanceStudentSummary | null>(null);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
   const [documents, setDocuments] = useState<StudentDocument[]>([]);
   const [documentsError, setDocumentsError] = useState<string | null>(null);
@@ -61,7 +68,9 @@ export function ParentStudentDetail({ studentId }: { studentId: string }) {
       } catch (loadError) {
         setDocuments([]);
         setDocumentsError(
-          loadError instanceof Error ? loadError.message : "Unable to load documents.",
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load documents.",
         );
       }
     }
@@ -88,7 +97,9 @@ export function ParentStudentDetail({ studentId }: { studentId: string }) {
       } catch (loadError) {
         setAttendanceSummary(null);
         setAttendanceError(
-          loadError instanceof Error ? loadError.message : "Unable to load attendance summary.",
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load attendance summary.",
         );
       }
     }
@@ -124,7 +135,9 @@ export function ParentStudentDetail({ studentId }: { studentId: string }) {
       />
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
-      {attendanceError ? <Notice tone="danger">{attendanceError}</Notice> : null}
+      {attendanceError ? (
+        <Notice tone="danger">{attendanceError}</Notice>
+      ) : null}
       {documentsError ? <Notice tone="danger">{documentsError}</Notice> : null}
 
       {isLoading ? (
@@ -142,7 +155,9 @@ export function ParentStudentDetail({ studentId }: { studentId: string }) {
         />
       ) : null}
 
-      {student ? <StudentProfileOverview showInternalIds={false} student={student} /> : null}
+      {student ? (
+        <StudentProfileOverview showInternalIds={false} student={student} />
+      ) : null}
 
       {student ? (
         <Card>
@@ -187,9 +202,13 @@ export function ParentStudentDetail({ studentId }: { studentId: string }) {
               Re-registration
             </Link>
             <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
-              <p className="font-semibold text-slate-900">Attendance (30 days)</p>
+              <p className="font-semibold text-slate-900">
+                Attendance (30 days)
+              </p>
               <p className="mt-1 text-slate-600">
-                Present: {attendanceSummary?.presentCount ?? "—"} • Late: {attendanceSummary?.lateCount ?? "—"} • Absent: {attendanceSummary?.absentCount ?? "—"}
+                Present: {attendanceSummary?.presentCount ?? "—"} • Late:{" "}
+                {attendanceSummary?.lateCount ?? "—"} • Absent:{" "}
+                {attendanceSummary?.absentCount ?? "—"}
               </p>
             </div>
           </CardContent>
@@ -203,7 +222,9 @@ export function ParentStudentDetail({ studentId }: { studentId: string }) {
           </CardHeader>
           <CardContent className="space-y-3">
             {documents.length === 0 ? (
-              <p className="text-sm text-slate-600">No documents are available.</p>
+              <p className="text-sm text-slate-600">
+                No documents are available.
+              </p>
             ) : (
               <div className="space-y-2">
                 {documents.slice(0, 8).map((doc) => (
@@ -212,7 +233,9 @@ export function ParentStudentDetail({ studentId }: { studentId: string }) {
                     key={doc.id}
                   >
                     <div>
-                      <p className="font-semibold text-slate-900">{doc.label ?? doc.fileName}</p>
+                      <p className="font-semibold text-slate-900">
+                        {doc.label ?? doc.fileName}
+                      </p>
                       <p className="text-xs text-slate-500">
                         {doc.type} • {formatDateLabel(doc.createdAt)}
                       </p>

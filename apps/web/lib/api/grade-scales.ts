@@ -48,6 +48,30 @@ export type UpdateGradeScaleRuleInput = {
   sortOrder?: number;
 };
 
+export type ApplyGradeScaleMultiSchoolInput = {
+  targetSchoolIds: string[];
+  sourceGradeScaleId?: string;
+  name?: string;
+  isDefault?: boolean;
+  copyRules?: boolean;
+};
+
+export type ApplyGradeScaleMultiSchoolResponse = {
+  name: string;
+  sourceGradeScaleId: string | null;
+  copiedRules: boolean;
+  createdCount: number;
+  skippedCount: number;
+  failedCount: number;
+  results: Array<{
+    schoolId: string;
+    schoolName: string;
+    status: "created" | "skipped" | "failed";
+    gradeScaleId?: string;
+    message: string;
+  }>;
+};
+
 export function listGradeScales(
   schoolId: string,
   options?: { includeInactive?: boolean },
@@ -68,7 +92,10 @@ export function createGradeScale(input: CreateGradeScaleInput) {
   });
 }
 
-export function updateGradeScale(gradeScaleId: string, input: UpdateGradeScaleInput) {
+export function updateGradeScale(
+  gradeScaleId: string,
+  input: UpdateGradeScaleInput,
+) {
   return apiFetch<GradeScale>(`/grade-scales/${gradeScaleId}`, {
     method: "PATCH",
     json: input,
@@ -93,17 +120,34 @@ export function activateGradeScale(gradeScaleId: string) {
   });
 }
 
-export function addGradeScaleRule(gradeScaleId: string, input: CreateGradeScaleRuleInput) {
+export function addGradeScaleRule(
+  gradeScaleId: string,
+  input: CreateGradeScaleRuleInput,
+) {
   return apiFetch<GradeScaleRule>(`/grade-scales/${gradeScaleId}/rules`, {
     method: "POST",
     json: input,
   });
 }
 
-export function updateGradeScaleRule(ruleId: string, input: UpdateGradeScaleRuleInput) {
+export function updateGradeScaleRule(
+  ruleId: string,
+  input: UpdateGradeScaleRuleInput,
+) {
   return apiFetch<GradeScaleRule>(`/grade-scale-rules/${ruleId}`, {
     method: "PATCH",
     json: input,
   });
 }
 
+export function applyGradeScaleMultiSchool(
+  input: ApplyGradeScaleMultiSchoolInput,
+) {
+  return apiFetch<ApplyGradeScaleMultiSchoolResponse>(
+    "/grade-scales/multi-school",
+    {
+      method: "POST",
+      json: input,
+    },
+  );
+}

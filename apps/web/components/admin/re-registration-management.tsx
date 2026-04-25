@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -11,7 +17,12 @@ import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth/auth-context";
-import { listSchools, listSchoolYears, type School, type SchoolYear } from "@/lib/api/schools";
+import {
+  listSchools,
+  listSchoolYears,
+  type School,
+  type SchoolYear,
+} from "@/lib/api/schools";
 import {
   createReRegistrationWindow,
   getReRegistrationWindowTracking,
@@ -77,7 +88,9 @@ function buildEmptyForm(): WindowFormState {
   return { opensAt: "", closesAt: "", isActive: true };
 }
 
-function buildFormFromWindow(window: ReRegistrationWindow | null): WindowFormState {
+function buildFormFromWindow(
+  window: ReRegistrationWindow | null,
+): WindowFormState {
   if (!window) {
     return buildEmptyForm();
   }
@@ -104,20 +117,24 @@ export function ReRegistrationManagement() {
   const [form, setForm] = useState<WindowFormState>(buildEmptyForm());
   const [editingWindowId, setEditingWindowId] = useState<string | null>(null);
   const [trackingWindowId, setTrackingWindowId] = useState<string>("");
-  const [tracking, setTracking] = useState<ReRegistrationTrackingResponse | null>(null);
-  const [trackingFilters, setTrackingFilters] = useState<ReRegistrationTrackingFilters>({
-    submissionStatus: "ALL",
-    returningIntent: "ALL",
-    reason: "",
-    gradeLevelId: "",
-    classId: "",
-    query: "",
-  });
+  const [tracking, setTracking] =
+    useState<ReRegistrationTrackingResponse | null>(null);
+  const [trackingFilters, setTrackingFilters] =
+    useState<ReRegistrationTrackingFilters>({
+      submissionStatus: "ALL",
+      returningIntent: "ALL",
+      reason: "",
+      gradeLevelId: "",
+      classId: "",
+      query: "",
+    });
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isRemindingAll, setIsRemindingAll] = useState(false);
-  const [remindingStudentId, setRemindingStudentId] = useState<string | null>(null);
+  const [remindingStudentId, setRemindingStudentId] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -145,7 +162,11 @@ export function ReRegistrationManagement() {
         setSchools(response);
         setSelectedSchoolId((current) => current || response[0]?.id || "");
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load schools.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load schools.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -169,11 +190,23 @@ export function ReRegistrationManagement() {
       setError(null);
 
       try {
-        const response = await listSchoolYears(selectedSchoolId, { includeInactive: true });
+        const response = await listSchoolYears(selectedSchoolId, {
+          includeInactive: true,
+        });
         setSchoolYears(response);
-        setSelectedSchoolYearId((current) => current || response.find((year) => year.isActive)?.id || response[0]?.id || "");
+        setSelectedSchoolYearId(
+          (current) =>
+            current ||
+            response.find((year) => year.isActive)?.id ||
+            response[0]?.id ||
+            "",
+        );
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load school years.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load school years.",
+        );
         setSchoolYears([]);
         setSelectedSchoolYearId("");
       }
@@ -200,8 +233,14 @@ export function ReRegistrationManagement() {
       setSuccessMessage(null);
 
       const [statusResult, windowsResult] = await Promise.allSettled([
-        getReRegistrationWindowStatus({ schoolId: selectedSchoolId, schoolYearId: selectedSchoolYearId }),
-        listReRegistrationWindows({ schoolId: selectedSchoolId, schoolYearId: selectedSchoolYearId }),
+        getReRegistrationWindowStatus({
+          schoolId: selectedSchoolId,
+          schoolYearId: selectedSchoolYearId,
+        }),
+        listReRegistrationWindows({
+          schoolId: selectedSchoolId,
+          schoolYearId: selectedSchoolYearId,
+        }),
       ]);
 
       if (statusResult.status === "fulfilled") {
@@ -243,8 +282,14 @@ export function ReRegistrationManagement() {
     }
 
     const [statusResponse, windowsResponse] = await Promise.all([
-      getReRegistrationWindowStatus({ schoolId: selectedSchoolId, schoolYearId: selectedSchoolYearId }),
-      listReRegistrationWindows({ schoolId: selectedSchoolId, schoolYearId: selectedSchoolYearId }),
+      getReRegistrationWindowStatus({
+        schoolId: selectedSchoolId,
+        schoolYearId: selectedSchoolYearId,
+      }),
+      listReRegistrationWindows({
+        schoolId: selectedSchoolId,
+        schoolYearId: selectedSchoolYearId,
+      }),
     ]);
 
     setStatus(statusResponse);
@@ -267,11 +312,18 @@ export function ReRegistrationManagement() {
       }
 
       try {
-        const response = await getReRegistrationWindowTracking(trackingWindowId, trackingFilters);
+        const response = await getReRegistrationWindowTracking(
+          trackingWindowId,
+          trackingFilters,
+        );
         setTracking(response);
       } catch (loadError) {
         setTracking(null);
-        setError(loadError instanceof Error ? loadError.message : "Unable to load tracking data.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load tracking data.",
+        );
       }
     }
 
@@ -283,7 +335,10 @@ export function ReRegistrationManagement() {
       return;
     }
 
-    const response = await getReRegistrationWindowTracking(trackingWindowId, trackingFilters);
+    const response = await getReRegistrationWindowTracking(
+      trackingWindowId,
+      trackingFilters,
+    );
     setTracking(response);
   }
 
@@ -303,7 +358,11 @@ export function ReRegistrationManagement() {
       );
       await refreshTrackingForCurrentFilters();
     } catch (remindError) {
-      setError(remindError instanceof Error ? remindError.message : "Unable to send reminders.");
+      setError(
+        remindError instanceof Error
+          ? remindError.message
+          : "Unable to send reminders.",
+      );
     } finally {
       setIsRemindingAll(false);
     }
@@ -322,9 +381,13 @@ export function ReRegistrationManagement() {
       const result = await remindPendingForStudent(trackingWindowId, studentId);
 
       if (result.status === "REMINDER_SENT") {
-        setSuccessMessage(`Reminder sent (${result.notificationsSent} notification${result.notificationsSent === 1 ? "" : "s"}).`);
+        setSuccessMessage(
+          `Reminder sent (${result.notificationsSent} notification${result.notificationsSent === 1 ? "" : "s"}).`,
+        );
       } else if (result.status === "SKIPPED_ALREADY_SUBMITTED") {
-        setSuccessMessage("Reminder skipped: student already submitted re-registration.");
+        setSuccessMessage(
+          "Reminder skipped: student already submitted re-registration.",
+        );
       } else if (result.status === "SKIPPED_NO_LINKED_PARENT") {
         setSuccessMessage("Reminder skipped: no linked parent account found.");
       } else {
@@ -335,7 +398,11 @@ export function ReRegistrationManagement() {
 
       await refreshTrackingForCurrentFilters();
     } catch (remindError) {
-      setError(remindError instanceof Error ? remindError.message : "Unable to send reminder.");
+      setError(
+        remindError instanceof Error
+          ? remindError.message
+          : "Unable to send reminder.",
+      );
     } finally {
       setRemindingStudentId(null);
     }
@@ -380,7 +447,11 @@ export function ReRegistrationManagement() {
 
       await refresh();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to save re-registration window.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save re-registration window.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -399,7 +470,9 @@ export function ReRegistrationManagement() {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-sm text-slate-500">Loading re-registration settings...</p>
+          <p className="text-sm text-slate-500">
+            Loading re-registration settings...
+          </p>
         </CardContent>
       </Card>
     );
@@ -412,7 +485,9 @@ export function ReRegistrationManagement() {
         description="Configure date-gated parent access for returning-student updates."
         meta={
           <>
-            <Badge variant="neutral">{selectedSchool?.name ?? "Select a school"}</Badge>
+            <Badge variant="neutral">
+              {selectedSchool?.name ?? "Select a school"}
+            </Badge>
             {status?.status === "OPEN" ? (
               <Badge variant="success">Open</Badge>
             ) : status?.status === "UPCOMING" ? (
@@ -430,7 +505,9 @@ export function ReRegistrationManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Context</CardTitle>
-          <CardDescription>Select the school and school year to configure.</CardDescription>
+          <CardDescription>
+            Select the school and school year to configure.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <Field htmlFor="rr-admin-school" label="School">
@@ -484,15 +561,24 @@ export function ReRegistrationManagement() {
             <CardHeader>
               <CardTitle>Window</CardTitle>
               <CardDescription>
-                Parents see the re-registration form only while the window is open.
+                Parents see the re-registration form only while the window is
+                open.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form className="grid gap-4 md:grid-cols-3" onSubmit={handleSubmit}>
+              <form
+                className="grid gap-4 md:grid-cols-3"
+                onSubmit={handleSubmit}
+              >
                 <Field htmlFor="rr-opens-at" label="Opens at">
                   <Input
                     id="rr-opens-at"
-                    onChange={(event) => setForm((current) => ({ ...current, opensAt: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        opensAt: event.target.value,
+                      }))
+                    }
                     type="datetime-local"
                     value={form.opensAt}
                   />
@@ -500,7 +586,12 @@ export function ReRegistrationManagement() {
                 <Field htmlFor="rr-closes-at" label="Closes at">
                   <Input
                     id="rr-closes-at"
-                    onChange={(event) => setForm((current) => ({ ...current, closesAt: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        closesAt: event.target.value,
+                      }))
+                    }
                     type="datetime-local"
                     value={form.closesAt}
                   />
@@ -509,7 +600,10 @@ export function ReRegistrationManagement() {
                   <Select
                     id="rr-active"
                     onChange={(event) =>
-                      setForm((current) => ({ ...current, isActive: event.target.value === "true" }))
+                      setForm((current) => ({
+                        ...current,
+                        isActive: event.target.value === "true",
+                      }))
                     }
                     value={form.isActive ? "true" : "false"}
                   >
@@ -519,7 +613,11 @@ export function ReRegistrationManagement() {
                 </Field>
                 <div className="md:col-span-3 flex justify-end">
                   <Button disabled={isSaving} type="submit">
-                    {isSaving ? "Saving..." : editingWindowId ? "Update window" : "Create window"}
+                    {isSaving
+                      ? "Saving..."
+                      : editingWindowId
+                        ? "Update window"
+                        : "Create window"}
                   </Button>
                 </div>
               </form>
@@ -529,7 +627,9 @@ export function ReRegistrationManagement() {
           <Card>
             <CardHeader>
               <CardTitle>History</CardTitle>
-              <CardDescription>All configured windows for this school year.</CardDescription>
+              <CardDescription>
+                All configured windows for this school year.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {windows.length === 0 ? (
@@ -544,10 +644,18 @@ export function ReRegistrationManagement() {
                     <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                       <thead className="bg-slate-50/80">
                         <tr>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Opens</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Closes</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Active</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Updated</th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Opens
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Closes
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Active
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Updated
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 bg-white">
@@ -561,12 +669,19 @@ export function ReRegistrationManagement() {
                             </td>
                             <td className="px-4 py-3">
                               {(() => {
-                                if (!window.isActive) return <Badge variant="neutral">Inactive</Badge>;
+                                if (!window.isActive)
+                                  return (
+                                    <Badge variant="neutral">Inactive</Badge>
+                                  );
                                 const now = new Date();
                                 const opensAt = new Date(window.opensAt);
                                 const closesAt = new Date(window.closesAt);
-                                if (now >= opensAt && now <= closesAt) return <Badge variant="success">Open</Badge>;
-                                if (now < opensAt) return <Badge variant="warning">Upcoming</Badge>;
+                                if (now >= opensAt && now <= closesAt)
+                                  return <Badge variant="success">Open</Badge>;
+                                if (now < opensAt)
+                                  return (
+                                    <Badge variant="warning">Upcoming</Badge>
+                                  );
                                 return <Badge variant="neutral">Closed</Badge>;
                               })()}
                             </td>
@@ -588,18 +703,27 @@ export function ReRegistrationManagement() {
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <CardTitle>Submission tracking</CardTitle>
-                  <Badge variant="warning">Pending: {tracking?.summary.pendingCount ?? 0}</Badge>
+                  <Badge variant="warning">
+                    Pending: {tracking?.summary.pendingCount ?? 0}
+                  </Badge>
                 </div>
                 <Button
-                  disabled={!trackingWindowId || isRemindingAll || (tracking?.summary.pendingCount ?? 0) === 0}
+                  disabled={
+                    !trackingWindowId ||
+                    isRemindingAll ||
+                    (tracking?.summary.pendingCount ?? 0) === 0
+                  }
                   onClick={() => void handleRemindAllPending()}
                   type="button"
                 >
-                  {isRemindingAll ? "Sending reminders..." : "Remind All Pending"}
+                  {isRemindingAll
+                    ? "Sending reminders..."
+                    : "Remind All Pending"}
                 </Button>
               </div>
               <CardDescription>
-                Track submitted and pending re-registration forms for each window.
+                Track submitted and pending re-registration forms for each
+                window.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -607,26 +731,33 @@ export function ReRegistrationManagement() {
                 <Field htmlFor="rr-tracking-window" label="Window">
                   <Select
                     id="rr-tracking-window"
-                    onChange={(event) => setTrackingWindowId(event.target.value)}
+                    onChange={(event) =>
+                      setTrackingWindowId(event.target.value)
+                    }
                     value={trackingWindowId}
                   >
                     <option value="">Select window</option>
                     {windows.map((window) => (
                       <option key={window.id} value={window.id}>
-                        {new Date(window.opensAt).toLocaleDateString()} → {new Date(window.closesAt).toLocaleDateString()}
+                        {new Date(window.opensAt).toLocaleDateString()} →{" "}
+                        {new Date(window.closesAt).toLocaleDateString()}
                         {window.isActive ? " (Active)" : ""}
                       </option>
                     ))}
                   </Select>
                 </Field>
 
-                <Field htmlFor="rr-filter-submission-status" label="Submission status">
+                <Field
+                  htmlFor="rr-filter-submission-status"
+                  label="Submission status"
+                >
                   <Select
                     id="rr-filter-submission-status"
                     onChange={(event) =>
                       setTrackingFilters((current) => ({
                         ...current,
-                        submissionStatus: event.target.value as ReRegistrationTrackingFilters["submissionStatus"],
+                        submissionStatus: event.target
+                          .value as ReRegistrationTrackingFilters["submissionStatus"],
                       }))
                     }
                     value={trackingFilters.submissionStatus ?? "ALL"}
@@ -637,13 +768,17 @@ export function ReRegistrationManagement() {
                   </Select>
                 </Field>
 
-                <Field htmlFor="rr-filter-returning-intent" label="Returning intent">
+                <Field
+                  htmlFor="rr-filter-returning-intent"
+                  label="Returning intent"
+                >
                   <Select
                     id="rr-filter-returning-intent"
                     onChange={(event) =>
                       setTrackingFilters((current) => ({
                         ...current,
-                        returningIntent: event.target.value as ReRegistrationTrackingFilters["returningIntent"],
+                        returningIntent: event.target
+                          .value as ReRegistrationTrackingFilters["returningIntent"],
                       }))
                     }
                     value={trackingFilters.returningIntent ?? "ALL"}
@@ -658,7 +793,10 @@ export function ReRegistrationManagement() {
                   <Input
                     id="rr-filter-query"
                     onChange={(event) =>
-                      setTrackingFilters((current) => ({ ...current, query: event.target.value }))
+                      setTrackingFilters((current) => ({
+                        ...current,
+                        query: event.target.value,
+                      }))
                     }
                     placeholder="First or last name"
                     value={trackingFilters.query ?? ""}
@@ -669,16 +807,21 @@ export function ReRegistrationManagement() {
                   <Select
                     id="rr-filter-grade"
                     onChange={(event) =>
-                      setTrackingFilters((current) => ({ ...current, gradeLevelId: event.target.value }))
+                      setTrackingFilters((current) => ({
+                        ...current,
+                        gradeLevelId: event.target.value,
+                      }))
                     }
                     value={trackingFilters.gradeLevelId ?? ""}
                   >
                     <option value="">All grades</option>
-                    {(tracking?.availableFilters.gradeLevels ?? []).map((grade) => (
-                      <option key={grade.id} value={grade.id}>
-                        {grade.name}
-                      </option>
-                    ))}
+                    {(tracking?.availableFilters.gradeLevels ?? []).map(
+                      (grade) => (
+                        <option key={grade.id} value={grade.id}>
+                          {grade.name}
+                        </option>
+                      ),
+                    )}
                   </Select>
                 </Field>
 
@@ -686,7 +829,10 @@ export function ReRegistrationManagement() {
                   <Select
                     id="rr-filter-class"
                     onChange={(event) =>
-                      setTrackingFilters((current) => ({ ...current, classId: event.target.value }))
+                      setTrackingFilters((current) => ({
+                        ...current,
+                        classId: event.target.value,
+                      }))
                     }
                     value={trackingFilters.classId ?? ""}
                   >
@@ -705,17 +851,20 @@ export function ReRegistrationManagement() {
                     onChange={(event) =>
                       setTrackingFilters((current) => ({
                         ...current,
-                        reason: event.target.value as ReRegistrationTrackingFilters["reason"],
+                        reason: event.target
+                          .value as ReRegistrationTrackingFilters["reason"],
                       }))
                     }
                     value={trackingFilters.reason ?? ""}
                   >
                     <option value="">All reasons</option>
-                    {(tracking?.availableFilters.reasons ?? []).map((reason) => (
-                      <option key={reason} value={reason}>
-                        {NON_RETURNING_REASON_LABELS[reason] ?? reason}
-                      </option>
-                    ))}
+                    {(tracking?.availableFilters.reasons ?? []).map(
+                      (reason) => (
+                        <option key={reason} value={reason}>
+                          {NON_RETURNING_REASON_LABELS[reason] ?? reason}
+                        </option>
+                      ),
+                    )}
                   </Select>
                 </Field>
 
@@ -750,32 +899,52 @@ export function ReRegistrationManagement() {
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                     <Card>
                       <CardContent className="pt-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total students</p>
-                        <p className="mt-1 text-2xl font-semibold text-slate-900">{tracking.summary.totalStudents}</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Total students
+                        </p>
+                        <p className="mt-1 text-2xl font-semibold text-slate-900">
+                          {tracking.summary.totalStudents}
+                        </p>
                       </CardContent>
                     </Card>
                     <Card>
                       <CardContent className="pt-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Submitted</p>
-                        <p className="mt-1 text-2xl font-semibold text-emerald-700">{tracking.summary.submittedCount}</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Submitted
+                        </p>
+                        <p className="mt-1 text-2xl font-semibold text-emerald-700">
+                          {tracking.summary.submittedCount}
+                        </p>
                       </CardContent>
                     </Card>
                     <Card>
                       <CardContent className="pt-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pending</p>
-                        <p className="mt-1 text-2xl font-semibold text-amber-700">{tracking.summary.pendingCount}</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Pending
+                        </p>
+                        <p className="mt-1 text-2xl font-semibold text-amber-700">
+                          {tracking.summary.pendingCount}
+                        </p>
                       </CardContent>
                     </Card>
                     <Card>
                       <CardContent className="pt-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Returning</p>
-                        <p className="mt-1 text-2xl font-semibold text-sky-700">{tracking.summary.returningCount}</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Returning
+                        </p>
+                        <p className="mt-1 text-2xl font-semibold text-sky-700">
+                          {tracking.summary.returningCount}
+                        </p>
                       </CardContent>
                     </Card>
                     <Card>
                       <CardContent className="pt-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Not returning</p>
-                        <p className="mt-1 text-2xl font-semibold text-rose-700">{tracking.summary.nonReturningCount}</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Not returning
+                        </p>
+                        <p className="mt-1 text-2xl font-semibold text-rose-700">
+                          {tracking.summary.nonReturningCount}
+                        </p>
                       </CardContent>
                     </Card>
                   </div>
@@ -785,25 +954,55 @@ export function ReRegistrationManagement() {
                       <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                         <thead className="bg-slate-50/80">
                           <tr>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Grade</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Classes</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Intent</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Reason</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Submitted</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Last reminded</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Student
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Grade
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Classes
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Status
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Intent
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Reason
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Submitted
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Last reminded
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Actions
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 bg-white">
                           {tracking.rows.map((row) => (
                             <tr key={row.studentId}>
-                              <td className="px-4 py-3 text-slate-800">{row.firstName} {row.lastName}</td>
-                              <td className="px-4 py-3 text-slate-600">{row.gradeLevelName ?? "—"}</td>
-                              <td className="px-4 py-3 text-slate-600">{row.classNames.length ? row.classNames.join(", ") : "—"}</td>
+                              <td className="px-4 py-3 text-slate-800">
+                                {row.firstName} {row.lastName}
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">
+                                {row.gradeLevelName ?? "—"}
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">
+                                {row.classNames.length
+                                  ? row.classNames.join(", ")
+                                  : "—"}
+                              </td>
                               <td className="px-4 py-3">
-                                <Badge variant={row.isSubmitted ? "success" : "warning"}>
+                                <Badge
+                                  variant={
+                                    row.isSubmitted ? "success" : "warning"
+                                  }
+                                >
                                   {row.isSubmitted ? "Submitted" : "Pending"}
                                 </Badge>
                               </td>
@@ -816,30 +1015,49 @@ export function ReRegistrationManagement() {
                               </td>
                               <td className="px-4 py-3 text-slate-600">
                                 {row.nonReturningReason
-                                  ? NON_RETURNING_REASON_LABELS[row.nonReturningReason] ?? row.nonReturningReason
+                                  ? (NON_RETURNING_REASON_LABELS[
+                                      row.nonReturningReason
+                                    ] ?? row.nonReturningReason)
                                   : "—"}
                                 {row.nonReturningComment ? (
-                                  <p className="mt-1 text-xs text-slate-500">{row.nonReturningComment}</p>
+                                  <p className="mt-1 text-xs text-slate-500">
+                                    {row.nonReturningComment}
+                                  </p>
                                 ) : null}
                               </td>
                               <td className="px-4 py-3 text-slate-500">
-                                {row.submittedAt ? new Date(row.submittedAt).toLocaleString() : "—"}
+                                {row.submittedAt
+                                  ? new Date(row.submittedAt).toLocaleString()
+                                  : "—"}
                               </td>
                               <td className="px-4 py-3 text-slate-500">
-                                {row.lastRemindedAt ? new Date(row.lastRemindedAt).toLocaleString() : "—"}
+                                {row.lastRemindedAt
+                                  ? new Date(
+                                      row.lastRemindedAt,
+                                    ).toLocaleString()
+                                  : "—"}
                               </td>
                               <td className="px-4 py-3">
                                 {row.isSubmitted ? (
-                                  <span className="text-xs text-slate-400">—</span>
+                                  <span className="text-xs text-slate-400">
+                                    —
+                                  </span>
                                 ) : (
                                   <Button
-                                    disabled={isRemindingAll || remindingStudentId === row.studentId}
-                                    onClick={() => void handleRemindStudent(row.studentId)}
+                                    disabled={
+                                      isRemindingAll ||
+                                      remindingStudentId === row.studentId
+                                    }
+                                    onClick={() =>
+                                      void handleRemindStudent(row.studentId)
+                                    }
                                     size="sm"
                                     type="button"
                                     variant="secondary"
                                   >
-                                    {remindingStudentId === row.studentId ? "Sending..." : "Remind"}
+                                    {remindingStudentId === row.studentId
+                                      ? "Sending..."
+                                      : "Remind"}
                                   </Button>
                                 )}
                               </td>
@@ -859,7 +1077,9 @@ export function ReRegistrationManagement() {
                   ) : null}
                 </>
               ) : (
-                <p className="text-sm text-slate-500">Loading tracking data...</p>
+                <p className="text-sm text-slate-500">
+                  Loading tracking data...
+                </p>
               )}
             </CardContent>
           </Card>
@@ -868,4 +1088,3 @@ export function ReRegistrationManagement() {
     </div>
   );
 }
-

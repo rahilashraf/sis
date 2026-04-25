@@ -5,6 +5,7 @@ import {
   IsEmail,
   IsEnum,
   IsArray,
+  MaxLength,
   IsOptional,
   IsString,
   MinLength,
@@ -37,6 +38,19 @@ export class CreateUserDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @Transform(({ value }) => {
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
 
   @IsString()
   @MinLength(6)

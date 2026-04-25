@@ -1,12 +1,12 @@
-import { apiFetch } from './client';
+import { apiFetch } from "./client";
 
 export type UniformOrderStatus =
-  | 'PENDING'
-  | 'APPROVED'
-  | 'PREPARING'
-  | 'READY_FOR_PICKUP'
-  | 'COMPLETED'
-  | 'CANCELLED';
+  | "PENDING"
+  | "APPROVED"
+  | "PREPARING"
+  | "READY_FOR_PICKUP"
+  | "COMPLETED"
+  | "CANCELLED";
 
 export type UniformItem = {
   id: string;
@@ -165,12 +165,12 @@ export type UpdateParentUniformOrderInput = {
 
 export function formatUniformOrderStatusLabel(status: UniformOrderStatus) {
   const labels: Record<UniformOrderStatus, string> = {
-    PENDING: 'Pending',
-    APPROVED: 'Approved',
-    PREPARING: 'Preparing',
-    READY_FOR_PICKUP: 'Ready for pickup',
-    COMPLETED: 'Completed',
-    CANCELLED: 'Cancelled',
+    PENDING: "Pending",
+    APPROVED: "Approved",
+    PREPARING: "Preparing",
+    READY_FOR_PICKUP: "Ready for pickup",
+    COMPLETED: "Completed",
+    CANCELLED: "Cancelled",
   };
 
   return labels[status] ?? status;
@@ -178,19 +178,19 @@ export function formatUniformOrderStatusLabel(status: UniformOrderStatus) {
 
 export function formatUniformMoney(value: unknown) {
   const numeric =
-    typeof value === 'number'
+    typeof value === "number"
       ? value
-      : typeof value === 'string'
+      : typeof value === "string"
         ? Number(value)
         : Number.NaN;
 
   if (!Number.isFinite(numeric)) {
-    return '—';
+    return "—";
   }
 
-  return new Intl.NumberFormat('en-CA', {
-    style: 'currency',
-    currency: 'CAD',
+  return new Intl.NumberFormat("en-CA", {
+    style: "currency",
+    currency: "CAD",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(numeric);
@@ -205,23 +205,23 @@ export function listUniformItems(options?: {
   const query = new URLSearchParams();
 
   if (options?.schoolId) {
-    query.set('schoolId', options.schoolId);
+    query.set("schoolId", options.schoolId);
   }
 
   if (options?.search?.trim()) {
-    query.set('search', options.search.trim());
+    query.set("search", options.search.trim());
   }
 
   if (options?.category?.trim()) {
-    query.set('category', options.category.trim());
+    query.set("category", options.category.trim());
   }
 
   if (options?.includeInactive !== undefined) {
-    query.set('includeInactive', options.includeInactive ? 'true' : 'false');
+    query.set("includeInactive", options.includeInactive ? "true" : "false");
   }
 
   return apiFetch<UniformItem[]>(
-    `/uniform-items${query.size ? `?${query.toString()}` : ''}`,
+    `/uniform-items${query.size ? `?${query.toString()}` : ""}`,
   );
 }
 
@@ -229,11 +229,11 @@ export function listParentUniformItems(studentId?: string) {
   const query = new URLSearchParams();
 
   if (studentId) {
-    query.set('studentId', studentId);
+    query.set("studentId", studentId);
   }
 
   return apiFetch<UniformItem[]>(
-    `/uniform-items/parent${query.size ? `?${query.toString()}` : ''}`,
+    `/uniform-items/parent${query.size ? `?${query.toString()}` : ""}`,
   );
 }
 
@@ -242,28 +242,31 @@ export function getUniformItem(itemId: string) {
 }
 
 export function createUniformItem(input: CreateUniformItemInput) {
-  return apiFetch<UniformItem>('/uniform-items', {
-    method: 'POST',
+  return apiFetch<UniformItem>("/uniform-items", {
+    method: "POST",
     json: input,
   });
 }
 
-export function updateUniformItem(itemId: string, input: UpdateUniformItemInput) {
+export function updateUniformItem(
+  itemId: string,
+  input: UpdateUniformItemInput,
+) {
   return apiFetch<UniformItem>(`/uniform-items/${itemId}`, {
-    method: 'PATCH',
+    method: "PATCH",
     json: input,
   });
 }
 
 export function archiveUniformItem(itemId: string) {
   return apiFetch<UniformItem>(`/uniform-items/${itemId}/archive`, {
-    method: 'PATCH',
+    method: "PATCH",
   });
 }
 
 export function activateUniformItem(itemId: string) {
   return apiFetch<UniformItem>(`/uniform-items/${itemId}/activate`, {
-    method: 'PATCH',
+    method: "PATCH",
   });
 }
 
@@ -276,23 +279,23 @@ export function listUniformOrders(options?: {
   const query = new URLSearchParams();
 
   if (options?.schoolId) {
-    query.set('schoolId', options.schoolId);
+    query.set("schoolId", options.schoolId);
   }
 
   if (options?.status) {
-    query.set('status', options.status);
+    query.set("status", options.status);
   }
 
   if (options?.studentId) {
-    query.set('studentId', options.studentId);
+    query.set("studentId", options.studentId);
   }
 
   if (options?.parentId) {
-    query.set('parentId', options.parentId);
+    query.set("parentId", options.parentId);
   }
 
   return apiFetch<UniformOrderAdmin[]>(
-    `/uniform-orders${query.size ? `?${query.toString()}` : ''}`,
+    `/uniform-orders${query.size ? `?${query.toString()}` : ""}`,
   );
 }
 
@@ -303,25 +306,27 @@ export function listParentUniformOrders(options?: {
   const query = new URLSearchParams();
 
   if (options?.studentId) {
-    query.set('studentId', options.studentId);
+    query.set("studentId", options.studentId);
   }
 
   if (options?.status) {
-    query.set('status', options.status);
+    query.set("status", options.status);
   }
 
   return apiFetch<UniformOrderParent[]>(
-    `/uniform-orders/parent${query.size ? `?${query.toString()}` : ''}`,
+    `/uniform-orders/parent${query.size ? `?${query.toString()}` : ""}`,
   );
 }
 
 export function getUniformOrder(orderId: string) {
-  return apiFetch<UniformOrderAdmin | UniformOrderParent>(`/uniform-orders/${orderId}`);
+  return apiFetch<UniformOrderAdmin | UniformOrderParent>(
+    `/uniform-orders/${orderId}`,
+  );
 }
 
 export function createUniformOrder(input: CreateUniformOrderInput) {
-  return apiFetch<UniformOrderParent>('/uniform-orders', {
-    method: 'POST',
+  return apiFetch<UniformOrderParent>("/uniform-orders", {
+    method: "POST",
     json: input,
   });
 }
@@ -331,7 +336,7 @@ export function updateUniformOrderStatus(
   input: UpdateUniformOrderStatusInput,
 ) {
   return apiFetch<UniformOrderAdmin>(`/uniform-orders/${orderId}/status`, {
-    method: 'PATCH',
+    method: "PATCH",
     json: input,
   });
 }
@@ -340,14 +345,20 @@ export function updateParentUniformOrder(
   orderId: string,
   input: UpdateParentUniformOrderInput,
 ) {
-  return apiFetch<UniformOrderParent>(`/uniform-orders/${orderId}/parent-edit`, {
-    method: 'PATCH',
-    json: input,
-  });
+  return apiFetch<UniformOrderParent>(
+    `/uniform-orders/${orderId}/parent-edit`,
+    {
+      method: "PATCH",
+      json: input,
+    },
+  );
 }
 
 export function cancelParentUniformOrder(orderId: string) {
-  return apiFetch<UniformOrderParent>(`/uniform-orders/${orderId}/parent-cancel`, {
-    method: 'POST',
-  });
+  return apiFetch<UniformOrderParent>(
+    `/uniform-orders/${orderId}/parent-cancel`,
+    {
+      method: "POST",
+    },
+  );
 }

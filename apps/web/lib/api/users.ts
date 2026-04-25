@@ -11,6 +11,7 @@ export type UserRemovalResult = {
 export type CreateUserInput = {
   username: string;
   email?: string;
+  phone?: string;
   password: string;
   firstName: string;
   lastName: string;
@@ -23,6 +24,7 @@ export type CreateUserInput = {
 export type UpdateUserInput = {
   username?: string;
   email?: string;
+  phone?: string;
   password?: string;
   firstName?: string;
   lastName?: string;
@@ -59,7 +61,9 @@ export function listUsers(options?: {
     query.set("sort", options.sort);
   }
 
-  return apiFetch<ManagedUser[]>(`/users${query.size ? `?${query.toString()}` : ""}`);
+  return apiFetch<ManagedUser[]>(
+    `/users${query.size ? `?${query.toString()}` : ""}`,
+  );
 }
 
 export function createUser(input: CreateUserInput) {
@@ -82,7 +86,10 @@ export function deleteUser(userId: string) {
   });
 }
 
-export function updateUserMemberships(userId: string, input: UpdateUserMembershipsInput) {
+export function updateUserMemberships(
+  userId: string,
+  input: UpdateUserMembershipsInput,
+) {
   return apiFetch<ManagedUser>(`/users/${userId}/memberships`, {
     method: "PATCH",
     json: input,

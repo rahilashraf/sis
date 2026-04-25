@@ -53,7 +53,8 @@ export function TeacherTimetableView() {
 
   const groupedBlocks = useMemo(() => {
     const sorted = [...blocks].sort((a, b) => {
-      const dayOrder = daysOfWeek.indexOf(a.dayOfWeek) - daysOfWeek.indexOf(b.dayOfWeek);
+      const dayOrder =
+        daysOfWeek.indexOf(a.dayOfWeek) - daysOfWeek.indexOf(b.dayOfWeek);
       if (dayOrder !== 0) {
         return dayOrder;
       }
@@ -88,7 +89,9 @@ export function TeacherTimetableView() {
       {isLoading ? (
         <Card>
           <CardContent className="pt-6">
-            <p className="text-center text-slate-600">Loading your timetable...</p>
+            <p className="text-center text-slate-600">
+              Loading your timetable...
+            </p>
           </CardContent>
         </Card>
       ) : groupedBlocks.length === 0 ? (
@@ -115,7 +118,9 @@ export function TeacherTimetableView() {
                           {block.startTime} - {block.endTime}
                         </Badge>
                         {block.roomLabel ? (
-                          <Badge variant="neutral">Room: {block.roomLabel}</Badge>
+                          <Badge variant="neutral">
+                            Room: {block.roomLabel}
+                          </Badge>
                         ) : null}
                       </div>
 
@@ -128,7 +133,9 @@ export function TeacherTimetableView() {
                       </div>
 
                       {block.notes ? (
-                        <p className="mt-3 text-sm text-slate-700">{block.notes}</p>
+                        <p className="mt-3 text-sm text-slate-700">
+                          {block.notes}
+                        </p>
                       ) : null}
                     </div>
                   ))}

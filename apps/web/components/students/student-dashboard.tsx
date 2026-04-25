@@ -14,8 +14,14 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
-import { getAttendanceStudentSummary, type AttendanceStudentSummary } from "@/lib/api/attendance";
-import { getStudentAccountSummary, type StudentAccountSummary } from "@/lib/api/billing";
+import {
+  getAttendanceStudentSummary,
+  type AttendanceStudentSummary,
+} from "@/lib/api/attendance";
+import {
+  getStudentAccountSummary,
+  type StudentAccountSummary,
+} from "@/lib/api/billing";
 import { listClassesForStudent, type SchoolClass } from "@/lib/api/classes";
 import { listNotifications, type Notification } from "@/lib/api/notifications";
 import {
@@ -24,7 +30,10 @@ import {
   type TimetableDayOfWeek,
 } from "@/lib/api/timetable";
 import { useAuth } from "@/lib/auth/auth-context";
-import { getDefaultSchoolContextId, getPrimarySchoolName } from "@/lib/auth/school-membership";
+import {
+  getDefaultSchoolContextId,
+  getPrimarySchoolName,
+} from "@/lib/auth/school-membership";
 import { dateOnlyFromDate } from "@/lib/date";
 
 const daysOfWeek: TimetableDayOfWeek[] = [
@@ -90,7 +99,9 @@ function SummaryCard({
     <Card>
       <CardContent className="space-y-1 pt-6">
         <p className="text-sm font-medium text-slate-600">{label}</p>
-        <p className="text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
+        <p className="text-2xl font-semibold tracking-tight text-slate-950">
+          {value}
+        </p>
         <p className="text-sm text-slate-500">{hint}</p>
       </CardContent>
     </Card>
@@ -99,7 +110,10 @@ function SummaryCard({
 
 function DashboardPill({ children }: { children: string }) {
   return (
-    <Badge className="shrink-0 whitespace-nowrap px-2 py-0.5 text-[11px] leading-4" variant="neutral">
+    <Badge
+      className="shrink-0 whitespace-nowrap px-2 py-0.5 text-[11px] leading-4"
+      variant="neutral"
+    >
       {children}
     </Badge>
   );
@@ -127,7 +141,9 @@ function ShortcutCard({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-base font-semibold text-slate-900">{title}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {description}
+            </p>
           </div>
           {badge ? <DashboardPill>{badge}</DashboardPill> : null}
         </div>
@@ -165,7 +181,9 @@ function PriorityCard({
           <DashboardPill>{badge}</DashboardPill>
         </div>
         <div>
-          <p className="text-lg font-semibold tracking-tight text-slate-950">{title}</p>
+          <p className="text-lg font-semibold tracking-tight text-slate-950">
+            {title}
+          </p>
           <p className="mt-1 text-sm leading-6 text-slate-500">{message}</p>
         </div>
       </CardContent>
@@ -178,9 +196,11 @@ export function StudentDashboard() {
   const user = session?.user ?? null;
   const [blocks, setBlocks] = useState<TimetableBlock[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
-  const [attendanceSummary, setAttendanceSummary] = useState<AttendanceStudentSummary | null>(null);
+  const [attendanceSummary, setAttendanceSummary] =
+    useState<AttendanceStudentSummary | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [accountSummary, setAccountSummary] = useState<StudentAccountSummary | null>(null);
+  const [accountSummary, setAccountSummary] =
+    useState<StudentAccountSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [partialWarning, setPartialWarning] = useState<string | null>(null);
@@ -226,18 +246,27 @@ export function StudentDashboard() {
         {
           label: "billing",
           execute: () =>
-            schoolId ? getStudentAccountSummary(user.id, { schoolId }) : Promise.resolve(null),
+            schoolId
+              ? getStudentAccountSummary(user.id, { schoolId })
+              : Promise.resolve(null),
         },
       ] as const;
 
-      const [blocksResult, classesResult, attendanceResult, notificationsResult, billingResult] =
-        (await Promise.allSettled(requests.map((request) => request.execute()))) as [
-          PromiseSettledResult<TimetableBlock[]>,
-          PromiseSettledResult<SchoolClass[]>,
-          PromiseSettledResult<AttendanceStudentSummary>,
-          PromiseSettledResult<Notification[]>,
-          PromiseSettledResult<StudentAccountSummary | null>,
-        ];
+      const [
+        blocksResult,
+        classesResult,
+        attendanceResult,
+        notificationsResult,
+        billingResult,
+      ] = (await Promise.allSettled(
+        requests.map((request) => request.execute()),
+      )) as [
+        PromiseSettledResult<TimetableBlock[]>,
+        PromiseSettledResult<SchoolClass[]>,
+        PromiseSettledResult<AttendanceStudentSummary>,
+        PromiseSettledResult<Notification[]>,
+        PromiseSettledResult<StudentAccountSummary | null>,
+      ];
 
       const results = [
         blocksResult,
@@ -251,19 +280,27 @@ export function StudentDashboard() {
       );
 
       setBlocks(blocksResult.status === "fulfilled" ? blocksResult.value : []);
-      setClasses(classesResult.status === "fulfilled" ? classesResult.value : []);
+      setClasses(
+        classesResult.status === "fulfilled" ? classesResult.value : [],
+      );
       setAttendanceSummary(
         attendanceResult.status === "fulfilled" ? attendanceResult.value : null,
       );
       setNotifications(
-        notificationsResult.status === "fulfilled" ? notificationsResult.value : [],
+        notificationsResult.status === "fulfilled"
+          ? notificationsResult.value
+          : [],
       );
-      setAccountSummary(billingResult.status === "fulfilled" ? billingResult.value : null);
+      setAccountSummary(
+        billingResult.status === "fulfilled" ? billingResult.value : null,
+      );
 
       if (failedLabels.length === requests.length) {
         setError("Unable to load your dashboard right now.");
       } else if (failedLabels.length > 0) {
-        setPartialWarning(`Some sections are unavailable right now: ${failedLabels.join(", ")}.`);
+        setPartialWarning(
+          `Some sections are unavailable right now: ${failedLabels.join(", ")}.`,
+        );
       }
 
       setIsLoading(false);
@@ -273,7 +310,9 @@ export function StudentDashboard() {
   }, [user]);
 
   const schoolName = getPrimarySchoolName(user);
-  const unreadNotifications = notifications.filter((notification) => !notification.isRead).length;
+  const unreadNotifications = notifications.filter(
+    (notification) => !notification.isRead,
+  ).length;
   const todayKey = daysOfWeek[(new Date().getDay() + 6) % 7];
   const currentTime = getCurrentTimeLabel();
 
@@ -287,11 +326,13 @@ export function StudentDashboard() {
     [sortedBlocks, todayKey],
   );
 
-  const nextBlockToday = todayBlocks.find((block) => block.endTime >= currentTime) ?? null;
+  const nextBlockToday =
+    todayBlocks.find((block) => block.endTime >= currentTime) ?? null;
 
   const nextScheduledGroup = (() => {
     for (let offset = 1; offset <= daysOfWeek.length; offset += 1) {
-      const day = daysOfWeek[(daysOfWeek.indexOf(todayKey) + offset) % daysOfWeek.length];
+      const day =
+        daysOfWeek[(daysOfWeek.indexOf(todayKey) + offset) % daysOfWeek.length];
       const dayBlocks = sortedBlocks.filter((block) => block.dayOfWeek === day);
       if (dayBlocks.length > 0) {
         return { day, blocks: dayBlocks };
@@ -316,7 +357,9 @@ export function StudentDashboard() {
   const outstandingBalance = Number(accountSummary?.totalOutstanding ?? 0);
   const overdueBalance = Number(accountSummary?.totalOverdue ?? 0);
   const priorityCharge =
-    accountSummary?.overdueCharges[0] ?? accountSummary?.outstandingCharges[0] ?? null;
+    accountSummary?.overdueCharges[0] ??
+    accountSummary?.outstandingCharges[0] ??
+    null;
 
   const priority = (() => {
     if (unreadNotifications > 0) {
@@ -335,8 +378,9 @@ export function StudentDashboard() {
       return {
         badge: "Next class",
         title:
-          nextBlockToday.classes.map((schoolClass) => schoolClass.name).join(", ") ||
-          "Scheduled class",
+          nextBlockToday.classes
+            .map((schoolClass) => schoolClass.name)
+            .join(", ") || "Scheduled class",
         message: `${nextBlockToday.startTime} - ${nextBlockToday.endTime}${nextBlockToday.roomLabel ? ` • Room ${nextBlockToday.roomLabel}` : ""}`,
       };
     }
@@ -367,10 +411,16 @@ export function StudentDashboard() {
         description={`Hi ${user.firstName} — here’s a calm, clear view of what matters most today, from your schedule to new updates and school essentials.`}
         actions={
           <>
-            <Link className={buttonClassName({ variant: "secondary" })} href="/student/timetable">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/student/timetable"
+            >
               Open timetable
             </Link>
-            <Link className={buttonClassName({ variant: "secondary" })} href="/notifications">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/notifications"
+            >
               View notifications
             </Link>
           </>
@@ -379,7 +429,10 @@ export function StudentDashboard() {
           <>
             {schoolName ? <Badge variant="neutral">{schoolName}</Badge> : null}
             <Badge variant="neutral">{dayLabel(todayKey)}</Badge>
-            <Badge variant="neutral">{unreadNotifications} unread update{unreadNotifications === 1 ? "" : "s"}</Badge>
+            <Badge variant="neutral">
+              {unreadNotifications} unread update
+              {unreadNotifications === 1 ? "" : "s"}
+            </Badge>
           </>
         }
       />
@@ -388,14 +441,18 @@ export function StudentDashboard() {
       {partialWarning ? <Notice tone="info">{partialWarning}</Notice> : null}
       {!error && overdueBalance > 0 ? (
         <Notice tone="warning" title="Outstanding balance requires attention">
-          You currently have {formatCurrency(accountSummary?.totalOverdue ?? 0)} overdue and {formatCurrency(accountSummary?.totalOutstanding ?? 0)} outstanding.
+          You currently have {formatCurrency(accountSummary?.totalOverdue ?? 0)}{" "}
+          overdue and {formatCurrency(accountSummary?.totalOutstanding ?? 0)}{" "}
+          outstanding.
         </Notice>
       ) : null}
 
       {isLoading ? (
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Loading your student dashboard...</p>
+            <p className="text-sm text-slate-500">
+              Loading your student dashboard...
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -426,7 +483,11 @@ export function StudentDashboard() {
             <SummaryCard
               label="Attendance rate"
               value={formatPercent(attendanceSummary?.attendancePercentage)}
-              hint={attendanceSummary ? "Based on the last 30 days" : "No attendance data yet"}
+              hint={
+                attendanceSummary
+                  ? "Based on the last 30 days"
+                  : "No attendance data yet"
+              }
             />
             <SummaryCard
               label="Outstanding balance"
@@ -437,26 +498,48 @@ export function StudentDashboard() {
                   : "No charges due"
               }
             />
-            <PriorityCard badge={priority.badge} message={priority.message} title={priority.title} />
+            <PriorityCard
+              badge={priority.badge}
+              message={priority.message}
+              title={priority.title}
+            />
           </div>
 
           <section className="space-y-3">
             <div>
-              <h2 className="text-lg font-semibold tracking-tight text-slate-950">Quick access</h2>
-              <p className="text-sm text-slate-600">Fast links to the student tools already available to you.</p>
+              <h2 className="text-lg font-semibold tracking-tight text-slate-950">
+                Quick access
+              </h2>
+              <p className="text-sm text-slate-600">
+                Fast links to the student tools already available to you.
+              </p>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <ShortcutCard
                 title="Timetable"
                 description="See your weekly class schedule and teacher assignments."
                 href="/student/timetable"
-                badge={todayBlocks.length > 0 ? `${todayBlocks.length} today` : "Weekly view"}
+                badge={
+                  todayBlocks.length > 0
+                    ? `${todayBlocks.length} today`
+                    : "Weekly view"
+                }
               />
               <ShortcutCard
                 title="Notifications"
                 description="Catch up on announcements, reminders, and school updates."
                 href="/notifications"
-                badge={unreadNotifications > 0 ? `${unreadNotifications} unread` : "Up to date"}
+                badge={
+                  unreadNotifications > 0
+                    ? `${unreadNotifications} unread`
+                    : "Up to date"
+                }
+              />
+              <ShortcutCard
+                title="Library"
+                description="Browse the catalogue and place hold requests for unavailable books."
+                href="/student/library"
+                badge="Self-service"
               />
             </div>
           </section>
@@ -485,15 +568,29 @@ export function StudentDashboard() {
                         key={block.id}
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="neutral">{block.startTime} - {block.endTime}</Badge>
-                          {block.roomLabel ? <Badge variant="neutral">Room {block.roomLabel}</Badge> : null}
-                          {isNext ? <Badge variant="neutral">Next</Badge> : null}
+                          <Badge variant="neutral">
+                            {block.startTime} - {block.endTime}
+                          </Badge>
+                          {block.roomLabel ? (
+                            <Badge variant="neutral">
+                              Room {block.roomLabel}
+                            </Badge>
+                          ) : null}
+                          {isNext ? (
+                            <Badge variant="neutral">Next</Badge>
+                          ) : null}
                         </div>
                         <div className="mt-3 space-y-1">
-                          <p className={`text-base font-semibold ${isNext ? "text-white" : "text-slate-950"}`}>
-                            {block.classes.map((schoolClass) => schoolClass.name).join(", ") || "Scheduled class"}
+                          <p
+                            className={`text-base font-semibold ${isNext ? "text-white" : "text-slate-950"}`}
+                          >
+                            {block.classes
+                              .map((schoolClass) => schoolClass.name)
+                              .join(", ") || "Scheduled class"}
                           </p>
-                          <p className={`text-sm ${isNext ? "text-slate-200" : "text-slate-600"}`}>
+                          <p
+                            className={`text-sm ${isNext ? "text-slate-200" : "text-slate-600"}`}
+                          >
                             {block.teacher.firstName} {block.teacher.lastName}
                             {block.notes ? ` • ${block.notes}` : ""}
                           </p>
@@ -504,13 +601,22 @@ export function StudentDashboard() {
                 ) : nextScheduledGroup ? (
                   <div className="space-y-3">
                     {nextScheduledGroup.blocks.slice(0, 3).map((block) => (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4" key={block.id}>
+                      <div
+                        className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                        key={block.id}
+                      >
                         <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="neutral">{dayLabel(nextScheduledGroup.day)}</Badge>
-                          <Badge variant="neutral">{block.startTime} - {block.endTime}</Badge>
+                          <Badge variant="neutral">
+                            {dayLabel(nextScheduledGroup.day)}
+                          </Badge>
+                          <Badge variant="neutral">
+                            {block.startTime} - {block.endTime}
+                          </Badge>
                         </div>
                         <p className="mt-3 text-base font-semibold text-slate-950">
-                          {block.classes.map((schoolClass) => schoolClass.name).join(", ") || "Scheduled class"}
+                          {block.classes
+                            .map((schoolClass) => schoolClass.name)
+                            .join(", ") || "Scheduled class"}
                         </p>
                         <p className="mt-1 text-sm text-slate-600">
                           {block.teacher.firstName} {block.teacher.lastName}
@@ -525,7 +631,13 @@ export function StudentDashboard() {
                     title="No timetable scheduled today"
                     description="Your schedule will appear here once classes are assigned and timetable blocks are published."
                     action={
-                      <Link className={buttonClassName({ size: "sm", variant: "secondary" })} href="/student/timetable">
+                      <Link
+                        className={buttonClassName({
+                          size: "sm",
+                          variant: "secondary",
+                        })}
+                        href="/student/timetable"
+                      >
                         Open full timetable
                       </Link>
                     }
@@ -537,7 +649,9 @@ export function StudentDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Recent notifications</CardTitle>
-                <CardDescription>Announcements and reminders delivered to your account.</CardDescription>
+                <CardDescription>
+                  Announcements and reminders delivered to your account.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {notifications.length === 0 ? (
@@ -549,18 +663,35 @@ export function StudentDashboard() {
                 ) : (
                   <div className="space-y-3">
                     {notifications.map((notification) => (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4" key={notification.id}>
+                      <div
+                        className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                        key={notification.id}
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-slate-950">{notification.title}</p>
-                            <p className="mt-1 text-sm leading-6 text-slate-600">{notification.message}</p>
+                            <p className="text-sm font-semibold text-slate-950">
+                              {notification.title}
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-slate-600">
+                              {notification.message}
+                            </p>
                           </div>
-                          <Badge variant="neutral">{notification.isRead ? "Read" : "Unread"}</Badge>
+                          <Badge variant="neutral">
+                            {notification.isRead ? "Read" : "Unread"}
+                          </Badge>
                         </div>
-                        <p className="mt-3 text-xs text-slate-500">{formatShortDate(notification.createdAt)}</p>
+                        <p className="mt-3 text-xs text-slate-500">
+                          {formatShortDate(notification.createdAt)}
+                        </p>
                       </div>
                     ))}
-                    <Link className={buttonClassName({ size: "sm", variant: "secondary" })} href="/notifications">
+                    <Link
+                      className={buttonClassName({
+                        size: "sm",
+                        variant: "secondary",
+                      })}
+                      href="/notifications"
+                    >
                       View all notifications
                     </Link>
                   </div>
@@ -573,7 +704,9 @@ export function StudentDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Current classes</CardTitle>
-                <CardDescription>Your active classes and learning groups this term.</CardDescription>
+                <CardDescription>
+                  Your active classes and learning groups this term.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {currentClasses.length === 0 ? (
@@ -585,11 +718,22 @@ export function StudentDashboard() {
                 ) : (
                   <div className="space-y-3">
                     {currentClasses.slice(0, 6).map((schoolClass) => (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4" key={schoolClass.id}>
+                      <div
+                        className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                        key={schoolClass.id}
+                      >
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-slate-950">{schoolClass.name}</p>
-                          {schoolClass.isHomeroom ? <Badge variant="neutral">Homeroom</Badge> : null}
-                          {schoolClass.subject ? <Badge variant="neutral">{schoolClass.subject}</Badge> : null}
+                          <p className="text-sm font-semibold text-slate-950">
+                            {schoolClass.name}
+                          </p>
+                          {schoolClass.isHomeroom ? (
+                            <Badge variant="neutral">Homeroom</Badge>
+                          ) : null}
+                          {schoolClass.subject ? (
+                            <Badge variant="neutral">
+                              {schoolClass.subject}
+                            </Badge>
+                          ) : null}
                         </div>
                         <p className="mt-2 text-sm text-slate-600">
                           {schoolClass.schoolYear.name}
@@ -607,7 +751,9 @@ export function StudentDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Forms</CardTitle>
-                <CardDescription>Outstanding student paperwork and acknowledgements.</CardDescription>
+                <CardDescription>
+                  Outstanding student paperwork and acknowledgements.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <EmptyState
@@ -615,7 +761,13 @@ export function StudentDashboard() {
                   title="Forms coming soon"
                   description="Student self-service forms are not available in the portal yet. Watch notifications for anything requiring action in the meantime."
                   action={
-                    <Link className={buttonClassName({ size: "sm", variant: "secondary" })} href="/notifications">
+                    <Link
+                      className={buttonClassName({
+                        size: "sm",
+                        variant: "secondary",
+                      })}
+                      href="/notifications"
+                    >
                       Check notifications
                     </Link>
                   }
@@ -626,13 +778,27 @@ export function StudentDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Library loans</CardTitle>
-                <CardDescription>Borrowed items and due dates will surface here when student access is enabled.</CardDescription>
+                <CardDescription>
+                  Browse books and place hold requests from your student library
+                  page.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <EmptyState
                   compact
-                  title="Library coming soon"
-                  description="Library checkout details will appear here once student self-service access is enabled."
+                  title="Open student library"
+                  description="View the catalogue and track your hold requests."
+                  action={
+                    <Link
+                      className={buttonClassName({
+                        size: "sm",
+                        variant: "secondary",
+                      })}
+                      href="/student/library"
+                    >
+                      Open library
+                    </Link>
+                  }
                 />
               </CardContent>
             </Card>

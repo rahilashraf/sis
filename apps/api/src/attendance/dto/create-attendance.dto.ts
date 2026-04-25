@@ -1,16 +1,14 @@
-import { Type } from 'class-transformer';
 import {
-  ArrayNotEmpty,
   IsArray,
   IsDateString,
   IsEnum,
   IsOptional,
   IsString,
-  ValidateNested,
+  ArrayMinSize,
 } from 'class-validator';
 import { AttendanceScopeType, AttendanceStatus } from '@prisma/client';
 
-class CreateAttendanceRecordDto {
+export class CreateAttendanceRecordDto {
   @IsString()
   studentId: string;
 
@@ -37,11 +35,6 @@ export class CreateAttendanceDto {
   @IsDateString()
   date: string;
 
-  @IsArray()
-  @ArrayNotEmpty()
-  @IsString({ each: true })
-  classIds: string[];
-
   @IsOptional()
   @IsEnum(AttendanceScopeType)
   scopeType?: AttendanceScopeType;
@@ -55,8 +48,11 @@ export class CreateAttendanceDto {
   notes?: string;
 
   @IsArray()
-  @ArrayNotEmpty()
-  @ValidateNested({ each: true })
-  @Type(() => CreateAttendanceRecordDto)
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  classIds: string[];
+
+  @IsArray()
+  @ArrayMinSize(1)
   records: CreateAttendanceRecordDto[];
 }

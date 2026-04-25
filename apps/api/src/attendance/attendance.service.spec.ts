@@ -1,5 +1,6 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { AttendanceStatus, UserRole } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 import { AttendanceService } from './attendance.service';
 
 describe('AttendanceService access control', () => {
@@ -7,7 +8,7 @@ describe('AttendanceService access control', () => {
   let prisma: {
     class: { findMany: jest.Mock };
     schoolYear: { findUnique: jest.Mock };
-    teacherClassAssignment: { findMany: jest.Mock };
+    teacherClassAssignment: { findMany: jest.Mock; findFirst: jest.Mock };
     studentParentLink: { findUnique: jest.Mock };
     studentClassEnrollment: { findFirst: jest.Mock; findMany: jest.Mock };
     attendanceSession: {
@@ -24,14 +25,23 @@ describe('AttendanceService access control', () => {
       upsert: jest.Mock;
       update: jest.Mock;
     };
+    attendanceStatusRule: {
+      findMany: jest.Mock;
+    };
+    user: {
+      findUnique: jest.Mock;
+    };
     $transaction: jest.Mock;
+  };
+  let auditService: {
+    log: jest.Mock;
   };
 
   beforeEach(() => {
     prisma = {
       class: { findMany: jest.fn() },
       schoolYear: { findUnique: jest.fn() },
-      teacherClassAssignment: { findMany: jest.fn() },
+      teacherClassAssignment: { findMany: jest.fn(), findFirst: jest.fn() },
       studentParentLink: { findUnique: jest.fn() },
       studentClassEnrollment: { findFirst: jest.fn(), findMany: jest.fn() },
       attendanceSession: {
@@ -48,12 +58,141 @@ describe('AttendanceService access control', () => {
         upsert: jest.fn(),
         update: jest.fn(),
       },
+      attendanceStatusRule: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      user: {
+        findUnique: jest.fn(),
+      },
       $transaction: jest.fn(async (operations: Array<Promise<unknown>>) =>
         Promise.all(operations),
       ),
     };
 
-    service = new AttendanceService(prisma as any);
+    auditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+    };
+
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-1',
+    });
+
+    service = new AttendanceService(
+      prisma as any,
+      auditService as unknown as AuditService,
+    );
+  });
+
+  it('blocks attendance creation when the class does not take attendance', async () => {
+    prisma.class.findMany
+      .mockResolvedValueOnce([
+        {
+          id: 'class-a',
+          schoolId: 'school-1',
+          isActive: true,
+          students: [{ studentId: 'student-1' }],
+          takesAttendance: false,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'class-a',
+          schoolId: 'school-1',
+          isActive: true,
+          students: [{ studentId: 'student-1' }],
+          takesAttendance: false,
+        },
+      ]);
+    prisma.schoolYear.findUnique.mockResolvedValue({
+      id: 'year-1',
+      schoolId: 'school-1',
+    });
+
+    await expect(
+      service.create(
+        {
+          id: 'owner-1',
+          role: UserRole.OWNER,
+          memberships: [],
+        } as never,
+        {
+          schoolId: 'school-1',
+          schoolYearId: 'year-1',
+          date: '2026-04-09',
+          classIds: ['class-a'],
+          records: [
+            {
+              studentId: 'student-1',
+              status: AttendanceStatus.PRESENT,
+            },
+          ],
+        },
+      ),
+    ).rejects.toEqual(
+      new BadRequestException('Attendance is not enabled for this class.'),
+    );
+
+    expect(prisma.attendanceSession.create).not.toHaveBeenCalled();
+    expect(prisma.attendanceRecord.upsert).not.toHaveBeenCalled();
+  });
+
+  it('blocks attendance session updates when the class does not take attendance', async () => {
+    prisma.attendanceSession.findUnique.mockResolvedValue({
+      id: 'session-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+      takenById: 'teacher-1',
+      date: new Date('2026-04-09T00:00:00.000Z'),
+      scopeType: 'CLASS',
+      scopeLabel: null,
+      notes: null,
+      createdAt: new Date('2026-04-09T08:00:00.000Z'),
+      updatedAt: new Date('2026-04-09T08:05:00.000Z'),
+      school: { id: 'school-1', name: 'North School', shortName: 'NS', isActive: true },
+      schoolYear: null,
+      takenBy: null,
+      classes: [
+        {
+          id: 'link-1',
+          attendanceSessionId: 'session-1',
+          classId: 'class-a',
+          createdAt: new Date(),
+          class: { id: 'class-a', name: 'Math' },
+        },
+      ],
+      records: [],
+    });
+    prisma.class.findMany.mockResolvedValue([
+      {
+        id: 'class-a',
+        schoolId: 'school-1',
+        takesAttendance: false,
+      },
+    ]);
+
+    await expect(
+      service.updateSession(
+        {
+          id: 'owner-1',
+          role: UserRole.OWNER,
+          memberships: [],
+        } as never,
+        'session-1',
+        {
+          records: [
+            {
+              studentId: 'student-1',
+              status: AttendanceStatus.LATE,
+            },
+          ],
+        },
+      ),
+    ).rejects.toEqual(
+      new BadRequestException('Attendance is not enabled for this class.'),
+    );
+
+    expect(prisma.attendanceRecord.upsert).not.toHaveBeenCalled();
+    expect(prisma.attendanceSession.update).not.toHaveBeenCalled();
   });
 
   it('updates an existing single-class attendance session when the same class and date is submitted again', async () => {
@@ -62,6 +201,7 @@ describe('AttendanceService access control', () => {
         id: 'class-a',
         schoolId: 'school-1',
         isActive: true,
+        takesAttendance: true,
         students: [{ studentId: 'student-1' }],
       },
     ]);
@@ -143,11 +283,13 @@ describe('AttendanceService access control', () => {
         },
       },
       update: {
+        customStatusId: null,
         status: AttendanceStatus.PRESENT,
         remark: null,
       },
       create: {
         attendanceSessionId: 'session-1',
+        customStatusId: null,
         studentId: 'student-1',
         date: new Date('2026-04-09T00:00:00.000Z'),
         status: AttendanceStatus.PRESENT,
@@ -163,6 +305,7 @@ describe('AttendanceService access control', () => {
         id: 'class-a',
         schoolId: 'school-1',
         isActive: true,
+        takesAttendance: true,
         students: [{ studentId: 'student-1' }],
       },
     ]);
@@ -259,11 +402,13 @@ describe('AttendanceService access control', () => {
         },
       },
       update: {
+        customStatusId: null,
         status: AttendanceStatus.LATE,
         remark: null,
       },
       create: {
         attendanceSessionId: 'session-legacy',
+        customStatusId: null,
         studentId: 'student-1',
         date: new Date('2026-04-09T00:00:00.000Z'),
         status: AttendanceStatus.LATE,
@@ -279,6 +424,7 @@ describe('AttendanceService access control', () => {
         id: 'class-a',
         schoolId: 'school-1',
         isActive: true,
+        takesAttendance: true,
         students: [{ studentId: 'student-1' }],
       },
     ]);
@@ -348,11 +494,13 @@ describe('AttendanceService access control', () => {
         },
       },
       update: {
+        customStatusId: null,
         status: AttendanceStatus.PRESENT,
         remark: null,
       },
       create: {
         attendanceSessionId: 'session-shared',
+        customStatusId: null,
         studentId: 'student-1',
         date: new Date('2026-04-09T00:00:00.000Z'),
         status: AttendanceStatus.PRESENT,
@@ -368,6 +516,7 @@ describe('AttendanceService access control', () => {
         id: 'class-a',
         schoolId: 'school-1',
         isActive: true,
+        takesAttendance: true,
         students: [{ studentId: 'student-1' }],
       },
     ]);
@@ -480,11 +629,13 @@ describe('AttendanceService access control', () => {
         },
       },
       update: {
+        customStatusId: null,
         status: AttendanceStatus.LATE,
         remark: null,
       },
       create: {
         attendanceSessionId: 'session-admin',
+        customStatusId: null,
         studentId: 'student-1',
         date: new Date('2026-04-11T00:00:00.000Z'),
         status: AttendanceStatus.LATE,
@@ -756,11 +907,11 @@ describe('AttendanceService access control', () => {
       id: 'enrollment-1',
     });
     prisma.attendanceRecord.findMany.mockResolvedValue([
-      { status: AttendanceStatus.PRESENT },
-      { status: AttendanceStatus.ABSENT },
-      { status: AttendanceStatus.LATE },
-      { status: AttendanceStatus.EXCUSED },
-      { status: AttendanceStatus.PRESENT },
+      { status: AttendanceStatus.PRESENT, attendanceSession: { schoolId: 'school-1' } },
+      { status: AttendanceStatus.ABSENT, attendanceSession: { schoolId: 'school-1' } },
+      { status: AttendanceStatus.LATE, attendanceSession: { schoolId: 'school-1' } },
+      { status: AttendanceStatus.EXCUSED, attendanceSession: { schoolId: 'school-1' } },
+      { status: AttendanceStatus.PRESENT, attendanceSession: { schoolId: 'school-1' } },
     ]);
 
     const result = await service.getStudentSummary(
@@ -780,6 +931,16 @@ describe('AttendanceService access control', () => {
       },
       select: {
         status: true,
+        customStatus: {
+          select: {
+            behavior: true,
+          },
+        },
+        attendanceSession: {
+          select: {
+            schoolId: true,
+          },
+        },
       },
       orderBy: {
         date: 'asc',
@@ -793,8 +954,7 @@ describe('AttendanceService access control', () => {
       presentCount: 2,
       absentCount: 1,
       lateCount: 1,
-      excusedCount: 1,
-      attendancePercentage: 60,
+      attendancePercentage: 75,
     });
   });
 

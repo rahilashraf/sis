@@ -14,8 +14,17 @@ import { CreateGradeScaleDto } from './dto/create-grade-scale.dto';
 import { CreateGradeScaleRuleDto } from './dto/create-grade-scale-rule.dto';
 import { UpdateGradeScaleDto } from './dto/update-grade-scale.dto';
 import { UpdateGradeScaleRuleDto } from './dto/update-grade-scale-rule.dto';
+import { ApplyGradeScaleMultiSchoolDto } from './dto/apply-grade-scale-multi-school.dto';
 
 type AuthUser = AuthenticatedUser;
+
+type MultiSchoolGradeScaleResult = {
+  schoolId: string;
+  schoolName: string;
+  status: 'created' | 'skipped' | 'failed';
+  gradeScaleId?: string;
+  message: string;
+};
 
 function isOverlap(
   left: { minPercent: number; maxPercent: number },
@@ -225,6 +234,164 @@ export class GradeScalesService {
 
       throw error;
     }
+  }
+
+  async applyAcrossSchools(user: AuthUser, data: ApplyGradeScaleMultiSchoolDto) {
+    this.ensureHighPrivilege(user);
+
+    const targetSchoolIds = Array.from(new Set(data.targetSchoolIds.map((id) => id.trim()))).filter(
+      Boolean,
+    );
+
+    if (targetSchoolIds.length === 0) {
+      throw new BadRequestException('At least one target school is required');
+    }
+
+    const [schools, sourceScale] = await Promise.all([
+      this.prisma.school.findMany({
+        where: {
+          id: {
+            in: targetSchoolIds,
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      }),
+      data.sourceGradeScaleId
+        ? this.prisma.gradeScale.findUnique({
+            where: { id: data.sourceGradeScaleId },
+            include: {
+              rules: {
+                orderBy: [{ sortOrder: 'asc' }, { minPercent: 'asc' }],
+              },
+            },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    if (schools.length !== targetSchoolIds.length) {
+      throw new NotFoundException('One or more target schools were not found');
+    }
+
+    if (data.sourceGradeScaleId && !sourceScale) {
+      throw new NotFoundException('Source grade scale not found');
+    }
+
+    if (sourceScale) {
+      ensureUserHasSchoolAccess(user, sourceScale.schoolId);
+    }
+
+    const requestedName = data.name?.trim() || '';
+    const effectiveName = requestedName || sourceScale?.name || '';
+
+    if (!effectiveName) {
+      throw new BadRequestException('name is required when sourceGradeScaleId is not provided');
+    }
+
+    const shouldCopyRules = data.copyRules ?? true;
+    const results: MultiSchoolGradeScaleResult[] = [];
+
+    for (const school of schools) {
+      ensureUserHasSchoolAccess(user, school.id);
+
+      try {
+        const existing = await this.prisma.gradeScale.findUnique({
+          where: {
+            schoolId_name: {
+              schoolId: school.id,
+              name: effectiveName,
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (existing) {
+          results.push({
+            schoolId: school.id,
+            schoolName: school.name,
+            status: 'skipped',
+            gradeScaleId: existing.id,
+            message: 'Skipped because a scale with this name already exists',
+          });
+          continue;
+        }
+
+        const created = await this.prisma.$transaction(async (tx) => {
+          const next = await tx.gradeScale.create({
+            data: {
+              schoolId: school.id,
+              name: effectiveName,
+              isDefault: data.isDefault ?? false,
+              isActive: true,
+            },
+          });
+
+          if (next.isDefault) {
+            await tx.gradeScale.updateMany({
+              where: {
+                schoolId: school.id,
+                id: { not: next.id },
+                isDefault: true,
+              },
+              data: { isDefault: false },
+            });
+          }
+
+          if (sourceScale && shouldCopyRules && sourceScale.rules.length > 0) {
+            await tx.gradeScaleRule.createMany({
+              data: sourceScale.rules.map((rule) => ({
+                gradeScaleId: next.id,
+                minPercent: rule.minPercent,
+                maxPercent: rule.maxPercent,
+                letterGrade: rule.letterGrade,
+                sortOrder: rule.sortOrder,
+              })),
+            });
+          }
+
+          return next;
+        });
+
+        results.push({
+          schoolId: school.id,
+          schoolName: school.name,
+          status: 'created',
+          gradeScaleId: created.id,
+          message: sourceScale && shouldCopyRules ? 'Created with copied rules' : 'Created',
+        });
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          results.push({
+            schoolId: school.id,
+            schoolName: school.name,
+            status: 'skipped',
+            message: 'Skipped because a duplicate grade scale already exists',
+          });
+          continue;
+        }
+
+        results.push({
+          schoolId: school.id,
+          schoolName: school.name,
+          status: 'failed',
+          message: error instanceof Error ? error.message : 'Failed to apply grade scale',
+        });
+      }
+    }
+
+    return {
+      name: effectiveName,
+      sourceGradeScaleId: sourceScale?.id ?? null,
+      copiedRules: Boolean(sourceScale && shouldCopyRules),
+      createdCount: results.filter((entry) => entry.status === 'created').length,
+      skippedCount: results.filter((entry) => entry.status === 'skipped').length,
+      failedCount: results.filter((entry) => entry.status === 'failed').length,
+      results,
+    };
   }
 
   async update(user: AuthUser, id: string, data: UpdateGradeScaleDto) {

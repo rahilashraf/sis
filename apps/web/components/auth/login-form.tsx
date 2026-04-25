@@ -55,7 +55,6 @@ export function LoginForm() {
 
   return (
     <Card className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/50 md:p-10">
-      
       {/* Logos */}
       <div className="mb-8 mt-2 flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
         <Image
@@ -81,17 +80,18 @@ export function LoginForm() {
       {/* Title */}
       <div className="mb-6 text-center space-y-2">
         <h1 className="text-xl font-semibold tracking-tight text-slate-900">
-          AIOK EduSIS
+          AIOK SIS
         </h1>
-        <p className="text-sm text-slate-600">
-          Sign in to access the system.
-        </p>
+        <p className="text-sm text-slate-600">Sign in to access the system.</p>
       </div>
 
       {/* Form */}
       <form className="space-y-5" onSubmit={handleSubmit}>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-700" htmlFor="username">
+          <label
+            className="text-sm font-medium text-slate-700"
+            htmlFor="username"
+          >
             Username
           </label>
           <Input
@@ -106,7 +106,10 @@ export function LoginForm() {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-700" htmlFor="password">
+          <label
+            className="text-sm font-medium text-slate-700"
+            htmlFor="password"
+          >
             Password
           </label>
           <Input

@@ -3,4 +3,3 @@ import { ReportingPeriodsManagement } from "@/components/admin/reporting-periods
 export default function AdminReportingPeriodsPage() {
   return <ReportingPeriodsManagement />;
 }
-

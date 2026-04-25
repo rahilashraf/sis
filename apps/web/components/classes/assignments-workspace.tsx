@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonClassName } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CheckboxField, Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -22,7 +28,10 @@ import {
   type AssessmentType,
 } from "@/lib/api/assessments";
 import { getClassById, type SchoolClass } from "@/lib/api/classes";
-import { listReportingPeriods, type ReportingPeriod } from "@/lib/api/reporting-periods";
+import {
+  listReportingPeriods,
+  type ReportingPeriod,
+} from "@/lib/api/reporting-periods";
 import {
   createAssessmentCategory,
   getGradebookSettings,
@@ -32,7 +41,11 @@ import {
   type AssessmentCategory,
   type GradebookSettings,
 } from "@/lib/api/gradebook";
-import { formatDateOnly, normalizeDateOnlyPayload, parseDateOnly } from "@/lib/date";
+import {
+  formatDateOnly,
+  normalizeDateOnlyPayload,
+  parseDateOnly,
+} from "@/lib/date";
 
 type Mode = "teacher" | "admin";
 
@@ -84,13 +97,24 @@ function buildEditForm(assessment: Assessment): AssessmentFormState {
   };
 }
 
-export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: string }) {
+export function AssignmentsWorkspace({
+  mode,
+  classId,
+}: {
+  mode: Mode;
+  classId: string;
+}) {
   const [schoolClass, setSchoolClass] = useState<SchoolClass | null>(null);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [assessmentTypes, setAssessmentTypes] = useState<AssessmentType[]>([]);
-  const [reportingPeriods, setReportingPeriods] = useState<ReportingPeriod[]>([]);
-  const [formState, setFormState] = useState<AssessmentFormState>(() => buildDefaultForm([]));
-  const [gradebookSettings, setGradebookSettings] = useState<GradebookSettings | null>(null);
+  const [reportingPeriods, setReportingPeriods] = useState<ReportingPeriod[]>(
+    [],
+  );
+  const [formState, setFormState] = useState<AssessmentFormState>(() =>
+    buildDefaultForm([]),
+  );
+  const [gradebookSettings, setGradebookSettings] =
+    useState<GradebookSettings | null>(null);
   const [categories, setCategories] = useState<AssessmentCategory[]>([]);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [categoryError, setCategoryError] = useState<string | null>(null);
@@ -120,15 +144,19 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
       reportingPeriods.find((period) => {
         const startsAt = parseDateOnly(period.startsAt);
         const endsAt = parseDateOnly(period.endsAt);
-        return Boolean(startsAt && endsAt && startsAt <= dueDate && dueDate <= endsAt);
+        return Boolean(
+          startsAt && endsAt && startsAt <= dueDate && dueDate <= endsAt,
+        );
       }) ?? null
     );
   }, [formState.dueDate, reportingPeriods]);
 
   const isFormLocked = selectedFormReportingPeriod?.isLocked ?? false;
-  const isEditingArchived = formState.mode === "edit" && Boolean(formState.assessmentId)
-    ? assessments.find((entry) => entry.id === formState.assessmentId)?.isActive === false
-    : false;
+  const isEditingArchived =
+    formState.mode === "edit" && Boolean(formState.assessmentId)
+      ? assessments.find((entry) => entry.id === formState.assessmentId)
+          ?.isActive === false
+      : false;
 
   const weightingMode: GradebookSettings["weightingMode"] =
     gradebookSettings?.weightingMode ?? "UNWEIGHTED";
@@ -152,7 +180,9 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
       return [];
     }
 
-    return assessments.filter((assessment) => assessment.isActive && !assessment.categoryId);
+    return assessments.filter(
+      (assessment) => assessment.isActive && !assessment.categoryId,
+    );
   }, [assessments, isCategoryWeighted]);
 
   const activeAssessmentWeightTotal = useMemo(
@@ -172,16 +202,19 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
     [activeCategories],
   );
 
-  const isAssessmentWeightTotalValid = Math.abs(activeAssessmentWeightTotal - 100) < 0.001;
-  const isCategoryWeightTotalValid = Math.abs(activeCategoryWeightTotal - 100) < 0.001;
+  const isAssessmentWeightTotalValid =
+    Math.abs(activeAssessmentWeightTotal - 100) < 0.001;
+  const isCategoryWeightTotalValid =
+    Math.abs(activeCategoryWeightTotal - 100) < 0.001;
 
   async function refresh() {
-    const [classResult, settingsResult, categoriesResult, assessmentsResult] = await Promise.allSettled([
-      getClassById(classId),
-      getGradebookSettings(classId),
-      listAssessmentCategories(classId, { includeInactive: true }),
-      listAssessments(classId, { includeInactive }),
-    ]);
+    const [classResult, settingsResult, categoriesResult, assessmentsResult] =
+      await Promise.allSettled([
+        getClassById(classId),
+        getGradebookSettings(classId),
+        listAssessmentCategories(classId, { includeInactive: true }),
+        listAssessments(classId, { includeInactive }),
+      ]);
 
     if (classResult.status === "fulfilled") {
       setSchoolClass(classResult.value);
@@ -220,9 +253,18 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
         const classResponse = await getClassById(classId);
         setSchoolClass(classResponse);
 
-        const [typesResponse, periodsResponse, settingsResponse, categoriesResponse, assessmentsResponse] = await Promise.all([
+        const [
+          typesResponse,
+          periodsResponse,
+          settingsResponse,
+          categoriesResponse,
+          assessmentsResponse,
+        ] = await Promise.all([
           listAssessmentTypes({ schoolId: classResponse.schoolId }),
-          listReportingPeriods({ schoolId: classResponse.schoolId, schoolYearId: classResponse.schoolYearId }),
+          listReportingPeriods({
+            schoolId: classResponse.schoolId,
+            schoolYearId: classResponse.schoolYearId,
+          }),
           getGradebookSettings(classId),
           listAssessmentCategories(classId, { includeInactive: true }),
           listAssessments(classId, { includeInactive }),
@@ -233,9 +275,15 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
         setGradebookSettings(settingsResponse);
         setCategories(categoriesResponse);
         setAssessments(assessmentsResponse);
-        setFormState((current) => (current.mode === "edit" ? current : buildDefaultForm(typesResponse)));
+        setFormState((current) =>
+          current.mode === "edit" ? current : buildDefaultForm(typesResponse),
+        );
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load assignments.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load assignments.",
+        );
         setAssessmentTypes([]);
         setReportingPeriods([]);
         setGradebookSettings(null);
@@ -250,7 +298,9 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
     void load();
   }, [classId, includeInactive]);
 
-  async function handleUpdateWeightingMode(nextMode: GradebookSettings["weightingMode"]) {
+  async function handleUpdateWeightingMode(
+    nextMode: GradebookSettings["weightingMode"],
+  ) {
     if (!gradebookSettings) {
       return;
     }
@@ -260,9 +310,13 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
     setSuccessMessage(null);
 
     try {
-      const response = await updateGradebookSettings(classId, { weightingMode: nextMode });
+      const response = await updateGradebookSettings(classId, {
+        weightingMode: nextMode,
+      });
       setGradebookSettings((current) =>
-        current ? { ...current, weightingMode: response.weightingMode } : current,
+        current
+          ? { ...current, weightingMode: response.weightingMode }
+          : current,
       );
       setSuccessMessage("Gradebook settings updated.");
       await refresh();
@@ -295,15 +349,22 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
         throw new Error("Category percent must be a positive number.");
       }
 
-      await createAssessmentCategory(classId, { name, weight: weight ?? undefined });
-      const refreshed = await listAssessmentCategories(classId, { includeInactive: true });
+      await createAssessmentCategory(classId, {
+        name,
+        weight: weight ?? undefined,
+      });
+      const refreshed = await listAssessmentCategories(classId, {
+        includeInactive: true,
+      });
       setCategories(refreshed);
       setNewCategoryName("");
       setNewCategoryWeight("100");
       setCategorySuccess("Category created.");
     } catch (createError) {
       setCategoryError(
-        createError instanceof Error ? createError.message : "Unable to create category.",
+        createError instanceof Error
+          ? createError.message
+          : "Unable to create category.",
       );
     }
   }
@@ -317,12 +378,16 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
 
     try {
       await updateAssessmentCategory(categoryId, input);
-      const refreshed = await listAssessmentCategories(classId, { includeInactive: true });
+      const refreshed = await listAssessmentCategories(classId, {
+        includeInactive: true,
+      });
       setCategories(refreshed);
       setCategorySuccess("Category updated.");
     } catch (updateError) {
       setCategoryError(
-        updateError instanceof Error ? updateError.message : "Unable to update category.",
+        updateError instanceof Error
+          ? updateError.message
+          : "Unable to update category.",
       );
     }
   }
@@ -397,7 +462,11 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
       await refresh();
       setFormState(buildDefaultForm(assessmentTypes));
     } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : "Unable to save assessment.");
+      setError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : "Unable to save assessment.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -409,11 +478,21 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
     setSuccessMessage(null);
 
     try {
-      await updateAssessment(assessment.id, { isPublishedToParents: !assessment.isPublishedToParents });
+      await updateAssessment(assessment.id, {
+        isPublishedToParents: !assessment.isPublishedToParents,
+      });
       await refresh();
-      setSuccessMessage(assessment.isPublishedToParents ? "Hidden from parents." : "Published to parents.");
+      setSuccessMessage(
+        assessment.isPublishedToParents
+          ? "Hidden from parents."
+          : "Published to parents.",
+      );
     } catch (toggleError) {
-      setError(toggleError instanceof Error ? toggleError.message : "Unable to update publish status.");
+      setError(
+        toggleError instanceof Error
+          ? toggleError.message
+          : "Unable to update publish status.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -434,7 +513,11 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
       }
       await refresh();
     } catch (toggleError) {
-      setError(toggleError instanceof Error ? toggleError.message : "Unable to update assessment status.");
+      setError(
+        toggleError instanceof Error
+          ? toggleError.message
+          : "Unable to update assessment status.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -454,13 +537,19 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
     <div className="space-y-6">
       <PageHeader
         title="Assignments"
-        description={schoolClass ? `${schoolClass.name} • Manage assessments` : "Manage class assessments"}
+        description={
+          schoolClass
+            ? `${schoolClass.name} • Manage assessments`
+            : "Manage class assessments"
+        }
         meta={
           <>
             <Badge variant="neutral">{assessments.length} items</Badge>
             <Badge variant="neutral">Method: {weightingModeLabel}</Badge>
             {activeAssessmentsMissingCategory.length > 0 ? (
-              <Badge variant="warning">{activeAssessmentsMissingCategory.length} uncategorized</Badge>
+              <Badge variant="warning">
+                {activeAssessmentsMissingCategory.length} uncategorized
+              </Badge>
             ) : null}
           </>
         }
@@ -469,7 +558,9 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
             <Button
               onClick={() => {
                 setIsCreateFormOpen(true);
-                document.getElementById("assessment-form-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                document
+                  .getElementById("assessment-form-card")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
               }}
               type="button"
               variant="secondary"
@@ -484,7 +575,11 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
             </Link>
             <Link
               className={buttonClassName({ variant: "secondary" })}
-              href={mode === "admin" ? `/admin/classes/${classId}/summary` : `/teacher/classes/${classId}`}
+              href={
+                mode === "admin"
+                  ? `/admin/classes/${classId}/summary`
+                  : `/teacher/classes/${classId}`
+              }
             >
               Class summary
             </Link>
@@ -496,7 +591,9 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
       {settingsError ? <Notice tone="danger">{settingsError}</Notice> : null}
       {categoryError ? <Notice tone="danger">{categoryError}</Notice> : null}
       {successMessage ? <Notice tone="success">{successMessage}</Notice> : null}
-      {categorySuccess ? <Notice tone="success">{categorySuccess}</Notice> : null}
+      {categorySuccess ? (
+        <Notice tone="success">{categorySuccess}</Notice>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -521,20 +618,27 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
                   onClick={() => {
                     setFormState(buildEditForm(assessment));
                     setIsCreateFormOpen(true);
-                    document.getElementById("assessment-form-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    document
+                      .getElementById("assessment-form-card")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
                   }}
                   type="button"
                 >
-                  <span className="font-medium text-slate-900">{assessment.title}</span>
+                  <span className="font-medium text-slate-900">
+                    {assessment.title}
+                  </span>
                   <span className="text-xs text-slate-500">
                     Max {assessment.maxScore}
-                    {assessment.dueAt ? ` • ${formatDateOnly(assessment.dueAt)}` : ""}
+                    {assessment.dueAt
+                      ? ` • ${formatDateOnly(assessment.dueAt)}`
+                      : ""}
                   </span>
                 </button>
               ))}
               {assessments.length > 6 ? (
                 <p className="text-xs text-slate-500">
-                  Showing 6 of {assessments.length} assessments. Full list appears below.
+                  Showing 6 of {assessments.length} assessments. Full list
+                  appears below.
                 </p>
               ) : null}
             </div>
@@ -546,7 +650,8 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
         <CardHeader>
           <CardTitle>Gradebook setup</CardTitle>
           <CardDescription>
-            Setup controls are separate from daily grading. Choose a calculation method, then manage categories if needed.
+            Setup controls are separate from daily grading. Choose a calculation
+            method, then manage categories if needed.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
@@ -555,23 +660,43 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
               disabled={!gradebookSettings || isSavingSettings}
               id="gradebook-weighting-mode"
               onChange={(event) =>
-                void handleUpdateWeightingMode(event.target.value as GradebookSettings["weightingMode"])
+                void handleUpdateWeightingMode(
+                  event.target.value as GradebookSettings["weightingMode"],
+                )
               }
               value={weightingMode}
             >
-              <option value="UNWEIGHTED">{CALCULATION_METHOD_LABELS.UNWEIGHTED}</option>
-              <option value="ASSESSMENT_WEIGHTED">{CALCULATION_METHOD_LABELS.ASSESSMENT_WEIGHTED}</option>
-              <option value="CATEGORY_WEIGHTED">{CALCULATION_METHOD_LABELS.CATEGORY_WEIGHTED}</option>
+              <option value="UNWEIGHTED">
+                {CALCULATION_METHOD_LABELS.UNWEIGHTED}
+              </option>
+              <option value="ASSESSMENT_WEIGHTED">
+                {CALCULATION_METHOD_LABELS.ASSESSMENT_WEIGHTED}
+              </option>
+              <option value="CATEGORY_WEIGHTED">
+                {CALCULATION_METHOD_LABELS.CATEGORY_WEIGHTED}
+              </option>
             </Select>
           </Field>
           <div className="md:col-span-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
             <p className="font-semibold text-slate-900">Notes</p>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-600">
-              <li>{CALCULATION_METHOD_LABELS.UNWEIGHTED}: all assessments count equally.</li>
-              <li>{CALCULATION_METHOD_LABELS.ASSESSMENT_WEIGHTED}: assessment weights are entered as percent of final grade.</li>
-              <li>{CALCULATION_METHOD_LABELS.CATEGORY_WEIGHTED}: category weights are entered as percent of final grade.</li>
+              <li>
+                {CALCULATION_METHOD_LABELS.UNWEIGHTED}: all assessments count
+                equally.
+              </li>
+              <li>
+                {CALCULATION_METHOD_LABELS.ASSESSMENT_WEIGHTED}: assessment
+                weights are entered as percent of final grade.
+              </li>
+              <li>
+                {CALCULATION_METHOD_LABELS.CATEGORY_WEIGHTED}: category weights
+                are entered as percent of final grade.
+              </li>
               {isCategoryWeighted ? (
-                <li>In weighted by category mode, assessments within a category count equally.</li>
+                <li>
+                  In weighted by category mode, assessments within a category
+                  count equally.
+                </li>
               ) : null}
             </ul>
           </div>
@@ -580,14 +705,16 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
 
       {isAssessmentWeighted ? (
         <Notice tone={isAssessmentWeightTotalValid ? "info" : "warning"}>
-          Assessment weight total: <strong>{activeAssessmentWeightTotal.toFixed(1)}%</strong>
+          Assessment weight total:{" "}
+          <strong>{activeAssessmentWeightTotal.toFixed(1)}%</strong>
           {isAssessmentWeightTotalValid ? " (ready)" : " (target: 100%)."}
         </Notice>
       ) : null}
 
       {isCategoryWeighted ? (
         <Notice tone={isCategoryWeightTotalValid ? "info" : "warning"}>
-          Category weight total: <strong>{activeCategoryWeightTotal.toFixed(1)}%</strong>
+          Category weight total:{" "}
+          <strong>{activeCategoryWeightTotal.toFixed(1)}%</strong>
           {isCategoryWeightTotalValid ? " (ready)" : " (target: 100%)."}
         </Notice>
       ) : null}
@@ -602,7 +729,10 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form className="grid gap-3 md:grid-cols-3" onSubmit={handleCreateCategory}>
+          <form
+            className="grid gap-3 md:grid-cols-3"
+            onSubmit={handleCreateCategory}
+          >
             <Field htmlFor="new-category-name" label="Name">
               <Input
                 id="new-category-name"
@@ -610,7 +740,10 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
                 value={newCategoryName}
               />
             </Field>
-            <Field htmlFor="new-category-weight" label="Percent of final grade (%)">
+            <Field
+              htmlFor="new-category-weight"
+              label="Percent of final grade (%)"
+            >
               <Input
                 disabled={!isCategoryWeighted}
                 id="new-category-weight"
@@ -638,22 +771,34 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Category</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Percent of final grade</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Active</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Category
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Percent of final grade
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Active
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {categories.map((category) => (
                       <tr className="align-top" key={category.id}>
-                        <td className="px-4 py-3 text-slate-900">{category.name}</td>
+                        <td className="px-4 py-3 text-slate-900">
+                          {category.name}
+                        </td>
                         <td className="px-4 py-3">
                           <Input
                             aria-label={`Weight for ${category.name}`}
                             className="h-9 w-28 rounded-lg px-2 text-right tabular-nums"
                             disabled={!isCategoryWeighted}
                             key={`${category.id}:${category.updatedAt}`}
-                            defaultValue={category.weight === null ? "" : String(category.weight)}
+                            defaultValue={
+                              category.weight === null
+                                ? ""
+                                : String(category.weight)
+                            }
                             inputMode="decimal"
                             onBlur={(event) => {
                               if (!isCategoryWeighted) {
@@ -661,15 +806,21 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
                               }
                               const raw = event.target.value.trim();
                               if (!raw) {
-                                void handleUpdateCategory(category.id, { weight: null });
+                                void handleUpdateCategory(category.id, {
+                                  weight: null,
+                                });
                                 return;
                               }
                               const parsed = Number(raw);
                               if (!Number.isFinite(parsed) || parsed <= 0) {
-                                setCategoryError("Category percent must be a positive number.");
+                                setCategoryError(
+                                  "Category percent must be a positive number.",
+                                );
                                 return;
                               }
-                              void handleUpdateCategory(category.id, { weight: parsed });
+                              void handleUpdateCategory(category.id, {
+                                weight: parsed,
+                              });
                             }}
                           />
                         </td>
@@ -677,7 +828,9 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
                           <Select
                             aria-label={`Active status for ${category.name}`}
                             onChange={(event) =>
-                              void handleUpdateCategory(category.id, { isActive: event.target.value === "true" })
+                              void handleUpdateCategory(category.id, {
+                                isActive: event.target.value === "true",
+                              })
                             }
                             value={category.isActive ? "true" : "false"}
                           >
@@ -693,17 +846,24 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
             </div>
           )}
 
-          {weightingMode === "CATEGORY_WEIGHTED" && activeCategories.length === 0 ? (
-            <Notice tone="warning">At least one active category is required for category weighting.</Notice>
-          ) : null}
-          {weightingMode === "CATEGORY_WEIGHTED" && activeAssessmentsMissingCategory.length > 0 ? (
+          {weightingMode === "CATEGORY_WEIGHTED" &&
+          activeCategories.length === 0 ? (
             <Notice tone="warning">
-              {activeAssessmentsMissingCategory.length} active assessment(s) are missing a category. Edit them below before enabling category weighting.
+              At least one active category is required for category weighting.
+            </Notice>
+          ) : null}
+          {weightingMode === "CATEGORY_WEIGHTED" &&
+          activeAssessmentsMissingCategory.length > 0 ? (
+            <Notice tone="warning">
+              {activeAssessmentsMissingCategory.length} active assessment(s) are
+              missing a category. Edit them below before enabling category
+              weighting.
             </Notice>
           ) : null}
           {!isCategoryWeighted ? (
             <Notice tone="info">
-              Category weights are ignored unless calculation method is <strong>Weighted by category</strong>.
+              Category weights are ignored unless calculation method is{" "}
+              <strong>Weighted by category</strong>.
             </Notice>
           ) : null}
         </CardContent>
@@ -712,9 +872,14 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
       <Card id="assessment-form-card">
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
-            <CardTitle>{formState.mode === "create" ? "Add assessment" : "Edit assessment"}</CardTitle>
+            <CardTitle>
+              {formState.mode === "create"
+                ? "Add assessment"
+                : "Edit assessment"}
+            </CardTitle>
             <CardDescription>
-              Reporting period is assigned automatically from the selected due date.
+              Reporting period is assigned automatically from the selected due
+              date.
             </CardDescription>
           </div>
           <Button
@@ -726,133 +891,193 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
           </Button>
         </CardHeader>
         {isCreateFormOpen ? (
-        <CardContent>
-          {isEditingArchived ? (
-            <Notice tone="warning">This assessment is archived. Activate it before editing.</Notice>
-          ) : null}
-          {isFormLocked ? (
-            <Notice tone="warning">Selected reporting period is locked. Editing is read-only.</Notice>
-          ) : null}
-          {dueDateHasNoMatchingReportingPeriod ? (
-            <Notice tone="danger">No reporting period matches the selected due date.</Notice>
-          ) : null}
+          <CardContent>
+            {isEditingArchived ? (
+              <Notice tone="warning">
+                This assessment is archived. Activate it before editing.
+              </Notice>
+            ) : null}
+            {isFormLocked ? (
+              <Notice tone="warning">
+                Selected reporting period is locked. Editing is read-only.
+              </Notice>
+            ) : null}
+            {dueDateHasNoMatchingReportingPeriod ? (
+              <Notice tone="danger">
+                No reporting period matches the selected due date.
+              </Notice>
+            ) : null}
 
-          <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
-            <Field htmlFor="assessment-title" label="Title">
-              <Input
-                id="assessment-title"
-                onChange={(event) => setFormState((current) => ({ ...current, title: event.target.value }))}
-                required
-                value={formState.title}
-              />
-            </Field>
-
-            <Field htmlFor="assessment-type" label="Type">
-              <Select
-                id="assessment-type"
-                onChange={(event) => setFormState((current) => ({ ...current, assessmentTypeId: event.target.value }))}
-                value={formState.assessmentTypeId}
-              >
-                {assessmentTypes.map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-
-            <Field htmlFor="assessment-category" label="Category">
-              <Select
-                disabled={isFormLocked || isEditingArchived || categories.length === 0}
-                id="assessment-category"
-                onChange={(event) => setFormState((current) => ({ ...current, categoryId: event.target.value }))}
-                value={formState.categoryId}
-              >
-                <option value="">
-                  {weightingMode === "CATEGORY_WEIGHTED" ? "Select category" : "No category"}
-                </option>
-                {activeCategories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-
-            <Field htmlFor="assessment-due" label="Due date">
-              <Input
-                id="assessment-due"
-                onChange={(event) => setFormState((current) => ({ ...current, dueDate: event.target.value }))}
-                type="date"
-                value={formState.dueDate}
-              />
-            </Field>
-
-            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 md:col-span-2">
-              <p>Reporting period is assigned automatically from the selected date.</p>
-              <p className="mt-1 font-medium text-slate-700">
-                {formState.dueDate
-                  ? selectedFormReportingPeriod
-                    ? `Matched reporting period: ${selectedFormReportingPeriod.order}. ${selectedFormReportingPeriod.name}${selectedFormReportingPeriod.isLocked ? " (Locked)" : ""}`
-                    : "No matching reporting period for this date."
-                  : "Select a due date to preview reporting period assignment."}
-              </p>
-            </div>
-
-            <Field htmlFor="assessment-max" label="Max score">
-              <Input
-                id="assessment-max"
-                inputMode="decimal"
-                onChange={(event) => setFormState((current) => ({ ...current, maxScore: event.target.value }))}
-                type="number"
-                value={formState.maxScore}
-              />
-            </Field>
-
-            {isAssessmentWeighted ? (
-              <Field htmlFor="assessment-weight" label="Percent of final grade (%)">
+            <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
+              <Field htmlFor="assessment-title" label="Title">
                 <Input
-                  id="assessment-weight"
-                  inputMode="decimal"
-                  onChange={(event) => setFormState((current) => ({ ...current, weight: event.target.value }))}
-                  type="number"
-                  value={formState.weight}
+                  id="assessment-title"
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      title: event.target.value,
+                    }))
+                  }
+                  required
+                  value={formState.title}
                 />
               </Field>
-            ) : (
-              <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-                {isCategoryWeighted
-                  ? "Assessment weight is disabled in weighted by category mode."
-                  : "Weight input is hidden in equal weighting mode."}
-              </div>
-            )}
 
-            <div className="md:col-span-2">
-              <CheckboxField
-                checked={formState.isPublishedToParents}
-                description="When enabled, this assessment is visible in the parent portal."
-                label="Published to parents"
-                onChange={(event) => setFormState((current) => ({ ...current, isPublishedToParents: event.target.checked }))}
-              />
-            </div>
-
-            <div className="md:col-span-2 flex flex-wrap justify-end gap-2">
-              {formState.mode === "edit" ? (
-                <Button
-                  disabled={isSubmitting}
-                  onClick={() => setFormState(buildDefaultForm(assessmentTypes))}
-                  type="button"
-                  variant="secondary"
+              <Field htmlFor="assessment-type" label="Type">
+                <Select
+                  id="assessment-type"
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      assessmentTypeId: event.target.value,
+                    }))
+                  }
+                  value={formState.assessmentTypeId}
                 >
-                  New assessment
+                  {assessmentTypes.map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
+              <Field htmlFor="assessment-category" label="Category">
+                <Select
+                  disabled={
+                    isFormLocked || isEditingArchived || categories.length === 0
+                  }
+                  id="assessment-category"
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      categoryId: event.target.value,
+                    }))
+                  }
+                  value={formState.categoryId}
+                >
+                  <option value="">
+                    {weightingMode === "CATEGORY_WEIGHTED"
+                      ? "Select category"
+                      : "No category"}
+                  </option>
+                  {activeCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
+              <Field htmlFor="assessment-due" label="Due date">
+                <Input
+                  id="assessment-due"
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      dueDate: event.target.value,
+                    }))
+                  }
+                  type="date"
+                  value={formState.dueDate}
+                />
+              </Field>
+
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 md:col-span-2">
+                <p>
+                  Reporting period is assigned automatically from the selected
+                  date.
+                </p>
+                <p className="mt-1 font-medium text-slate-700">
+                  {formState.dueDate
+                    ? selectedFormReportingPeriod
+                      ? `Matched reporting period: ${selectedFormReportingPeriod.order}. ${selectedFormReportingPeriod.name}${selectedFormReportingPeriod.isLocked ? " (Locked)" : ""}`
+                      : "No matching reporting period for this date."
+                    : "Select a due date to preview reporting period assignment."}
+                </p>
+              </div>
+
+              <Field htmlFor="assessment-max" label="Max score">
+                <Input
+                  id="assessment-max"
+                  inputMode="decimal"
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      maxScore: event.target.value,
+                    }))
+                  }
+                  type="number"
+                  value={formState.maxScore}
+                />
+              </Field>
+
+              {isAssessmentWeighted ? (
+                <Field
+                  htmlFor="assessment-weight"
+                  label="Percent of final grade (%)"
+                >
+                  <Input
+                    id="assessment-weight"
+                    inputMode="decimal"
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        weight: event.target.value,
+                      }))
+                    }
+                    type="number"
+                    value={formState.weight}
+                  />
+                </Field>
+              ) : (
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                  {isCategoryWeighted
+                    ? "Assessment weight is disabled in weighted by category mode."
+                    : "Weight input is hidden in equal weighting mode."}
+                </div>
+              )}
+
+              <div className="md:col-span-2">
+                <CheckboxField
+                  checked={formState.isPublishedToParents}
+                  description="When enabled, this assessment is visible in the parent portal."
+                  label="Published to parents"
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      isPublishedToParents: event.target.checked,
+                    }))
+                  }
+                />
+              </div>
+
+              <div className="md:col-span-2 flex flex-wrap justify-end gap-2">
+                {formState.mode === "edit" ? (
+                  <Button
+                    disabled={isSubmitting}
+                    onClick={() =>
+                      setFormState(buildDefaultForm(assessmentTypes))
+                    }
+                    type="button"
+                    variant="secondary"
+                  >
+                    New assessment
+                  </Button>
+                ) : null}
+                <Button
+                  disabled={isSubmitting || isFormLocked || isEditingArchived}
+                  type="submit"
+                >
+                  {isSubmitting
+                    ? "Saving..."
+                    : formState.mode === "create"
+                      ? "Create"
+                      : "Save"}
                 </Button>
-              ) : null}
-              <Button disabled={isSubmitting || isFormLocked || isEditingArchived} type="submit">
-                {isSubmitting ? "Saving..." : formState.mode === "create" ? "Create" : "Save"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
+              </div>
+            </form>
+          </CardContent>
         ) : null}
       </Card>
 
@@ -860,7 +1085,9 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
         <CardHeader className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <CardTitle>Assessment List</CardTitle>
-            <CardDescription>Compact list of active and archived assessments.</CardDescription>
+            <CardDescription>
+              Compact list of active and archived assessments.
+            </CardDescription>
           </div>
           <label className="flex items-center gap-2 text-sm text-slate-600">
             <input
@@ -883,62 +1110,111 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Title</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Type</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Reporting period</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Category</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Due</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Max</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Weight %</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Parents</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Title
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Type
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Reporting period
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Category
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Due
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Max
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Weight %
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Parents
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {assessments.map((assessment) => (
-                      <tr className="align-top hover:bg-slate-50" key={assessment.id}>
+                      <tr
+                        className="align-top hover:bg-slate-50"
+                        key={assessment.id}
+                      >
                         <td className="px-4 py-3">
                           <button
                             className="text-left font-medium text-slate-900 hover:underline"
-                            onClick={() => setFormState(buildEditForm(assessment))}
+                            onClick={() =>
+                              setFormState(buildEditForm(assessment))
+                            }
                             type="button"
                           >
                             {assessment.title}
                           </button>
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{assessment.assessmentType.name}</td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {assessment.assessmentType.name}
+                        </td>
                         <td className="px-4 py-3 text-slate-600">
                           {assessment.reportingPeriodId
                             ? (() => {
-                                const period = reportingPeriods.find((p) => p.id === assessment.reportingPeriodId);
-                                return period ? `${period.order}. ${period.name}${period.isLocked ? " (Locked)" : ""}` : "—";
+                                const period = reportingPeriods.find(
+                                  (p) => p.id === assessment.reportingPeriodId,
+                                );
+                                return period
+                                  ? `${period.order}. ${period.name}${period.isLocked ? " (Locked)" : ""}`
+                                  : "—";
                               })()
                             : "Unassigned"}
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           {assessment.categoryId
-                            ? categoryById.get(assessment.categoryId)?.name ?? "—"
+                            ? (categoryById.get(assessment.categoryId)?.name ??
+                              "—")
                             : weightingMode === "CATEGORY_WEIGHTED"
                               ? "Required"
                               : "—"}
                         </td>
                         <td className="px-4 py-3 text-slate-600">
-                          {assessment.dueAt ? formatDateOnly(assessment.dueAt) : "—"}
+                          {assessment.dueAt
+                            ? formatDateOnly(assessment.dueAt)
+                            : "—"}
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{assessment.maxScore}</td>
                         <td className="px-4 py-3 text-slate-600">
-                          {assessment.weight === null || assessment.weight === undefined
+                          {assessment.maxScore}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {assessment.weight === null ||
+                          assessment.weight === undefined
                             ? "—"
                             : `${assessment.weight}%`}
                         </td>
                         <td className="px-4 py-3">
-                          <Badge variant={assessment.isPublishedToParents ? "success" : "neutral"}>
-                            {assessment.isPublishedToParents ? "Visible" : "Hidden"}
+                          <Badge
+                            variant={
+                              assessment.isPublishedToParents
+                                ? "success"
+                                : "neutral"
+                            }
+                          >
+                            {assessment.isPublishedToParents
+                              ? "Visible"
+                              : "Hidden"}
                           </Badge>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge variant={assessment.isActive ? "success" : "neutral"}>
+                          <Badge
+                            variant={
+                              assessment.isActive ? "success" : "neutral"
+                            }
+                          >
                             {assessment.isActive ? "Active" : "Archived"}
                           </Badge>
                         </td>
@@ -946,7 +1222,9 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
                           <div className="flex flex-wrap gap-2">
                             <Button
                               disabled={isSubmitting}
-                              onClick={() => setFormState(buildEditForm(assessment))}
+                              onClick={() =>
+                                setFormState(buildEditForm(assessment))
+                              }
                               size="sm"
                               type="button"
                               variant="secondary"
@@ -955,19 +1233,27 @@ export function AssignmentsWorkspace({ mode, classId }: { mode: Mode; classId: s
                             </Button>
                             <Button
                               disabled={isSubmitting || !assessment.isActive}
-                              onClick={() => void handleTogglePublish(assessment)}
+                              onClick={() =>
+                                void handleTogglePublish(assessment)
+                              }
                               size="sm"
                               type="button"
                               variant="ghost"
                             >
-                              {assessment.isPublishedToParents ? "Unpublish" : "Publish"}
+                              {assessment.isPublishedToParents
+                                ? "Unpublish"
+                                : "Publish"}
                             </Button>
                             <Button
                               disabled={isSubmitting}
-                              onClick={() => void handleArchiveToggle(assessment)}
+                              onClick={() =>
+                                void handleArchiveToggle(assessment)
+                              }
                               size="sm"
                               type="button"
-                              variant={assessment.isActive ? "danger" : "secondary"}
+                              variant={
+                                assessment.isActive ? "danger" : "secondary"
+                              }
                             >
                               {assessment.isActive ? "Archive" : "Activate"}
                             </Button>

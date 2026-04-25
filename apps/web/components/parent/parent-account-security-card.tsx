@@ -45,7 +45,8 @@ export function ParentAccountSecurityCard() {
       <CardHeader>
         <CardTitle>Security overview</CardTitle>
         <CardDescription>
-          Basic account identity and security visibility for this parent account.
+          Basic account identity and security visibility for this parent
+          account.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -104,7 +105,9 @@ export function ParentAccountSecurityCard() {
 
             <div className="grid gap-2 text-xs text-slate-600 md:grid-cols-2">
               <p>Account created: {formatDateTimeLabel(security.createdAt)}</p>
-              <p>Last profile update: {formatDateTimeLabel(security.updatedAt)}</p>
+              <p>
+                Last profile update: {formatDateTimeLabel(security.updatedAt)}
+              </p>
             </div>
           </div>
         ) : (

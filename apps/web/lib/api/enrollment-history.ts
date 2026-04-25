@@ -93,7 +93,9 @@ function normalizeEnrollmentHistoryRecord(
 export function getEnrollmentHistory(studentId: string) {
   return apiFetch<RawEnrollmentHistoryRecord | null>(
     `/enrollment-history/students/${studentId}`,
-  ).then((record) => (record ? normalizeEnrollmentHistoryRecord(record) : null));
+  ).then((record) =>
+    record ? normalizeEnrollmentHistoryRecord(record) : null,
+  );
 }
 
 export function createEnrollmentHistory(
@@ -107,7 +109,8 @@ export function createEnrollmentHistory(
       json: {
         ...input,
         dateOfEnrollment: normalizeDateOnlyPayload(input.dateOfEnrollment),
-        dateOfDeparture: normalizeDateOnlyPayload(input.dateOfDeparture) || null,
+        dateOfDeparture:
+          normalizeDateOnlyPayload(input.dateOfDeparture) || null,
       },
     },
   ).then(normalizeEnrollmentHistoryRecord);
@@ -124,10 +127,17 @@ export function updateEnrollmentHistory(
       json: {
         ...input,
         ...(input.dateOfEnrollment !== undefined
-          ? { dateOfEnrollment: normalizeDateOnlyPayload(input.dateOfEnrollment) }
+          ? {
+              dateOfEnrollment: normalizeDateOnlyPayload(
+                input.dateOfEnrollment,
+              ),
+            }
           : {}),
         ...(input.dateOfDeparture !== undefined
-          ? { dateOfDeparture: normalizeDateOnlyPayload(input.dateOfDeparture) || null }
+          ? {
+              dateOfDeparture:
+                normalizeDateOnlyPayload(input.dateOfDeparture) || null,
+            }
           : {}),
       },
     },
@@ -147,7 +157,9 @@ export function replaceEnrollmentSubjects(
   ).then(normalizeEnrollmentHistoryRecord);
 }
 
-export function listEnrollmentSubjectOptions(options?: { includeInactive?: boolean }) {
+export function listEnrollmentSubjectOptions(options?: {
+  includeInactive?: boolean;
+}) {
   const params = new URLSearchParams();
 
   if (options?.includeInactive) {
@@ -162,20 +174,26 @@ export function listEnrollmentSubjectOptions(options?: { includeInactive?: boole
 export function createEnrollmentSubjectOption(
   input: CreateEnrollmentSubjectOptionInput,
 ) {
-  return apiFetch<EnrollmentSubjectOption>("/enrollment-history/subject-options", {
-    method: "POST",
-    json: input,
-  });
+  return apiFetch<EnrollmentSubjectOption>(
+    "/enrollment-history/subject-options",
+    {
+      method: "POST",
+      json: input,
+    },
+  );
 }
 
 export function updateEnrollmentSubjectOption(
   id: string,
   input: UpdateEnrollmentSubjectOptionInput,
 ) {
-  return apiFetch<EnrollmentSubjectOption>(`/enrollment-history/subject-options/${id}`, {
-    method: "PATCH",
-    json: input,
-  });
+  return apiFetch<EnrollmentSubjectOption>(
+    `/enrollment-history/subject-options/${id}`,
+    {
+      method: "PATCH",
+      json: input,
+    },
+  );
 }
 
 export function activateEnrollmentSubjectOption(id: string) {

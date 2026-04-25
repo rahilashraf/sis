@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -46,8 +52,12 @@ export function LibraryOverdueManagement() {
         const schoolList = await listSchools({ includeInactive: false });
         setSchools(schoolList);
 
-        const defaultSchoolId = getDefaultSchoolContextId(session?.user) ?? schoolList[0]?.id ?? "";
-        const resolved = schoolList.find((school) => school.id === defaultSchoolId)?.id ?? schoolList[0]?.id ?? "";
+        const defaultSchoolId =
+          getDefaultSchoolContextId(session?.user) ?? schoolList[0]?.id ?? "";
+        const resolved =
+          schoolList.find((school) => school.id === defaultSchoolId)?.id ??
+          schoolList[0]?.id ??
+          "";
         setSchoolId(resolved);
       } catch {
         setSchools([]);
@@ -75,7 +85,11 @@ export function LibraryOverdueManagement() {
         setRows(response);
       } catch (loadError) {
         setRows([]);
-        setError(loadError instanceof Error ? loadError.message : "Unable to load overdue items.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load overdue items.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -98,7 +112,11 @@ export function LibraryOverdueManagement() {
       <PageHeader
         title="Library Overdue"
         description="Review overdue books and follow up with families."
-        meta={<Badge variant="neutral">{selectedSchool?.name ?? "All schools"}</Badge>}
+        meta={
+          <Badge variant="neutral">
+            {selectedSchool?.name ?? "All schools"}
+          </Badge>
+        }
       />
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
@@ -106,11 +124,17 @@ export function LibraryOverdueManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Filters</CardTitle>
-          <CardDescription>Filter by school and student/item search terms.</CardDescription>
+          <CardDescription>
+            Filter by school and student/item search terms.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <Field htmlFor="library-overdue-school" label="School">
-            <Select id="library-overdue-school" value={schoolId} onChange={(event) => setSchoolId(event.target.value)}>
+            <Select
+              id="library-overdue-school"
+              value={schoolId}
+              onChange={(event) => setSchoolId(event.target.value)}
+            >
               <option value="">All schools</option>
               {schools.map((school) => (
                 <option key={school.id} value={school.id}>
@@ -134,23 +158,37 @@ export function LibraryOverdueManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Overdue loans</CardTitle>
-          <CardDescription>Active loans where due date is before today.</CardDescription>
+          <CardDescription>
+            Active loans where due date is before today.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <p className="text-sm text-slate-500">Loading overdue records...</p>
           ) : rows.length === 0 ? (
-            <EmptyState compact title="No overdue items" description="No overdue loans match the current filters." />
+            <EmptyState
+              compact
+              title="No overdue items"
+              description="No overdue loans match the current filters."
+            />
           ) : (
             <div className="overflow-hidden rounded-xl border border-slate-200">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Item</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Due date</th>
-                      <th className="px-4 py-3 font-semibold text-right text-slate-700">Days overdue</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Student
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Item
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Due date
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-right text-slate-700">
+                        Days overdue
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
@@ -160,14 +198,24 @@ export function LibraryOverdueManagement() {
                           <p className="font-medium text-slate-900">
                             {row.student.firstName} {row.student.lastName}
                           </p>
-                          <p className="mt-1 text-xs text-slate-500">{row.student.username}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {row.student.username}
+                          </p>
                         </td>
                         <td className="px-4 py-4">
-                          <p className="font-medium text-slate-900">{row.item.title}</p>
-                          <p className="mt-1 text-xs text-slate-500">{row.item.author ?? "Unknown author"}</p>
+                          <p className="font-medium text-slate-900">
+                            {row.item.title}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {row.item.author ?? "Unknown author"}
+                          </p>
                         </td>
-                        <td className="px-4 py-4 text-slate-700">{formatDateLabel(row.dueDate)}</td>
-                        <td className="px-4 py-4 text-right font-semibold tabular-nums text-red-600">{row.daysOverdue}</td>
+                        <td className="px-4 py-4 text-slate-700">
+                          {formatDateLabel(row.dueDate)}
+                        </td>
+                        <td className="px-4 py-4 text-right font-semibold tabular-nums text-red-600">
+                          {row.daysOverdue}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

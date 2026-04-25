@@ -19,7 +19,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth/auth-context";
-import { listMyParentStudents, type ParentStudentLink } from "@/lib/api/students";
+import {
+  listMyParentStudents,
+  type ParentStudentLink,
+} from "@/lib/api/students";
 import {
   createUniformOrder,
   formatUniformMoney,
@@ -56,7 +59,9 @@ export function ParentUniformCatalog() {
   const [links, setLinks] = useState<ParentStudentLink[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [items, setItems] = useState<UniformItem[]>([]);
-  const [lineByItemId, setLineByItemId] = useState<Record<string, LineState>>({});
+  const [lineByItemId, setLineByItemId] = useState<Record<string, LineState>>(
+    {},
+  );
   const [notes, setNotes] = useState("");
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
 
@@ -236,22 +241,33 @@ export function ParentUniformCatalog() {
         description="Select items for your child and submit a school-scoped order."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link className={buttonClassName({ variant: "secondary" })} href="/parent/uniform/orders">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/parent/uniform/orders"
+            >
               Order history
             </Link>
-            <Link className={buttonClassName({ variant: "secondary" })} href="/parent">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/parent"
+            >
               Back to parent portal
             </Link>
           </div>
         }
-        meta={<Badge variant="neutral">{selectedLineCount} selected item(s)</Badge>}
+        meta={
+          <Badge variant="neutral">{selectedLineCount} selected item(s)</Badge>
+        }
       />
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {createdOrderId ? (
         <Notice tone="success">
           Order submitted successfully. View details in{" "}
-          <Link className="underline" href={`/parent/uniform/orders/${encodeURIComponent(createdOrderId)}`}>
+          <Link
+            className="underline"
+            href={`/parent/uniform/orders/${encodeURIComponent(createdOrderId)}`}
+          >
             order #{createdOrderId.slice(0, 8)}
           </Link>
           .
@@ -291,7 +307,10 @@ export function ParentUniformCatalog() {
                 </Select>
               </Field>
 
-              <Field htmlFor="parent-uniform-notes" label="Order notes (optional)">
+              <Field
+                htmlFor="parent-uniform-notes"
+                label="Order notes (optional)"
+              >
                 <Textarea
                   id="parent-uniform-notes"
                   onChange={(event) => setNotes(event.target.value)}
@@ -307,12 +326,16 @@ export function ParentUniformCatalog() {
             <CardHeader>
               <CardTitle>Catalog</CardTitle>
               <CardDescription>
-                {selectedLink ? `Ordering for ${getStudentLabel(selectedLink)}.` : "Select a student."}
+                {selectedLink
+                  ? `Ordering for ${getStudentLabel(selectedLink)}.`
+                  : "Select a student."}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingItems ? (
-                <p className="text-sm text-slate-500">Loading available items...</p>
+                <p className="text-sm text-slate-500">
+                  Loading available items...
+                </p>
               ) : items.length === 0 ? (
                 <EmptyState
                   compact
@@ -329,13 +352,22 @@ export function ParentUniformCatalog() {
                     };
 
                     return (
-                      <div className="rounded-xl border border-slate-200 p-4" key={item.id}>
+                      <div
+                        className="rounded-xl border border-slate-200 p-4"
+                        key={item.id}
+                      >
                         <div className="grid gap-3 md:grid-cols-2">
                           <div>
-                            <p className="text-base font-semibold text-slate-900">{item.name}</p>
-                            <p className="mt-1 text-sm text-slate-600">{item.category || "Uniform item"}</p>
+                            <p className="text-base font-semibold text-slate-900">
+                              {item.name}
+                            </p>
+                            <p className="mt-1 text-sm text-slate-600">
+                              {item.category || "Uniform item"}
+                            </p>
                             {item.description ? (
-                              <p className="mt-2 text-sm text-slate-600">{item.description}</p>
+                              <p className="mt-2 text-sm text-slate-600">
+                                {item.description}
+                              </p>
                             ) : null}
                             <p className="mt-2 text-sm font-medium text-slate-900">
                               {formatUniformMoney(item.price)}
@@ -343,7 +375,10 @@ export function ParentUniformCatalog() {
                           </div>
 
                           <div className="grid gap-3 md:grid-cols-3">
-                            <Field htmlFor={`uniform-item-qty-${item.id}`} label="Quantity">
+                            <Field
+                              htmlFor={`uniform-item-qty-${item.id}`}
+                              label="Quantity"
+                            >
                               <Input
                                 id={`uniform-item-qty-${item.id}`}
                                 inputMode="numeric"
@@ -362,7 +397,10 @@ export function ParentUniformCatalog() {
                               />
                             </Field>
 
-                            <Field htmlFor={`uniform-item-size-${item.id}`} label="Size">
+                            <Field
+                              htmlFor={`uniform-item-size-${item.id}`}
+                              label="Size"
+                            >
                               <Select
                                 disabled={item.availableSizes.length === 0}
                                 id={`uniform-item-size-${item.id}`}
@@ -377,7 +415,11 @@ export function ParentUniformCatalog() {
                                 }
                                 value={line.selectedSize}
                               >
-                                <option value="">{item.availableSizes.length ? "Select size" : "N/A"}</option>
+                                <option value="">
+                                  {item.availableSizes.length
+                                    ? "Select size"
+                                    : "N/A"}
+                                </option>
                                 {item.availableSizes.map((size) => (
                                   <option key={size} value={size}>
                                     {size}
@@ -386,7 +428,10 @@ export function ParentUniformCatalog() {
                               </Select>
                             </Field>
 
-                            <Field htmlFor={`uniform-item-color-${item.id}`} label="Color">
+                            <Field
+                              htmlFor={`uniform-item-color-${item.id}`}
+                              label="Color"
+                            >
                               <Select
                                 disabled={item.availableColors.length === 0}
                                 id={`uniform-item-color-${item.id}`}
@@ -401,7 +446,11 @@ export function ParentUniformCatalog() {
                                 }
                                 value={line.selectedColor}
                               >
-                                <option value="">{item.availableColors.length ? "Select color" : "N/A"}</option>
+                                <option value="">
+                                  {item.availableColors.length
+                                    ? "Select color"
+                                    : "N/A"}
+                                </option>
                                 {item.availableColors.map((color) => (
                                   <option key={color} value={color}>
                                     {color}
@@ -416,7 +465,11 @@ export function ParentUniformCatalog() {
                   })}
 
                   <div className="flex justify-end">
-                    <Button disabled={isSubmitting || !selectedStudentId} onClick={() => void handleSubmitOrder()} type="button">
+                    <Button
+                      disabled={isSubmitting || !selectedStudentId}
+                      onClick={() => void handleSubmitOrder()}
+                      type="button"
+                    >
                       {isSubmitting ? "Submitting..." : "Place order"}
                     </Button>
                   </div>

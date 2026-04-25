@@ -33,6 +33,7 @@ export type SchoolClass = {
   name: string;
   subject: string | null;
   isHomeroom: boolean;
+  takesAttendance: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -59,6 +60,43 @@ export type ClassRemovalResult = {
   reason?: string;
 };
 
+export type BulkEnrollmentIssue = {
+  studentId: string;
+  classId: string;
+  reason: string;
+};
+
+export type BulkEnrollmentWarning = {
+  studentId: string;
+  classId: string;
+  message: string;
+};
+
+export type BulkEnrollmentResult = {
+  success: StudentEnrollment[];
+  skipped: BulkEnrollmentIssue[];
+  failed: BulkEnrollmentIssue[];
+  warnings: BulkEnrollmentWarning[];
+};
+
+export type DuplicateClassInput = {
+  targetSchoolId: string;
+  targetSchoolYearId: string;
+  targetName?: string;
+  targetGradeLevelId?: string;
+  targetSubjectOptionId?: string;
+  targetTeacherId?: string;
+  isHomeroom?: boolean;
+  takesAttendance?: boolean;
+  copyAssessmentCategories?: boolean;
+  copyAssessments?: boolean;
+};
+
+export type CopyGradebookSettingsInput = {
+  targetClassId: string;
+  copyAssessmentCategories?: boolean;
+};
+
 export type CreateClassInput = {
   schoolId: string;
   schoolYearId: string;
@@ -66,6 +104,7 @@ export type CreateClassInput = {
   subjectOptionId: string;
   name: string;
   isHomeroom?: boolean;
+  takesAttendance?: boolean;
 };
 
 export type UpdateClassInput = {
@@ -73,10 +112,14 @@ export type UpdateClassInput = {
   gradeLevelId?: string;
   subjectOptionId?: string;
   isHomeroom?: boolean;
+  takesAttendance?: boolean;
   isActive?: boolean;
 };
 
-export function listClasses(options?: { includeInactive?: boolean; schoolId?: string }) {
+export function listClasses(options?: {
+  includeInactive?: boolean;
+  schoolId?: string;
+}) {
   const query = new URLSearchParams();
 
   if (options?.includeInactive) {
@@ -87,7 +130,9 @@ export function listClasses(options?: { includeInactive?: boolean; schoolId?: st
     query.set("schoolId", options.schoolId);
   }
 
-  return apiFetch<SchoolClass[]>(`/classes${query.size ? `?${query.toString()}` : ""}`);
+  return apiFetch<SchoolClass[]>(
+    `/classes${query.size ? `?${query.toString()}` : ""}`,
+  );
 }
 
 export function getClassById(classId: string) {
@@ -136,16 +181,22 @@ export function updateTeacherAssignment(
     endsAt?: string | null;
   },
 ) {
-  return apiFetch<TeacherAssignment>(`/classes/${classId}/teachers/${teacherId}`, {
-    method: "PATCH",
-    json: input,
-  });
+  return apiFetch<TeacherAssignment>(
+    `/classes/${classId}/teachers/${teacherId}`,
+    {
+      method: "PATCH",
+      json: input,
+    },
+  );
 }
 
 export function removeTeacher(classId: string, teacherId: string) {
-  return apiFetch<TeacherAssignment>(`/classes/${classId}/teachers/${teacherId}`, {
-    method: "DELETE",
-  });
+  return apiFetch<TeacherAssignment>(
+    `/classes/${classId}/teachers/${teacherId}`,
+    {
+      method: "DELETE",
+    },
+  );
 }
 
 export function enrollStudent(classId: string, studentId: string) {
@@ -155,15 +206,86 @@ export function enrollStudent(classId: string, studentId: string) {
   });
 }
 
-export function removeStudent(classId: string, studentId: string) {
-  return apiFetch<StudentEnrollment>(`/classes/${classId}/students/${studentId}`, {
-    method: "DELETE",
+export function bulkEnrollStudentAcrossClasses(input: {
+  studentId: string;
+  classIds: string[];
+}) {
+  return apiFetch<BulkEnrollmentResult>("/classes/bulk-enroll", {
+    method: "POST",
+    json: input,
   });
+}
+
+export function bulkEnrollStudentsIntoClass(
+  classId: string,
+  input: { studentIds: string[] },
+) {
+  return apiFetch<BulkEnrollmentResult>(
+    `/classes/${classId}/bulk-enroll-students`,
+    {
+      method: "POST",
+      json: input,
+    },
+  );
+}
+
+export function removeStudent(classId: string, studentId: string) {
+  return apiFetch<StudentEnrollment>(
+    `/classes/${classId}/students/${studentId}`,
+    {
+      method: "DELETE",
+    },
+  );
 }
 
 export function deleteClass(classId: string) {
   return apiFetch<ClassRemovalResult>(`/classes/${classId}`, {
     method: "DELETE",
+  });
+}
+
+export function duplicateClass(classId: string, input: DuplicateClassInput) {
+  return apiFetch<{
+    class: SchoolClass;
+    copiedFromClassId: string;
+    copiedWeightingMode: boolean;
+    copiedAssessmentCategories: {
+      copied: boolean;
+      createdCount: number;
+      updatedCount: number;
+      sourceCount: number;
+    };
+    copiedAssessments: boolean;
+    copiedEnrollments: boolean;
+    copiedGrades: boolean;
+    copiedTeacherAssignments?: number;
+    skippedTeacherAssignments?: number;
+  }>(`/classes/${classId}/duplicate`, {
+    method: "POST",
+    json: input,
+  });
+}
+
+export function copyGradebookSettings(
+  sourceClassId: string,
+  input: CopyGradebookSettingsInput,
+) {
+  return apiFetch<{
+    sourceClassId: string;
+    targetClassId: string;
+    weightingMode: "UNWEIGHTED" | "ASSESSMENT_WEIGHTED" | "CATEGORY_WEIGHTED";
+    copiedAssessmentCategories: {
+      copied: boolean;
+      createdCount: number;
+      updatedCount: number;
+      sourceCount: number;
+    };
+    copiedAssessments: boolean;
+    copiedGrades: boolean;
+    copiedEnrollments: boolean;
+  }>(`/classes/${sourceClassId}/copy-gradebook-settings`, {
+    method: "POST",
+    json: input,
   });
 }
 

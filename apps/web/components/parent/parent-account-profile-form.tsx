@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
@@ -13,6 +19,7 @@ export function ParentAccountProfileForm() {
   const { session, updateUser } = useAuth();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -20,7 +27,8 @@ export function ParentAccountProfileForm() {
   useEffect(() => {
     setFirstName(session?.user.firstName ?? "");
     setLastName(session?.user.lastName ?? "");
-  }, [session?.user.firstName, session?.user.lastName]);
+    setPhone(session?.user.phone ?? "");
+  }, [session?.user.firstName, session?.user.lastName, session?.user.phone]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -29,6 +37,7 @@ export function ParentAccountProfileForm() {
 
     const nextFirstName = firstName.trim();
     const nextLastName = lastName.trim();
+    const nextPhone = phone.trim();
 
     if (!nextFirstName || !nextLastName) {
       setError("First name and last name are required.");
@@ -41,6 +50,7 @@ export function ParentAccountProfileForm() {
       const updated = await updateMyProfile({
         firstName: nextFirstName,
         lastName: nextLastName,
+        phone: nextPhone || undefined,
       });
 
       updateUser(updated);
@@ -61,12 +71,15 @@ export function ParentAccountProfileForm() {
       <CardHeader>
         <CardTitle>Profile</CardTitle>
         <CardDescription>
-          Update your name details. Email and username are read-only in v1.
+          Update your name and phone details. Email and username are read-only
+          in v1.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? <Notice tone="danger">{error}</Notice> : null}
-        {successMessage ? <Notice tone="success">{successMessage}</Notice> : null}
+        {successMessage ? (
+          <Notice tone="success">{successMessage}</Notice>
+        ) : null}
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="grid gap-4 md:grid-cols-2">
@@ -85,6 +98,15 @@ export function ParentAccountProfileForm() {
                 onChange={(event) => setLastName(event.target.value)}
                 required
                 value={lastName}
+              />
+            </Field>
+
+            <Field htmlFor="parent-account-phone" label="Phone">
+              <Input
+                id="parent-account-phone"
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="Optional"
+                value={phone}
               />
             </Field>
           </div>

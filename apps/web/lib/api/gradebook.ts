@@ -42,7 +42,10 @@ export type StudentGradeSummary = {
     statusLabel?: {
       key: string;
       label: string;
-      behavior: "COUNT_AS_ZERO" | "EXCLUDE_FROM_CALCULATION" | "INFORMATION_ONLY";
+      behavior:
+        | "COUNT_AS_ZERO"
+        | "EXCLUDE_FROM_CALCULATION"
+        | "INFORMATION_ONLY";
     } | null;
     comment: string | null;
   }>;
@@ -130,7 +133,10 @@ export type ClassGradebookGrid = {
         id: string;
         key: string;
         label: string;
-        behavior: "COUNT_AS_ZERO" | "EXCLUDE_FROM_CALCULATION" | "INFORMATION_ONLY";
+        behavior:
+          | "COUNT_AS_ZERO"
+          | "EXCLUDE_FROM_CALCULATION"
+          | "INFORMATION_ONLY";
       } | null;
       comment: string | null;
       updatedAt: string;
@@ -220,7 +226,10 @@ export type StudentInClassSummary = {
       statusLabel?: {
         key: string;
         label: string;
-        behavior: "COUNT_AS_ZERO" | "EXCLUDE_FROM_CALCULATION" | "INFORMATION_ONLY";
+        behavior:
+          | "COUNT_AS_ZERO"
+          | "EXCLUDE_FROM_CALCULATION"
+          | "INFORMATION_ONLY";
       } | null;
       comment: string | null;
     }>;
@@ -242,7 +251,12 @@ export type StudentAcademicOverview = {
       subject: string | null;
       schoolId: string;
       schoolYearId: string;
-      school: { id: string; name: string; shortName: string | null; isActive: boolean };
+      school: {
+        id: string;
+        name: string;
+        shortName: string | null;
+        isActive: boolean;
+      };
       schoolYear: {
         id: string;
         schoolId: string;
@@ -272,7 +286,9 @@ export type StudentAcademicOverview = {
 };
 
 export function getStudentAcademicOverview(studentId: string) {
-  return apiFetch<StudentAcademicOverview>(`/students/${studentId}/academic-overview`);
+  return apiFetch<StudentAcademicOverview>(
+    `/students/${studentId}/academic-overview`,
+  );
 }
 
 export type GradebookSettings = {
@@ -290,10 +306,13 @@ export function updateGradebookSettings(
   classId: string,
   input: { weightingMode: GradebookSettings["weightingMode"] },
 ) {
-  return apiFetch<{ classId: string; weightingMode: GradebookSettings["weightingMode"] }>(
-    `/classes/${classId}/gradebook-settings`,
-    { method: "PATCH", json: input },
-  );
+  return apiFetch<{
+    classId: string;
+    weightingMode: GradebookSettings["weightingMode"];
+  }>(`/classes/${classId}/gradebook-settings`, {
+    method: "PATCH",
+    json: input,
+  });
 }
 
 export type AssessmentCategory = {
@@ -307,7 +326,10 @@ export type AssessmentCategory = {
   updatedAt: string;
 };
 
-export function listAssessmentCategories(classId: string, options?: { includeInactive?: boolean }) {
+export function listAssessmentCategories(
+  classId: string,
+  options?: { includeInactive?: boolean },
+) {
   const query = new URLSearchParams();
   if (options?.includeInactive) {
     query.set("includeInactive", "true");
@@ -321,15 +343,20 @@ export function createAssessmentCategory(
   classId: string,
   input: { name: string; sortOrder?: number; weight?: number | null },
 ) {
-  return apiFetch<AssessmentCategory>(`/classes/${classId}/assessment-categories`, {
-    method: "POST",
-    json: input,
-  });
+  return apiFetch<AssessmentCategory>(
+    `/classes/${classId}/assessment-categories`,
+    {
+      method: "POST",
+      json: input,
+    },
+  );
 }
 
 export function updateAssessmentCategory(
   categoryId: string,
-  input: Partial<Pick<AssessmentCategory, "name" | "sortOrder" | "weight" | "isActive">>,
+  input: Partial<
+    Pick<AssessmentCategory, "name" | "sortOrder" | "weight" | "isActive">
+  >,
 ) {
   return apiFetch<AssessmentCategory>(`/assessment-categories/${categoryId}`, {
     method: "PATCH",
@@ -350,7 +377,11 @@ export type GradeOverride = {
   updatedAt: string;
 };
 
-export function getGradeOverride(options: { classId: string; studentId: string; reportingPeriodId?: string | null }) {
+export function getGradeOverride(options: {
+  classId: string;
+  studentId: string;
+  reportingPeriodId?: string | null;
+}) {
   const query = new URLSearchParams();
   if (options.reportingPeriodId) {
     query.set("reportingPeriodId", options.reportingPeriodId);
@@ -368,13 +399,20 @@ export function upsertGradeOverride(
     overrideReason?: string | null;
   },
 ) {
-  return apiFetch<GradeOverride>(`/classes/${options.classId}/students/${options.studentId}/grade-override`, {
-    method: "PUT",
-    json: input,
-  });
+  return apiFetch<GradeOverride>(
+    `/classes/${options.classId}/students/${options.studentId}/grade-override`,
+    {
+      method: "PUT",
+      json: input,
+    },
+  );
 }
 
-export function deleteGradeOverride(options: { classId: string; studentId: string; reportingPeriodId?: string | null }) {
+export function deleteGradeOverride(options: {
+  classId: string;
+  studentId: string;
+  reportingPeriodId?: string | null;
+}) {
   const query = new URLSearchParams();
   if (options.reportingPeriodId) {
     query.set("reportingPeriodId", options.reportingPeriodId);

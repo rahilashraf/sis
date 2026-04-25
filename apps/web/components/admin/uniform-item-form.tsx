@@ -116,13 +116,16 @@ export function UniformItemForm({ itemId }: { itemId?: string }) {
         setSchools(schoolResponse);
 
         const defaultSchoolId =
-          getDefaultSchoolContextId(session?.user) ?? schoolResponse[0]?.id ?? "";
+          getDefaultSchoolContextId(session?.user) ??
+          schoolResponse[0]?.id ??
+          "";
 
         if (!itemId) {
           setForm((current) => ({
             ...current,
             schoolId:
-              schoolResponse.find((school) => school.id === defaultSchoolId)?.id ??
+              schoolResponse.find((school) => school.id === defaultSchoolId)
+                ?.id ??
               schoolResponse[0]?.id ??
               "",
           }));
@@ -134,7 +137,9 @@ export function UniformItemForm({ itemId }: { itemId?: string }) {
         setForm(toFormState(loadedItem));
       } catch (loadError) {
         setError(
-          loadError instanceof Error ? loadError.message : "Unable to load item form.",
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load item form.",
         );
       } finally {
         setIsLoading(false);
@@ -244,13 +249,19 @@ export function UniformItemForm({ itemId }: { itemId?: string }) {
         title={isEditMode ? "Edit Uniform Item" : "Create Uniform Item"}
         description="Keep catalog details simple and school-scoped for parent ordering."
         actions={
-          <Link className={buttonClassName({ variant: "secondary" })} href="/admin/uniform/items">
+          <Link
+            className={buttonClassName({ variant: "secondary" })}
+            href="/admin/uniform/items"
+          >
             Back to catalog
           </Link>
         }
         meta={
           <Badge variant="neutral">
-            {isEditMode ? item?.school.name ?? "" : schools.find((school) => school.id === form.schoolId)?.name ?? ""}
+            {isEditMode
+              ? (item?.school.name ?? "")
+              : (schools.find((school) => school.id === form.schoolId)?.name ??
+                "")}
           </Badge>
         }
       />
@@ -260,7 +271,9 @@ export function UniformItemForm({ itemId }: { itemId?: string }) {
       <Card>
         <CardHeader>
           <CardTitle>Item details</CardTitle>
-          <CardDescription>Provide name, pricing, and simple size/color options.</CardDescription>
+          <CardDescription>
+            Provide name, pricing, and simple size/color options.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
@@ -269,7 +282,10 @@ export function UniformItemForm({ itemId }: { itemId?: string }) {
                 disabled={isEditMode}
                 id="uniform-item-school"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, schoolId: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    schoolId: event.target.value,
+                  }))
                 }
                 value={form.schoolId}
               >
@@ -286,7 +302,10 @@ export function UniformItemForm({ itemId }: { itemId?: string }) {
               <Input
                 id="uniform-item-name"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, name: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
                 }
                 value={form.name}
               />
@@ -297,7 +316,10 @@ export function UniformItemForm({ itemId }: { itemId?: string }) {
                 id="uniform-item-price"
                 inputMode="decimal"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, price: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    price: event.target.value,
+                  }))
                 }
                 placeholder="0.00"
                 required
@@ -310,7 +332,10 @@ export function UniformItemForm({ itemId }: { itemId?: string }) {
                 id="uniform-item-sort-order"
                 inputMode="numeric"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, sortOrder: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    sortOrder: event.target.value,
+                  }))
                 }
                 value={form.sortOrder}
               />
@@ -320,7 +345,10 @@ export function UniformItemForm({ itemId }: { itemId?: string }) {
               <Input
                 id="uniform-item-category"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, category: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    category: event.target.value,
+                  }))
                 }
                 placeholder="Shirt, Pants, Sweater"
                 value={form.category}
@@ -331,7 +359,10 @@ export function UniformItemForm({ itemId }: { itemId?: string }) {
               <Input
                 id="uniform-item-sku"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, sku: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    sku: event.target.value,
+                  }))
                 }
                 value={form.sku}
               />
@@ -345,7 +376,10 @@ export function UniformItemForm({ itemId }: { itemId?: string }) {
               <Textarea
                 id="uniform-item-description"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, description: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
                 }
                 rows={3}
                 value={form.description}
@@ -359,7 +393,10 @@ export function UniformItemForm({ itemId }: { itemId?: string }) {
               <Input
                 id="uniform-item-sizes"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, availableSizesText: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    availableSizesText: event.target.value,
+                  }))
                 }
                 placeholder="XS, S, M, L"
                 value={form.availableSizesText}
@@ -373,7 +410,10 @@ export function UniformItemForm({ itemId }: { itemId?: string }) {
               <Input
                 id="uniform-item-colors"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, availableColorsText: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    availableColorsText: event.target.value,
+                  }))
                 }
                 placeholder="Black, Navy, White"
                 value={form.availableColorsText}
@@ -386,14 +426,20 @@ export function UniformItemForm({ itemId }: { itemId?: string }) {
                   checked={form.isActive}
                   label="Item is active"
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, isActive: event.target.checked }))
+                    setForm((current) => ({
+                      ...current,
+                      isActive: event.target.checked,
+                    }))
                   }
                 />
               </div>
             ) : null}
 
             <div className="md:col-span-2 flex justify-end gap-2">
-              <Link className={buttonClassName({ variant: "secondary" })} href="/admin/uniform/items">
+              <Link
+                className={buttonClassName({ variant: "secondary" })}
+                href="/admin/uniform/items"
+              >
                 Cancel
               </Link>
               <Button disabled={isSubmitting} type="submit">

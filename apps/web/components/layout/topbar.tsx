@@ -8,7 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import type { AuthenticatedUser } from "@/lib/auth/types";
-import { getActiveSchoolMemberships, getPrimarySchoolName } from "@/lib/auth/school-membership";
+import {
+  getActiveSchoolMemberships,
+  getPrimarySchoolName,
+} from "@/lib/auth/school-membership";
 import { formatRoleLabel, getInitials } from "@/lib/utils";
 import { getUnreadNotificationsCount } from "@/lib/api/notifications";
 
@@ -29,8 +32,9 @@ export function Topbar({
 }: TopbarProps) {
   const schoolMemberships = getActiveSchoolMemberships(user);
   const selectedSchoolName =
-    schoolMemberships.find((membership) => membership.schoolId === selectedSchoolId)?.school.name ??
-    getPrimarySchoolName(user);
+    schoolMemberships.find(
+      (membership) => membership.schoolId === selectedSchoolId,
+    )?.school.name ?? getPrimarySchoolName(user);
   const hasMultipleSchools = schoolMemberships.length > 1;
 
   const [unreadCount, setUnreadCount] = useState(0);
@@ -78,7 +82,9 @@ export function Topbar({
               className="h-8 w-auto object-contain"
               priority
             />
-            <span className="text-sm font-semibold text-slate-900">AIOK SIS</span>
+            <span className="text-sm font-semibold text-slate-900">
+              AIOK SIS
+            </span>
           </Link>
 
           <Link
@@ -114,12 +120,17 @@ export function Topbar({
               <div className="mt-2">
                 <Select
                   aria-label="School context"
-                  className="h-8 min-w-[180px] text-xs"
+                  className="h-8 min-w-45 text-xs"
                   value={selectedSchoolId ?? ""}
-                  onChange={(event) => onSchoolChange(event.target.value || null)}
+                  onChange={(event) =>
+                    onSchoolChange(event.target.value || null)
+                  }
                 >
                   {schoolMemberships.map((membership) => (
-                    <option key={membership.schoolId} value={membership.schoolId}>
+                    <option
+                      key={membership.schoolId}
+                      value={membership.schoolId}
+                    >
                       {membership.school.shortName || membership.school.name}
                     </option>
                   ))}

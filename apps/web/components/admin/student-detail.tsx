@@ -20,16 +20,15 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth/auth-context";
-import {
-  listGradeLevels,
-  type GradeLevel,
-} from "@/lib/api/grade-levels";
+import { listGradeLevels, type GradeLevel } from "@/lib/api/grade-levels";
 import {
   createStudentParentLink,
   deleteStudentParentLink,
   getStudentById,
+  listStudentLinkedParentContacts,
   listStudentParents,
   updateStudent,
+  type StudentLinkedParentContact,
   type StudentParentLink,
   type StudentProfile,
   type UpdateStudentInput,
@@ -168,8 +167,7 @@ function buildUpdatePayload(
   }
 
   if (
-    normalizeText(form.healthCardNumber) !==
-    (student.healthCardNumber ?? null)
+    normalizeText(form.healthCardNumber) !== (student.healthCardNumber ?? null)
   ) {
     payload.healthCardNumber = normalizeText(form.healthCardNumber);
   }
@@ -187,8 +185,7 @@ function buildUpdatePayload(
   }
 
   if (
-    normalizeText(form.guardian1Address) !==
-    (student.guardian1Address ?? null)
+    normalizeText(form.guardian1Address) !== (student.guardian1Address ?? null)
   ) {
     payload.guardian1Address = normalizeText(form.guardian1Address);
   }
@@ -220,8 +217,7 @@ function buildUpdatePayload(
   }
 
   if (
-    normalizeText(form.guardian2Address) !==
-    (student.guardian2Address ?? null)
+    normalizeText(form.guardian2Address) !== (student.guardian2Address ?? null)
   ) {
     payload.guardian2Address = normalizeText(form.guardian2Address);
   }
@@ -278,7 +274,9 @@ function buildUpdatePayload(
     normalizeText(form.emergencyContactRelationship) !==
     (student.emergencyContactRelationship ?? null)
   ) {
-    payload.emergencyContactRelationship = normalizeText(form.emergencyContactRelationship);
+    payload.emergencyContactRelationship = normalizeText(
+      form.emergencyContactRelationship,
+    );
   }
 
   return payload;
@@ -289,23 +287,33 @@ export function StudentDetail({ studentId }: { studentId: string }) {
   const [student, setStudent] = useState<StudentProfile | null>(null);
   const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
   const [parents, setParents] = useState<StudentParentLink[]>([]);
+  const [linkedParentContacts, setLinkedParentContacts] = useState<
+    StudentLinkedParentContact[]
+  >([]);
   const [parentUsers, setParentUsers] = useState<ManagedUser[]>([]);
   const [form, setForm] = useState<StudentProfileFormState | null>(null);
   const [parentSearch, setParentSearch] = useState("");
   const [selectedParentId, setSelectedParentId] = useState("");
-  const [unlinkTarget, setUnlinkTarget] = useState<StudentParentLink | null>(null);
+  const [unlinkTarget, setUnlinkTarget] = useState<StudentParentLink | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingParents, setIsLoadingParents] = useState(false);
   const [isLoadingGradeLevels, setIsLoadingGradeLevels] = useState(false);
-  const [isLoadingParentDirectory, setIsLoadingParentDirectory] = useState(false);
+  const [isLoadingParentDirectory, setIsLoadingParentDirectory] =
+    useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isLinkingParent, setIsLinkingParent] = useState(false);
   const [isUnlinkingParent, setIsUnlinkingParent] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
-  const [parentSectionError, setParentSectionError] = useState<string | null>(null);
+  const [parentSectionError, setParentSectionError] = useState<string | null>(
+    null,
+  );
   const [gradeLevelsError, setGradeLevelsError] = useState<string | null>(null);
-  const [parentDirectoryError, setParentDirectoryError] = useState<string | null>(null);
+  const [parentDirectoryError, setParentDirectoryError] = useState<
+    string | null
+  >(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
   const canManageStudent =
@@ -326,7 +334,10 @@ export function StudentDetail({ studentId }: { studentId: string }) {
     session?.user.role === "STAFF" ||
     session?.user.role === "TEACHER";
 
-  function updateFormValue(field: keyof StudentProfileFormState, value: string) {
+  function updateFormValue(
+    field: keyof StudentProfileFormState,
+    value: string,
+  ) {
     setForm((current) =>
       current
         ? {
@@ -384,7 +395,8 @@ export function StudentDetail({ studentId }: { studentId: string }) {
     }
 
     return gradeLevels.filter(
-      (gradeLevel) => gradeLevel.isActive || gradeLevel.id === student.gradeLevelId,
+      (gradeLevel) =>
+        gradeLevel.isActive || gradeLevel.id === student.gradeLevelId,
     );
   }, [gradeLevels, student]);
 
@@ -399,6 +411,7 @@ export function StudentDetail({ studentId }: { studentId: string }) {
       setStudent(null);
       setGradeLevels([]);
       setParents([]);
+      setLinkedParentContacts([]);
       setParentUsers([]);
       setForm(null);
 
@@ -420,9 +433,12 @@ export function StudentDetail({ studentId }: { studentId: string }) {
             setIsLoadingGradeLevels(true);
 
             try {
-              const gradeLevelResponse = await listGradeLevels(studentSchoolIds[0], {
-                includeInactive: true,
-              });
+              const gradeLevelResponse = await listGradeLevels(
+                studentSchoolIds[0],
+                {
+                  includeInactive: true,
+                },
+              );
               setGradeLevels(gradeLevelResponse);
             } catch (loadError) {
               setGradeLevelsError(
@@ -438,7 +454,9 @@ export function StudentDetail({ studentId }: { studentId: string }) {
           }
         }
       } catch (loadError) {
-        setPageError(getErrorMessage(loadError, "Unable to load student details."));
+        setPageError(
+          getErrorMessage(loadError, "Unable to load student details."),
+        );
         return;
       } finally {
         setIsLoading(false);
@@ -449,6 +467,19 @@ export function StudentDetail({ studentId }: { studentId: string }) {
       try {
         const parentResponse = await listStudentParents(studentId);
         setParents(parentResponse);
+        setLinkedParentContacts(
+          parentResponse.map((link) => ({
+            linkId: link.id,
+            parentId: link.parentId,
+            firstName: link.parent.firstName,
+            lastName: link.parent.lastName,
+            email: link.parent.email,
+            phone: link.parent.phone,
+            username: link.parent.username,
+            isActive: link.parent.isActive,
+            linkedAt: link.createdAt,
+          })),
+        );
       } catch (loadError) {
         setParentSectionError(
           getErrorMessage(loadError, "Unable to load linked parents."),
@@ -488,7 +519,7 @@ export function StudentDetail({ studentId }: { studentId: string }) {
     setSelectedParentId((current) =>
       availableParents.some((parent) => parent.id === current)
         ? current
-        : availableParents[0]?.id ?? "",
+        : (availableParents[0]?.id ?? ""),
     );
   }, [availableParents]);
 
@@ -508,9 +539,12 @@ export function StudentDetail({ studentId }: { studentId: string }) {
 
       if (studentSchoolIds.length === 1) {
         try {
-          const gradeLevelResponse = await listGradeLevels(studentSchoolIds[0], {
-            includeInactive: true,
-          });
+          const gradeLevelResponse = await listGradeLevels(
+            studentSchoolIds[0],
+            {
+              includeInactive: true,
+            },
+          );
           setGradeLevels(gradeLevelResponse);
           setGradeLevelsError(null);
         } catch (loadError) {
@@ -531,6 +565,8 @@ export function StudentDetail({ studentId }: { studentId: string }) {
     try {
       const parentResponse = await listStudentParents(studentId);
       setParents(parentResponse);
+      const parentContacts = await listStudentLinkedParentContacts(studentId);
+      setLinkedParentContacts(parentContacts);
       setParentSectionError(null);
     } catch (loadError) {
       setParentSectionError(
@@ -590,7 +626,9 @@ export function StudentDetail({ studentId }: { studentId: string }) {
       setSelectedParentId("");
       setSuccessMessage("Parent linked successfully.");
     } catch (submissionError) {
-      setParentSectionError(getErrorMessage(submissionError, "Unable to link parent."));
+      setParentSectionError(
+        getErrorMessage(submissionError, "Unable to link parent."),
+      );
     } finally {
       setIsLinkingParent(false);
     }
@@ -629,10 +667,18 @@ export function StudentDetail({ studentId }: { studentId: string }) {
           <>
             <Link
               className={buttonClassName({ variant: "secondary" })}
-              href="/admin/users"
+              href="/admin/users/student-profiles"
             >
-              Back to users
+              Back to student profiles
             </Link>
+            {student ? (
+              <Link
+                className={buttonClassName({ variant: "ghost" })}
+                href={`/admin/classes/bulk-enrollment?studentId=${encodeURIComponent(student.id)}`}
+              >
+                Manage enrollments
+              </Link>
+            ) : null}
             {student ? (
               <Link
                 className={buttonClassName({ variant: "ghost" })}
@@ -670,8 +716,9 @@ export function StudentDetail({ studentId }: { studentId: string }) {
       {successMessage ? <Notice tone="success">{successMessage}</Notice> : null}
       {!isLoading && !canManageStudent ? (
         <Notice tone="info">
-          This view is read-only for your current role. Student profile updates and
-          parent link changes remain limited to owner, super admin, and admin roles.
+          This view is read-only for your current role. Student profile updates
+          and parent link changes remain limited to owner, super admin, and
+          admin roles.
         </Notice>
       ) : null}
 
@@ -693,6 +740,7 @@ export function StudentDetail({ studentId }: { studentId: string }) {
       {student ? (
         <>
           <StudentProfileOverview
+            linkedParentContacts={linkedParentContacts}
             showSensitiveHealthInfo={canManageStudent}
             student={student}
           />
@@ -725,7 +773,9 @@ export function StudentDetail({ studentId }: { studentId: string }) {
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="neutral">{parents.length} linked parents</Badge>
+                    <Badge variant="neutral">
+                      {parents.length} linked parents
+                    </Badge>
                     <Badge variant="neutral">
                       {availableParents.length} available to link
                     </Badge>
@@ -748,7 +798,9 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                       >
                         <Input
                           id="student-parent-search"
-                          onChange={(event) => setParentSearch(event.target.value)}
+                          onChange={(event) =>
+                            setParentSearch(event.target.value)
+                          }
                           placeholder="Search parent accounts"
                           value={parentSearch}
                         />
@@ -761,7 +813,9 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                       >
                         <Select
                           id="student-parent-select"
-                          onChange={(event) => setSelectedParentId(event.target.value)}
+                          onChange={(event) =>
+                            setSelectedParentId(event.target.value)
+                          }
                           value={selectedParentId}
                         >
                           <option value="">
@@ -797,7 +851,9 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="text-sm font-semibold text-slate-900">Linked parents</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Linked parents
+                  </p>
                   <p className="mt-2 text-sm text-slate-600">
                     {parents.length > 0
                       ? "Unlinking is confirmed before access is removed."
@@ -813,7 +869,16 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                           {link.parent.firstName} {link.parent.lastName}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
-                          {getDisplayText(link.parent.email, `@${link.parent.username}`)}
+                          {getDisplayText(
+                            link.parent.email,
+                            `@${link.parent.username}`,
+                          )}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {getDisplayText(
+                            link.parent.phone,
+                            "No phone on file",
+                          )}
                         </p>
                       </div>
                     ))}
@@ -841,7 +906,9 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                 <Notice tone="info">Loading parent directory...</Notice>
               ) : null}
 
-              {canManageStudent && !isLoadingParentDirectory && availableParents.length === 0 ? (
+              {canManageStudent &&
+              !isLoadingParentDirectory &&
+              availableParents.length === 0 ? (
                 <EmptyState
                   compact
                   description={
@@ -858,33 +925,66 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                   <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                     <thead className="bg-slate-50/80">
                       <tr>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Parent</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Username</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Email</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Linked</th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Parent
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Username
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Email
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Phone
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Linked
+                        </th>
                         {canManageStudent ? (
-                          <th className="px-4 py-3 font-semibold text-slate-700">Action</th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Action
+                          </th>
                         ) : null}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white">
                       {parents.map((link) => (
-                        <tr className="align-top hover:bg-slate-50" key={link.id}>
+                        <tr
+                          className="align-top hover:bg-slate-50"
+                          key={link.id}
+                        >
                           <td className="px-4 py-4">
                             <p className="font-medium text-slate-900">
                               {link.parent.firstName} {link.parent.lastName}
                             </p>
-                            <p className="mt-1 text-sm text-slate-500">{link.parent.id}</p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {link.parent.id}
+                            </p>
                           </td>
                           <td className="px-4 py-4 text-slate-600">
                             {getDisplayText(link.parent.username)}
                           </td>
                           <td className="px-4 py-4 text-slate-600">
-                            {getDisplayText(link.parent.email, "No email on file")}
+                            {getDisplayText(
+                              link.parent.email,
+                              "No email on file",
+                            )}
+                          </td>
+                          <td className="px-4 py-4 text-slate-600">
+                            {getDisplayText(
+                              link.parent.phone,
+                              "No phone on file",
+                            )}
                           </td>
                           <td className="px-4 py-4">
-                            <Badge variant={link.parent.isActive ? "success" : "neutral"}>
+                            <Badge
+                              variant={
+                                link.parent.isActive ? "success" : "neutral"
+                              }
+                            >
                               {link.parent.isActive ? "Active" : "Inactive"}
                             </Badge>
                           </td>
@@ -912,7 +1012,10 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                       ))}
                       {parents.length === 0 ? (
                         <tr>
-                          <td className="px-4 py-8" colSpan={canManageStudent ? 6 : 5}>
+                          <td
+                            className="px-4 py-8"
+                            colSpan={canManageStudent ? 7 : 6}
+                          >
                             <EmptyState
                               compact
                               description="No parents are currently linked to this student."
@@ -933,11 +1036,15 @@ export function StudentDetail({ studentId }: { studentId: string }) {
               <CardHeader>
                 <CardTitle>Edit Student Profile</CardTitle>
                 <CardDescription>
-                  Keep identity, health, guardian, and existing contact details current.
+                  Keep identity, health, guardian, and existing contact details
+                  current.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSaveProfile}>
+                <form
+                  className="grid gap-4 md:grid-cols-2"
+                  onSubmit={handleSaveProfile}
+                >
                   {profileError ? (
                     <div className="md:col-span-2">
                       <Notice tone="danger">{profileError}</Notice>
@@ -945,7 +1052,9 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                   ) : null}
 
                   <div className="md:col-span-2">
-                    <h3 className="text-sm font-semibold text-slate-900">Identity</h3>
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Identity
+                    </h3>
                     <p className="mt-1 text-sm text-slate-500">
                       Core identifiers and student-facing account details.
                     </p>
@@ -968,7 +1077,9 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                   <Field htmlFor="student-oen" label="OEN">
                     <Input
                       id="student-oen"
-                      onChange={(event) => updateFormValue("oen", event.target.value)}
+                      onChange={(event) =>
+                        updateFormValue("oen", event.target.value)
+                      }
                       value={form.oen}
                     />
                   </Field>
@@ -1051,7 +1162,9 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                   ) : null}
 
                   <div className="md:col-span-2 mt-2 border-t border-slate-200 pt-4">
-                    <h3 className="text-sm font-semibold text-slate-900">Health Info</h3>
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Health Info
+                    </h3>
                     <p className="mt-1 text-sm text-slate-500">
                       Sensitive health details are limited to admin roles.
                     </p>
@@ -1101,10 +1214,12 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                   </Field>
 
                   <div className="md:col-span-2 mt-2 border-t border-slate-200 pt-4">
-                    <h3 className="text-sm font-semibold text-slate-900">Guardian 1</h3>
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Guardian 1
+                    </h3>
                     <p className="mt-1 text-sm text-slate-500">
-                      Administrative contact details stored separately from linked
-                      parent portal access.
+                      Administrative contact details stored separately from
+                      linked parent portal access.
                     </p>
                   </div>
 
@@ -1157,17 +1272,26 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                     <Input
                       id="student-guardian1-relationship"
                       onChange={(event) =>
-                        updateFormValue("guardian1Relationship", event.target.value)
+                        updateFormValue(
+                          "guardian1Relationship",
+                          event.target.value,
+                        )
                       }
                       value={form.guardian1Relationship}
                     />
                   </Field>
 
-                  <Field htmlFor="student-guardian1-work-phone" label="Work phone">
+                  <Field
+                    htmlFor="student-guardian1-work-phone"
+                    label="Work phone"
+                  >
                     <Input
                       id="student-guardian1-work-phone"
                       onChange={(event) =>
-                        updateFormValue("guardian1WorkPhone", event.target.value)
+                        updateFormValue(
+                          "guardian1WorkPhone",
+                          event.target.value,
+                        )
                       }
                       type="tel"
                       value={form.guardian1WorkPhone}
@@ -1175,9 +1299,12 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                   </Field>
 
                   <div className="md:col-span-2 mt-2 border-t border-slate-200 pt-4">
-                    <h3 className="text-sm font-semibold text-slate-900">Guardian 2</h3>
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Guardian 2
+                    </h3>
                     <p className="mt-1 text-sm text-slate-500">
-                      Secondary administrative contact details for the student file.
+                      Secondary administrative contact details for the student
+                      file.
                     </p>
                   </div>
 
@@ -1230,17 +1357,26 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                     <Input
                       id="student-guardian2-relationship"
                       onChange={(event) =>
-                        updateFormValue("guardian2Relationship", event.target.value)
+                        updateFormValue(
+                          "guardian2Relationship",
+                          event.target.value,
+                        )
                       }
                       value={form.guardian2Relationship}
                     />
                   </Field>
 
-                  <Field htmlFor="student-guardian2-work-phone" label="Work phone">
+                  <Field
+                    htmlFor="student-guardian2-work-phone"
+                    label="Work phone"
+                  >
                     <Input
                       id="student-guardian2-work-phone"
                       onChange={(event) =>
-                        updateFormValue("guardian2WorkPhone", event.target.value)
+                        updateFormValue(
+                          "guardian2WorkPhone",
+                          event.target.value,
+                        )
                       }
                       type="tel"
                       value={form.guardian2WorkPhone}
@@ -1252,11 +1388,15 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                       Additional Contact
                     </h3>
                     <p className="mt-1 text-sm text-slate-500">
-                      Existing address and emergency contact fields remain available.
+                      Existing address and emergency contact fields remain
+                      available.
                     </p>
                   </div>
 
-                  <Field htmlFor="student-address-line-1" label="Address line 1">
+                  <Field
+                    htmlFor="student-address-line-1"
+                    label="Address line 1"
+                  >
                     <Input
                       id="student-address-line-1"
                       onChange={(event) =>
@@ -1266,7 +1406,10 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                     />
                   </Field>
 
-                  <Field htmlFor="student-address-line-2" label="Address line 2">
+                  <Field
+                    htmlFor="student-address-line-2"
+                    label="Address line 2"
+                  >
                     <Input
                       id="student-address-line-2"
                       onChange={(event) =>
@@ -1313,7 +1456,10 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                     <Input
                       id="student-emergency-contact-name"
                       onChange={(event) =>
-                        updateFormValue("emergencyContactName", event.target.value)
+                        updateFormValue(
+                          "emergencyContactName",
+                          event.target.value,
+                        )
                       }
                       value={form.emergencyContactName}
                     />
@@ -1326,7 +1472,10 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                     <Input
                       id="student-emergency-contact-phone"
                       onChange={(event) =>
-                        updateFormValue("emergencyContactPhone", event.target.value)
+                        updateFormValue(
+                          "emergencyContactPhone",
+                          event.target.value,
+                        )
                       }
                       value={form.emergencyContactPhone}
                     />
@@ -1339,7 +1488,10 @@ export function StudentDetail({ studentId }: { studentId: string }) {
                     <Input
                       id="student-emergency-contact-relationship"
                       onChange={(event) =>
-                        updateFormValue("emergencyContactRelationship", event.target.value)
+                        updateFormValue(
+                          "emergencyContactRelationship",
+                          event.target.value,
+                        )
                       }
                       value={form.emergencyContactRelationship}
                     />

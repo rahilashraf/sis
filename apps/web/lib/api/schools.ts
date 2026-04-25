@@ -72,7 +72,9 @@ export function listSchools(options?: { includeInactive?: boolean }) {
     query.set("includeInactive", "true");
   }
 
-  return apiFetch<School[]>(`/schools${query.size ? `?${query.toString()}` : ""}`);
+  return apiFetch<School[]>(
+    `/schools${query.size ? `?${query.toString()}` : ""}`,
+  );
 }
 
 export function createSchool(input: CreateSchoolInput) {
@@ -117,7 +119,9 @@ export async function listSchoolYears(
     query.set("includeInactive", "true");
   }
 
-  const response = await apiFetch<RawSchoolYear[]>(`/school-years?${query.toString()}`);
+  const response = await apiFetch<RawSchoolYear[]>(
+    `/school-years?${query.toString()}`,
+  );
   return response.map(normalizeSchoolYear);
 }
 
@@ -138,30 +142,43 @@ export async function updateSchoolYear(
   schoolYearId: string,
   input: UpdateSchoolYearInput,
 ) {
-  const response = await apiFetch<RawSchoolYear>(`/school-years/${schoolYearId}`, {
-    method: "PATCH",
-    json: {
-      ...input,
-      ...(input.startDate !== undefined ? { startDate: toDateOnly(input.startDate) } : {}),
-      ...(input.endDate !== undefined ? { endDate: toDateOnly(input.endDate) } : {}),
+  const response = await apiFetch<RawSchoolYear>(
+    `/school-years/${schoolYearId}`,
+    {
+      method: "PATCH",
+      json: {
+        ...input,
+        ...(input.startDate !== undefined
+          ? { startDate: toDateOnly(input.startDate) }
+          : {}),
+        ...(input.endDate !== undefined
+          ? { endDate: toDateOnly(input.endDate) }
+          : {}),
+      },
     },
-  });
+  );
 
   return normalizeSchoolYear(response);
 }
 
 export async function archiveSchoolYear(schoolYearId: string) {
-  const response = await apiFetch<RawSchoolYear>(`/school-years/${schoolYearId}/archive`, {
-    method: "PATCH",
-  });
+  const response = await apiFetch<RawSchoolYear>(
+    `/school-years/${schoolYearId}/archive`,
+    {
+      method: "PATCH",
+    },
+  );
 
   return normalizeSchoolYear(response);
 }
 
 export async function activateSchoolYear(schoolYearId: string) {
-  const response = await apiFetch<RawSchoolYear>(`/school-years/${schoolYearId}/activate`, {
-    method: "PATCH",
-  });
+  const response = await apiFetch<RawSchoolYear>(
+    `/school-years/${schoolYearId}/activate`,
+    {
+      method: "PATCH",
+    },
+  );
 
   return normalizeSchoolYear(response);
 }

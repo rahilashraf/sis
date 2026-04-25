@@ -16,15 +16,21 @@ function uniqueBySchoolId(memberships: UserSchoolMembership[]) {
   return unique;
 }
 
-export function getActiveSchoolMemberships(user: AuthenticatedUser | null | undefined) {
+export function getActiveSchoolMemberships(
+  user: AuthenticatedUser | null | undefined,
+) {
   if (!user?.memberships?.length) {
     return [] as UserSchoolMembership[];
   }
 
-  return uniqueBySchoolId(user.memberships.filter((membership) => membership.isActive));
+  return uniqueBySchoolId(
+    user.memberships.filter((membership) => membership.isActive),
+  );
 }
 
-export function getAccessibleSchoolIds(user: AuthenticatedUser | null | undefined) {
+export function getAccessibleSchoolIds(
+  user: AuthenticatedUser | null | undefined,
+) {
   const activeMemberships = getActiveSchoolMemberships(user);
   if (activeMemberships.length > 0) {
     return activeMemberships.map((membership) => membership.schoolId);
@@ -37,7 +43,9 @@ export function getAccessibleSchoolIds(user: AuthenticatedUser | null | undefine
   return [] as string[];
 }
 
-export function getDefaultSchoolContextId(user: AuthenticatedUser | null | undefined) {
+export function getDefaultSchoolContextId(
+  user: AuthenticatedUser | null | undefined,
+) {
   const [membership] = getActiveSchoolMemberships(user);
   return membership?.schoolId ?? user?.schoolId ?? null;
 }
@@ -54,7 +62,9 @@ export function normalizeSchoolContextId(
   return getDefaultSchoolContextId(user);
 }
 
-export function getPrimarySchoolName(user: AuthenticatedUser | null | undefined) {
+export function getPrimarySchoolName(
+  user: AuthenticatedUser | null | undefined,
+) {
   const [membership] = getActiveSchoolMemberships(user);
   return membership?.school.name ?? null;
 }

@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonClassName } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -15,7 +21,9 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { getDefaultSchoolContextId } from "@/lib/auth/school-membership";
 import {
   createLibraryItem,
+  listLibraryHolds,
   listLibraryItems,
+  listLibraryLoans,
   updateLibraryItem,
   type LibraryItem,
   type LibraryItemStatus,
@@ -42,7 +50,9 @@ const emptyForm: ItemForm = {
   totalCopies: "1",
 };
 
-function getStatusVariant(status: LibraryItemStatus): "neutral" | "primary" | "warning" | "danger" {
+function getStatusVariant(
+  status: LibraryItemStatus,
+): "neutral" | "primary" | "warning" | "danger" {
   if (status === "LOST") {
     return "danger";
   }
@@ -87,9 +97,15 @@ export function LibraryItemsManagement() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [savingOverrideItemId, setSavingOverrideItemId] = useState<
+    string | null
+  >(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [overrideDrafts, setOverrideDrafts] = useState<
+    Record<string, { status: LibraryItemStatus; totalCopies: string }>
+  >({});
 
   const selectedSchool = useMemo(
     () => schools.find((school) => school.id === schoolId) ?? null,
@@ -109,11 +125,19 @@ export function LibraryItemsManagement() {
         const schoolList = await listSchools({ includeInactive: false });
         setSchools(schoolList);
 
-        const defaultSchoolId = getDefaultSchoolContextId(session?.user) ?? schoolList[0]?.id ?? "";
-        const resolved = schoolList.find((school) => school.id === defaultSchoolId)?.id ?? schoolList[0]?.id ?? "";
+        const defaultSchoolId =
+          getDefaultSchoolContextId(session?.user) ?? schoolList[0]?.id ?? "";
+        const resolved =
+          schoolList.find((school) => school.id === defaultSchoolId)?.id ??
+          schoolList[0]?.id ??
+          "";
         setSchoolId(resolved);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load schools.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load schools.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -139,7 +163,11 @@ export function LibraryItemsManagement() {
         setItems(response);
       } catch (loadError) {
         setItems([]);
-        setError(loadError instanceof Error ? loadError.message : "Unable to load library items.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load library items.",
+        );
       } finally {
         setIsRefreshing(false);
       }
@@ -147,6 +175,54 @@ export function LibraryItemsManagement() {
 
     void loadItems();
   }, [role, schoolId, search]);
+
+  useEffect(() => {
+    setOverrideDrafts((current) => {
+      const next = { ...current };
+
+      for (const item of items) {
+        if (!next[item.id]) {
+          next[item.id] = {
+            status: item.status,
+            totalCopies: String(item.totalCopies),
+          };
+        }
+      }
+
+      for (const itemId of Object.keys(next)) {
+        if (!items.some((item) => item.id === itemId)) {
+          delete next[itemId];
+        }
+      }
+
+      return next;
+    });
+  }, [items]);
+
+  function getOverrideDraft(item: LibraryItem) {
+    return (
+      overrideDrafts[item.id] ?? {
+        status: item.status,
+        totalCopies: String(item.totalCopies),
+      }
+    );
+  }
+
+  function updateOverrideDraft(
+    itemId: string,
+    updates: Partial<{ status: LibraryItemStatus; totalCopies: string }>,
+  ) {
+    setOverrideDrafts((current) => ({
+      ...current,
+      [itemId]: {
+        ...(current[itemId] ?? {
+          status: "AVAILABLE" as LibraryItemStatus,
+          totalCopies: "1",
+        }),
+        ...updates,
+      },
+    }));
+  }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -185,10 +261,17 @@ export function LibraryItemsManagement() {
       setForm(emptyForm);
       setSuccessMessage("Library item created.");
 
-      const refreshed = await listLibraryItems({ schoolId, search: search.trim() || undefined });
+      const refreshed = await listLibraryItems({
+        schoolId,
+        search: search.trim() || undefined,
+      });
       setItems(refreshed);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to create library item.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to create library item.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -201,10 +284,81 @@ export function LibraryItemsManagement() {
     try {
       await updateLibraryItem(item.id, { status: "ARCHIVED" });
       setSuccessMessage(`Archived “${item.title}”.`);
-      const refreshed = await listLibraryItems({ schoolId: schoolId || undefined, search: search.trim() || undefined });
+      const refreshed = await listLibraryItems({
+        schoolId: schoolId || undefined,
+        search: search.trim() || undefined,
+      });
       setItems(refreshed);
     } catch (archiveError) {
-      setError(archiveError instanceof Error ? archiveError.message : "Unable to archive item.");
+      setError(
+        archiveError instanceof Error
+          ? archiveError.message
+          : "Unable to archive item.",
+      );
+    }
+  }
+
+  async function handleQuickOverrideSave(item: LibraryItem) {
+    const draft = getOverrideDraft(item);
+    const parsedTotalCopies = Number(draft.totalCopies);
+
+    if (!Number.isInteger(parsedTotalCopies) || parsedTotalCopies < 1) {
+      setError("Total copies must be a positive whole number.");
+      return;
+    }
+
+    setError(null);
+    setSuccessMessage(null);
+    setSavingOverrideItemId(item.id);
+
+    try {
+      const [activeLoans, activeHolds] = await Promise.all([
+        listLibraryLoans({ itemId: item.id, activeOnly: true }),
+        listLibraryHolds({ itemId: item.id, status: "ACTIVE" }),
+      ]);
+
+      if (parsedTotalCopies < activeLoans.length) {
+        setError(
+          `Cannot reduce total copies below active checkouts (${activeLoans.length}) for “${item.title}”.`,
+        );
+        return;
+      }
+
+      const hasStatusConflict =
+        (draft.status === "AVAILABLE" && activeLoans.length > 0) ||
+        (draft.status === "CHECKED_OUT" && activeLoans.length === 0) ||
+        ((draft.status === "LOST" || draft.status === "ARCHIVED") &&
+          (activeLoans.length > 0 || activeHolds.length > 0));
+
+      if (hasStatusConflict) {
+        const shouldContinue = window.confirm(
+          `Status override for “${item.title}” may conflict with active records (${activeLoans.length} checkout(s), ${activeHolds.length} hold(s)). Continue?`,
+        );
+
+        if (!shouldContinue) {
+          return;
+        }
+      }
+
+      await updateLibraryItem(item.id, {
+        status: draft.status,
+        totalCopies: parsedTotalCopies,
+      });
+
+      setSuccessMessage(`Updated overrides for “${item.title}”.`);
+      const refreshed = await listLibraryItems({
+        schoolId: schoolId || undefined,
+        search: search.trim() || undefined,
+      });
+      setItems(refreshed);
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save item override.",
+      );
+    } finally {
+      setSavingOverrideItemId(null);
     }
   }
 
@@ -232,7 +386,11 @@ export function LibraryItemsManagement() {
       <PageHeader
         title="Library Items"
         description="Manage library books and inventory availability."
-        meta={<Badge variant="neutral">{selectedSchool?.name ?? "All schools"}</Badge>}
+        meta={
+          <Badge variant="neutral">
+            {selectedSchool?.name ?? "All schools"}
+          </Badge>
+        }
       />
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
@@ -241,12 +399,18 @@ export function LibraryItemsManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Add item</CardTitle>
-          <CardDescription>Create a new library item with copy counts.</CardDescription>
+          <CardDescription>
+            Create a new library item with copy counts.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-3" onSubmit={handleCreate}>
             <Field htmlFor="library-items-school" label="School">
-              <Select id="library-items-school" value={schoolId} onChange={(event) => setSchoolId(event.target.value)}>
+              <Select
+                id="library-items-school"
+                value={schoolId}
+                onChange={(event) => setSchoolId(event.target.value)}
+              >
                 <option value="">Select school</option>
                 {schools.map((school) => (
                   <option key={school.id} value={school.id}>
@@ -260,7 +424,12 @@ export function LibraryItemsManagement() {
               <Input
                 id="library-items-title"
                 value={form.title}
-                onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
+                }
               />
             </Field>
 
@@ -268,7 +437,12 @@ export function LibraryItemsManagement() {
               <Input
                 id="library-items-author"
                 value={form.author}
-                onChange={(event) => setForm((current) => ({ ...current, author: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    author: event.target.value,
+                  }))
+                }
               />
             </Field>
 
@@ -276,7 +450,12 @@ export function LibraryItemsManagement() {
               <Input
                 id="library-items-isbn"
                 value={form.isbn}
-                onChange={(event) => setForm((current) => ({ ...current, isbn: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    isbn: event.target.value,
+                  }))
+                }
               />
             </Field>
 
@@ -284,7 +463,12 @@ export function LibraryItemsManagement() {
               <Input
                 id="library-items-barcode"
                 value={form.barcode}
-                onChange={(event) => setForm((current) => ({ ...current, barcode: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    barcode: event.target.value,
+                  }))
+                }
               />
             </Field>
 
@@ -292,7 +476,12 @@ export function LibraryItemsManagement() {
               <Input
                 id="library-items-category"
                 value={form.category}
-                onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    category: event.target.value,
+                  }))
+                }
               />
             </Field>
 
@@ -303,7 +492,12 @@ export function LibraryItemsManagement() {
                 step={1}
                 type="number"
                 value={form.totalCopies}
-                onChange={(event) => setForm((current) => ({ ...current, totalCopies: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    totalCopies: event.target.value,
+                  }))
+                }
               />
             </Field>
 
@@ -319,7 +513,9 @@ export function LibraryItemsManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Items</CardTitle>
-          <CardDescription>Availability and item status by school.</CardDescription>
+          <CardDescription>
+            Availability and item status by school.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Field htmlFor="library-items-search" label="Search">
@@ -345,45 +541,136 @@ export function LibraryItemsManagement() {
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Title</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Category</th>
-                      <th className="px-4 py-3 font-semibold text-right text-slate-700">Available</th>
-                      <th className="px-4 py-3 font-semibold text-right text-slate-700">Total</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Title
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Category
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-right text-slate-700">
+                        Available
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-right text-slate-700">
+                        Total
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {items.map((item) => (
                       <tr key={item.id} className="align-top hover:bg-slate-50">
                         <td className="px-4 py-4">
-                          <p className="font-medium text-slate-900">{item.title}</p>
+                          <p className="font-medium text-slate-900">
+                            {item.title}
+                          </p>
                           <p className="mt-1 text-xs text-slate-500">
                             {item.author ?? "Unknown author"}
                             {item.isbn ? ` • ISBN ${item.isbn}` : ""}
                           </p>
-                          {item.barcode ? <p className="mt-1 text-xs text-slate-500">Barcode: {item.barcode}</p> : null}
+                          {item.barcode ? (
+                            <p className="mt-1 text-xs text-slate-500">
+                              Barcode: {item.barcode}
+                            </p>
+                          ) : null}
                         </td>
-                        <td className="px-4 py-4 text-slate-700">{item.category ?? "—"}</td>
-                        <td className="px-4 py-4 text-right tabular-nums font-semibold text-slate-900">{item.availableCopies}</td>
-                        <td className="px-4 py-4 text-right tabular-nums text-slate-700">{item.totalCopies}</td>
-                        <td className="px-4 py-4">
-                          <Badge variant={getStatusVariant(item.status)}>{statusLabel(item.status)}</Badge>
+                        <td className="px-4 py-4 text-slate-700">
+                          {item.category ?? "—"}
+                        </td>
+                        <td className="px-4 py-4 text-right tabular-nums font-semibold text-slate-900">
+                          {item.availableCopies}
+                        </td>
+                        <td className="px-4 py-4 text-right tabular-nums text-slate-700">
+                          {item.totalCopies}
                         </td>
                         <td className="px-4 py-4">
-                          <div className="flex flex-wrap gap-2">
+                          <Badge variant={getStatusVariant(item.status)}>
+                            {statusLabel(item.status)}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex min-w-65 flex-wrap items-end gap-2">
+                            <div className="w-36">
+                              <Field
+                                htmlFor={`library-item-status-${item.id}`}
+                                label="Status"
+                              >
+                                <Select
+                                  id={`library-item-status-${item.id}`}
+                                  value={getOverrideDraft(item).status}
+                                  onChange={(event) =>
+                                    updateOverrideDraft(item.id, {
+                                      status: event.target
+                                        .value as LibraryItemStatus,
+                                    })
+                                  }
+                                >
+                                  <option value="AVAILABLE">Available</option>
+                                  <option value="CHECKED_OUT">
+                                    Checked out
+                                  </option>
+                                  <option value="LOST">Lost</option>
+                                  <option value="ARCHIVED">Archived</option>
+                                </Select>
+                              </Field>
+                            </div>
+
+                            <div className="w-24">
+                              <Field
+                                htmlFor={`library-item-total-${item.id}`}
+                                label="Total"
+                              >
+                                <Input
+                                  id={`library-item-total-${item.id}`}
+                                  min={1}
+                                  step={1}
+                                  type="number"
+                                  value={getOverrideDraft(item).totalCopies}
+                                  onChange={(event) =>
+                                    updateOverrideDraft(item.id, {
+                                      totalCopies: event.target.value,
+                                    })
+                                  }
+                                />
+                              </Field>
+                            </div>
+
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => void handleQuickOverrideSave(item)}
+                              disabled={savingOverrideItemId === item.id}
+                            >
+                              {savingOverrideItemId === item.id
+                                ? "Saving..."
+                                : "Save"}
+                            </Button>
+
                             <Link
-                              className={buttonClassName({ size: "sm", variant: "secondary" })}
+                              className={buttonClassName({
+                                size: "sm",
+                                variant: "secondary",
+                              })}
                               href={`/admin/library/items/${encodeURIComponent(item.id)}/edit`}
                             >
                               Edit
                             </Link>
                             {item.status !== "ARCHIVED" ? (
-                              <Button size="sm" variant="secondary" onClick={() => void handleQuickArchive(item)}>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => void handleQuickArchive(item)}
+                              >
                                 Archive
                               </Button>
                             ) : (
-                              <span className="text-xs text-slate-500">Archived</span>
+                              <span className="text-xs text-slate-500">
+                                Archived
+                              </span>
                             )}
                           </div>
                         </td>

@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -133,7 +139,9 @@ function userBelongsToSchool(user: ManagedUser, schoolId: string) {
     return true;
   }
 
-  return user.memberships.some((membership) => membership.schoolId === schoolId);
+  return user.memberships.some(
+    (membership) => membership.schoolId === schoolId,
+  );
 }
 
 export function LibraryFinesManagement() {
@@ -149,9 +157,14 @@ export function LibraryFinesManagement() {
   const [reasonFilter, setReasonFilter] = useState<LibraryFineReason | "">("");
 
   const [settings, setSettings] = useState<LibraryFineSettings | null>(null);
-  const [settingsForm, setSettingsForm] = useState<FineSettingsForm>(defaultSettingsForm);
-  const [manualForm, setManualForm] = useState<ManualFineForm>(defaultManualFineForm);
-  const [unclaimedForm, setUnclaimedForm] = useState<UnclaimedHoldForm>(defaultUnclaimedHoldForm);
+  const [settingsForm, setSettingsForm] =
+    useState<FineSettingsForm>(defaultSettingsForm);
+  const [manualForm, setManualForm] = useState<ManualFineForm>(
+    defaultManualFineForm,
+  );
+  const [unclaimedForm, setUnclaimedForm] = useState<UnclaimedHoldForm>(
+    defaultUnclaimedHoldForm,
+  );
   const [fines, setFines] = useState<LibraryFine[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -189,14 +202,19 @@ export function LibraryFinesManagement() {
         ]);
         setSchools(schoolList);
         setStudents(userList);
-        const defaultSchoolId = getDefaultSchoolContextId(session?.user) ?? schoolList[0]?.id ?? "";
+        const defaultSchoolId =
+          getDefaultSchoolContextId(session?.user) ?? schoolList[0]?.id ?? "";
         const resolved =
           schoolList.find((school) => school.id === defaultSchoolId)?.id ??
           schoolList[0]?.id ??
           "";
         setSchoolId(resolved);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load schools.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load schools.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -213,7 +231,9 @@ export function LibraryFinesManagement() {
     const nextStudentId = filteredStudents[0]?.id ?? "";
 
     if (
-      !filteredStudents.some((student) => student.id === manualForm.studentId) &&
+      !filteredStudents.some(
+        (student) => student.id === manualForm.studentId,
+      ) &&
       manualForm.studentId !== nextStudentId
     ) {
       setManualForm((current) => ({
@@ -223,7 +243,9 @@ export function LibraryFinesManagement() {
     }
 
     if (
-      !filteredStudents.some((student) => student.id === unclaimedForm.studentId) &&
+      !filteredStudents.some(
+        (student) => student.id === unclaimedForm.studentId,
+      ) &&
       unclaimedForm.studentId !== nextStudentId
     ) {
       setUnclaimedForm((current) => ({
@@ -231,7 +253,12 @@ export function LibraryFinesManagement() {
         studentId: nextStudentId,
       }));
     }
-  }, [filteredStudents, manualForm.studentId, schoolId, unclaimedForm.studentId]);
+  }, [
+    filteredStudents,
+    manualForm.studentId,
+    schoolId,
+    unclaimedForm.studentId,
+  ]);
 
   useEffect(() => {
     async function loadSettingsAndFines() {
@@ -265,7 +292,11 @@ export function LibraryFinesManagement() {
       } catch (loadError) {
         setSettings(null);
         setFines([]);
-        setError(loadError instanceof Error ? loadError.message : "Unable to load library fine data.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load library fine data.",
+        );
       } finally {
         setIsLoadingFines(false);
       }
@@ -330,7 +361,11 @@ export function LibraryFinesManagement() {
       });
       setSuccessMessage("Fine settings saved.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to save fine settings.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save fine settings.",
+      );
     } finally {
       setIsSavingSettings(false);
     }
@@ -363,14 +398,20 @@ export function LibraryFinesManagement() {
         libraryItemId: manualForm.libraryItemId.trim() || undefined,
         checkoutId: manualForm.checkoutId.trim() || undefined,
         holdReference: manualForm.holdReference.trim() || undefined,
-        dueDate: manualForm.dueDate ? new Date(`${manualForm.dueDate}T23:59:59`).toISOString() : undefined,
+        dueDate: manualForm.dueDate
+          ? new Date(`${manualForm.dueDate}T23:59:59`).toISOString()
+          : undefined,
       });
 
       setManualForm(defaultManualFineForm);
       setSuccessMessage("Library fine created.");
       await refreshFines();
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "Unable to create fine.");
+      setError(
+        createError instanceof Error
+          ? createError.message
+          : "Unable to create fine.",
+      );
     } finally {
       setIsCreatingManualFine(false);
     }
@@ -393,7 +434,11 @@ export function LibraryFinesManagement() {
       setSuccessMessage("Fine waived successfully.");
       await refreshFines();
     } catch (waiveError) {
-      setError(waiveError instanceof Error ? waiveError.message : "Unable to waive fine.");
+      setError(
+        waiveError instanceof Error
+          ? waiveError.message
+          : "Unable to waive fine.",
+      );
     } finally {
       setIsWaivingFineId(null);
     }
@@ -405,7 +450,11 @@ export function LibraryFinesManagement() {
       return;
     }
 
-    if (!window.confirm("Assess overdue fines for current overdue loans in this school?")) {
+    if (
+      !window.confirm(
+        "Assess overdue fines for current overdue loans in this school?",
+      )
+    ) {
       return;
     }
 
@@ -420,7 +469,11 @@ export function LibraryFinesManagement() {
       );
       await refreshFines();
     } catch (assessmentError) {
-      setError(assessmentError instanceof Error ? assessmentError.message : "Unable to assess overdue fines.");
+      setError(
+        assessmentError instanceof Error
+          ? assessmentError.message
+          : "Unable to assess overdue fines.",
+      );
     } finally {
       setIsAssessingOverdue(false);
     }
@@ -434,8 +487,13 @@ export function LibraryFinesManagement() {
       return;
     }
 
-    if (!unclaimedForm.studentId.trim() || !unclaimedForm.holdReference.trim()) {
-      setError("Student and hold reference are required for unclaimed hold fines.");
+    if (
+      !unclaimedForm.studentId.trim() ||
+      !unclaimedForm.holdReference.trim()
+    ) {
+      setError(
+        "Student and hold reference are required for unclaimed hold fines.",
+      );
       return;
     }
 
@@ -459,7 +517,11 @@ export function LibraryFinesManagement() {
       setSuccessMessage("Unclaimed hold fine created.");
       await refreshFines();
     } catch (assessmentError) {
-      setError(assessmentError instanceof Error ? assessmentError.message : "Unable to create unclaimed hold fine.");
+      setError(
+        assessmentError instanceof Error
+          ? assessmentError.message
+          : "Unable to create unclaimed hold fine.",
+      );
     } finally {
       setIsAssessingUnclaimed(false);
     }
@@ -478,7 +540,9 @@ export function LibraryFinesManagement() {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-sm text-slate-500">Loading library fine management…</p>
+          <p className="text-sm text-slate-500">
+            Loading library fine management…
+          </p>
         </CardContent>
       </Card>
     );
@@ -491,7 +555,9 @@ export function LibraryFinesManagement() {
         description="Manage fine policies, assess fines, and resolve student library balances."
         meta={
           <>
-            <Badge variant="neutral">{selectedSchool?.name ?? "No school selected"}</Badge>
+            <Badge variant="neutral">
+              {selectedSchool?.name ?? "No school selected"}
+            </Badge>
             <Badge variant="neutral">{fines.length} fines</Badge>
           </>
         }
@@ -503,11 +569,17 @@ export function LibraryFinesManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Filters</CardTitle>
-          <CardDescription>Filter fines by school, student, status, and reason.</CardDescription>
+          <CardDescription>
+            Filter fines by school, student, status, and reason.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
           <Field htmlFor="library-fines-school" label="School">
-            <Select id="library-fines-school" value={schoolId} onChange={(event) => setSchoolId(event.target.value)}>
+            <Select
+              id="library-fines-school"
+              value={schoolId}
+              onChange={(event) => setSchoolId(event.target.value)}
+            >
               <option value="">Select school</option>
               {schools.map((school) => (
                 <option key={school.id} value={school.id}>
@@ -530,7 +602,9 @@ export function LibraryFinesManagement() {
             <Select
               id="library-fines-status"
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as LibraryFineStatus | "")}
+              onChange={(event) =>
+                setStatusFilter(event.target.value as LibraryFineStatus | "")
+              }
             >
               <option value="">All statuses</option>
               <option value="OPEN">Open</option>
@@ -544,7 +618,9 @@ export function LibraryFinesManagement() {
             <Select
               id="library-fines-reason"
               value={reasonFilter}
-              onChange={(event) => setReasonFilter(event.target.value as LibraryFineReason | "")}
+              onChange={(event) =>
+                setReasonFilter(event.target.value as LibraryFineReason | "")
+              }
             >
               <option value="">All reasons</option>
               <option value="LATE">Late</option>
@@ -560,18 +636,25 @@ export function LibraryFinesManagement() {
         <CardHeader>
           <CardTitle>Fine Settings</CardTitle>
           <CardDescription>
-            Policy values used for automatic library fines. Only OWNER and SUPER_ADMIN can edit.
+            Policy values used for automatic library fines. Only OWNER and
+            SUPER_ADMIN can edit.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-4 md:grid-cols-5" onSubmit={handleSaveSettings}>
+          <form
+            className="grid gap-4 md:grid-cols-5"
+            onSubmit={handleSaveSettings}
+          >
             <Field htmlFor="library-late-fine-amount" label="Late fine amount">
               <Input
                 id="library-late-fine-amount"
                 inputMode="decimal"
                 value={settingsForm.lateFineAmount}
                 onChange={(event) =>
-                  setSettingsForm((current) => ({ ...current, lateFineAmount: event.target.value }))
+                  setSettingsForm((current) => ({
+                    ...current,
+                    lateFineAmount: event.target.value,
+                  }))
                 }
               />
             </Field>
@@ -582,12 +665,18 @@ export function LibraryFinesManagement() {
                 inputMode="decimal"
                 value={settingsForm.lostItemFineAmount}
                 onChange={(event) =>
-                  setSettingsForm((current) => ({ ...current, lostItemFineAmount: event.target.value }))
+                  setSettingsForm((current) => ({
+                    ...current,
+                    lostItemFineAmount: event.target.value,
+                  }))
                 }
               />
             </Field>
 
-            <Field htmlFor="library-unclaimed-fine-amount" label="Unclaimed hold amount">
+            <Field
+              htmlFor="library-unclaimed-fine-amount"
+              label="Unclaimed hold amount"
+            >
               <Input
                 id="library-unclaimed-fine-amount"
                 inputMode="decimal"
@@ -609,7 +698,10 @@ export function LibraryFinesManagement() {
                 type="number"
                 value={settingsForm.lateFineGraceDays}
                 onChange={(event) =>
-                  setSettingsForm((current) => ({ ...current, lateFineGraceDays: event.target.value }))
+                  setSettingsForm((current) => ({
+                    ...current,
+                    lateFineGraceDays: event.target.value,
+                  }))
                 }
               />
             </Field>
@@ -621,7 +713,8 @@ export function LibraryFinesManagement() {
                 onChange={(event) =>
                   setSettingsForm((current) => ({
                     ...current,
-                    lateFineFrequency: event.target.value as LibraryLateFineFrequency,
+                    lateFineFrequency: event.target
+                      .value as LibraryLateFineFrequency,
                   }))
                 }
               >
@@ -633,9 +726,14 @@ export function LibraryFinesManagement() {
             <div className="md:col-span-5 flex items-center justify-between gap-3">
               <p className="text-xs text-slate-500">
                 Current settings updated{" "}
-                {settings?.updatedAt ? formatDateLabel(settings.updatedAt) : "—"}
+                {settings?.updatedAt
+                  ? formatDateLabel(settings.updatedAt)
+                  : "—"}
               </p>
-              <Button disabled={!canManagePolicy || isSavingSettings} type="submit">
+              <Button
+                disabled={!canManagePolicy || isSavingSettings}
+                type="submit"
+              >
                 {isSavingSettings ? "Saving…" : "Save settings"}
               </Button>
             </div>
@@ -646,11 +744,17 @@ export function LibraryFinesManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Operational Actions</CardTitle>
-          <CardDescription>Run fine assessments and issue manual fines.</CardDescription>
+          <CardDescription>
+            Run fine assessments and issue manual fines.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-wrap items-center gap-3">
-            <Button disabled={isAssessingOverdue || !schoolId} onClick={() => void handleAssessOverdue()} type="button">
+            <Button
+              disabled={isAssessingOverdue || !schoolId}
+              onClick={() => void handleAssessOverdue()}
+              type="button"
+            >
               {isAssessingOverdue ? "Assessing…" : "Assess overdue fines"}
             </Button>
             <p className="text-xs text-slate-500">
@@ -658,13 +762,22 @@ export function LibraryFinesManagement() {
             </p>
           </div>
 
-          <form className="grid gap-4 md:grid-cols-5" onSubmit={handleAssessUnclaimed}>
-            <Field htmlFor="library-unclaimed-student" label="Unclaimed hold student">
+          <form
+            className="grid gap-4 md:grid-cols-5"
+            onSubmit={handleAssessUnclaimed}
+          >
+            <Field
+              htmlFor="library-unclaimed-student"
+              label="Unclaimed hold student"
+            >
               <Select
                 id="library-unclaimed-student"
                 value={unclaimedForm.studentId}
                 onChange={(event) =>
-                  setUnclaimedForm((current) => ({ ...current, studentId: event.target.value }))
+                  setUnclaimedForm((current) => ({
+                    ...current,
+                    studentId: event.target.value,
+                  }))
                 }
               >
                 <option value="">Select student</option>
@@ -676,61 +789,93 @@ export function LibraryFinesManagement() {
               </Select>
             </Field>
 
-            <Field htmlFor="library-unclaimed-hold-reference" label="Hold reference">
+            <Field
+              htmlFor="library-unclaimed-hold-reference"
+              label="Hold reference"
+            >
               <Input
                 id="library-unclaimed-hold-reference"
                 value={unclaimedForm.holdReference}
                 onChange={(event) =>
-                  setUnclaimedForm((current) => ({ ...current, holdReference: event.target.value }))
+                  setUnclaimedForm((current) => ({
+                    ...current,
+                    holdReference: event.target.value,
+                  }))
                 }
               />
             </Field>
 
-            <Field htmlFor="library-unclaimed-item" label="Library item ID (optional)">
+            <Field
+              htmlFor="library-unclaimed-item"
+              label="Library item ID (optional)"
+            >
               <Input
                 id="library-unclaimed-item"
                 value={unclaimedForm.libraryItemId}
                 onChange={(event) =>
-                  setUnclaimedForm((current) => ({ ...current, libraryItemId: event.target.value }))
+                  setUnclaimedForm((current) => ({
+                    ...current,
+                    libraryItemId: event.target.value,
+                  }))
                 }
               />
             </Field>
 
-            <Field htmlFor="library-unclaimed-due-date" label="Due date (optional)">
+            <Field
+              htmlFor="library-unclaimed-due-date"
+              label="Due date (optional)"
+            >
               <Input
                 id="library-unclaimed-due-date"
                 type="date"
                 value={unclaimedForm.dueDate}
                 onChange={(event) =>
-                  setUnclaimedForm((current) => ({ ...current, dueDate: event.target.value }))
+                  setUnclaimedForm((current) => ({
+                    ...current,
+                    dueDate: event.target.value,
+                  }))
                 }
               />
             </Field>
 
-            <Field htmlFor="library-unclaimed-description" label="Description (optional)">
+            <Field
+              htmlFor="library-unclaimed-description"
+              label="Description (optional)"
+            >
               <Input
                 id="library-unclaimed-description"
                 value={unclaimedForm.description}
                 onChange={(event) =>
-                  setUnclaimedForm((current) => ({ ...current, description: event.target.value }))
+                  setUnclaimedForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
                 }
               />
             </Field>
 
             <div className="md:col-span-5 flex justify-end">
               <Button disabled={isAssessingUnclaimed} type="submit">
-                {isAssessingUnclaimed ? "Creating…" : "Create unclaimed hold fine"}
+                {isAssessingUnclaimed
+                  ? "Creating…"
+                  : "Create unclaimed hold fine"}
               </Button>
             </div>
           </form>
 
-          <form className="grid gap-4 md:grid-cols-4" onSubmit={handleCreateManualFine}>
+          <form
+            className="grid gap-4 md:grid-cols-4"
+            onSubmit={handleCreateManualFine}
+          >
             <Field htmlFor="library-manual-student-id" label="Student">
               <Select
                 id="library-manual-student-id"
                 value={manualForm.studentId}
                 onChange={(event) =>
-                  setManualForm((current) => ({ ...current, studentId: event.target.value }))
+                  setManualForm((current) => ({
+                    ...current,
+                    studentId: event.target.value,
+                  }))
                 }
               >
                 <option value="">Select student</option>
@@ -767,28 +912,43 @@ export function LibraryFinesManagement() {
                 inputMode="decimal"
                 value={manualForm.amount}
                 onChange={(event) =>
-                  setManualForm((current) => ({ ...current, amount: event.target.value }))
+                  setManualForm((current) => ({
+                    ...current,
+                    amount: event.target.value,
+                  }))
                 }
               />
             </Field>
 
-            <Field htmlFor="library-manual-due-date" label="Due date (optional)">
+            <Field
+              htmlFor="library-manual-due-date"
+              label="Due date (optional)"
+            >
               <Input
                 id="library-manual-due-date"
                 type="date"
                 value={manualForm.dueDate}
                 onChange={(event) =>
-                  setManualForm((current) => ({ ...current, dueDate: event.target.value }))
+                  setManualForm((current) => ({
+                    ...current,
+                    dueDate: event.target.value,
+                  }))
                 }
               />
             </Field>
 
-            <Field htmlFor="library-manual-checkout-id" label="Checkout ID (if late/lost)">
+            <Field
+              htmlFor="library-manual-checkout-id"
+              label="Checkout ID (if late/lost)"
+            >
               <Input
                 id="library-manual-checkout-id"
                 value={manualForm.checkoutId}
                 onChange={(event) =>
-                  setManualForm((current) => ({ ...current, checkoutId: event.target.value }))
+                  setManualForm((current) => ({
+                    ...current,
+                    checkoutId: event.target.value,
+                  }))
                 }
               />
             </Field>
@@ -798,27 +958,42 @@ export function LibraryFinesManagement() {
                 id="library-manual-item-id"
                 value={manualForm.libraryItemId}
                 onChange={(event) =>
-                  setManualForm((current) => ({ ...current, libraryItemId: event.target.value }))
+                  setManualForm((current) => ({
+                    ...current,
+                    libraryItemId: event.target.value,
+                  }))
                 }
               />
             </Field>
 
-            <Field htmlFor="library-manual-hold-reference" label="Hold reference (if unclaimed)">
+            <Field
+              htmlFor="library-manual-hold-reference"
+              label="Hold reference (if unclaimed)"
+            >
               <Input
                 id="library-manual-hold-reference"
                 value={manualForm.holdReference}
                 onChange={(event) =>
-                  setManualForm((current) => ({ ...current, holdReference: event.target.value }))
+                  setManualForm((current) => ({
+                    ...current,
+                    holdReference: event.target.value,
+                  }))
                 }
               />
             </Field>
 
-            <Field htmlFor="library-manual-description" label="Description (optional)">
+            <Field
+              htmlFor="library-manual-description"
+              label="Description (optional)"
+            >
               <Input
                 id="library-manual-description"
                 value={manualForm.description}
                 onChange={(event) =>
-                  setManualForm((current) => ({ ...current, description: event.target.value }))
+                  setManualForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
                 }
               />
             </Field>
@@ -835,26 +1010,46 @@ export function LibraryFinesManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Fine Records</CardTitle>
-          <CardDescription>Open and settled library fines linked to student billing charges.</CardDescription>
+          <CardDescription>
+            Open and settled library fines linked to student billing charges.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoadingFines ? (
             <p className="text-sm text-slate-500">Loading fines…</p>
           ) : fines.length === 0 ? (
-            <EmptyState compact title="No fines found" description="No library fines match the current filters." />
+            <EmptyState
+              compact
+              title="No fines found"
+              description="No library fines match the current filters."
+            />
           ) : (
             <div className="overflow-hidden rounded-xl border border-slate-200">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Reason</th>
-                      <th className="px-4 py-3 font-semibold text-right text-slate-700">Amount</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Assessed</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Charge</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Student
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Reason
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-right text-slate-700">
+                        Amount
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Assessed
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Charge
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
@@ -864,23 +1059,35 @@ export function LibraryFinesManagement() {
                           <p className="font-medium text-slate-900">
                             {fine.student.firstName} {fine.student.lastName}
                           </p>
-                          <p className="mt-1 text-xs text-slate-500">{fine.student.username}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {fine.student.username}
+                          </p>
                         </td>
                         <td className="px-4 py-4">
-                          <p className="font-medium text-slate-900">{reasonLabel(fine.reason)}</p>
-                          <p className="mt-1 text-xs text-slate-500">{fine.description ?? "—"}</p>
+                          <p className="font-medium text-slate-900">
+                            {reasonLabel(fine.reason)}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {fine.description ?? "—"}
+                          </p>
                         </td>
                         <td className="px-4 py-4 text-right font-medium text-slate-900">
                           {formatCurrency(fine.amount)}
                         </td>
                         <td className="px-4 py-4">
-                          <Badge variant={statusVariant(fine.status)}>{fine.status}</Badge>
+                          <Badge variant={statusVariant(fine.status)}>
+                            {fine.status}
+                          </Badge>
                         </td>
-                        <td className="px-4 py-4 text-slate-700">{formatDateLabel(fine.assessedAt)}</td>
+                        <td className="px-4 py-4 text-slate-700">
+                          {formatDateLabel(fine.assessedAt)}
+                        </td>
                         <td className="px-4 py-4 text-xs text-slate-600">
                           {fine.billingCharge ? (
                             <>
-                              <p className="font-medium text-slate-900">{fine.billingCharge.title}</p>
+                              <p className="font-medium text-slate-900">
+                                {fine.billingCharge.title}
+                              </p>
                               <p>{fine.billingCharge.id}</p>
                             </>
                           ) : (
@@ -895,10 +1102,14 @@ export function LibraryFinesManagement() {
                               variant="secondary"
                               onClick={() => void handleWaiveFine(fine)}
                             >
-                              {isWaivingFineId === fine.id ? "Waiving…" : "Waive"}
+                              {isWaivingFineId === fine.id
+                                ? "Waiving…"
+                                : "Waive"}
                             </Button>
                           ) : (
-                            <span className="text-xs text-slate-500">No action</span>
+                            <span className="text-xs text-slate-500">
+                              No action
+                            </span>
                           )}
                         </td>
                       </tr>

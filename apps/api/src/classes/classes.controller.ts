@@ -18,6 +18,10 @@ import { UpdateClassDto } from './dto/update-class.dto';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
 import { UpdateTeacherAssignmentDto } from './dto/update-teacher-assignment.dto';
 import { EnrollStudentDto } from './dto/enroll-student.dto';
+import { BulkEnrollStudentClassesDto } from './dto/bulk-enroll-student-classes.dto';
+import { BulkEnrollClassStudentsDto } from './dto/bulk-enroll-class-students.dto';
+import { DuplicateClassDto } from './dto/duplicate-class.dto';
+import { CopyGradebookSettingsDto } from './dto/copy-gradebook-settings.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -104,6 +108,16 @@ export class ClassesController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Post('bulk-enroll')
+  bulkEnrollStudentAcrossClasses(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: BulkEnrollStudentClassesDto,
+  ) {
+    return this.classesService.bulkEnrollStudentAcrossClasses(req.user, body);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
   @Post(':id/enroll-student')
   enrollStudent(
     @Req() req: AuthenticatedRequest,
@@ -111,6 +125,17 @@ export class ClassesController {
     @Body() body: EnrollStudentDto,
   ) {
     return this.classesService.enrollStudent(req.user, id, body);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Post(':id/bulk-enroll-students')
+  bulkEnrollStudentsIntoClass(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+    @Body() body: BulkEnrollClassStudentsDto,
+  ) {
+    return this.classesService.bulkEnrollStudentsIntoClass(req.user, id, body);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -153,6 +178,28 @@ export class ClassesController {
     @Body() body: UpdateClassDto,
   ) {
     return this.classesService.update(req.user, id, body);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Post(':id/duplicate')
+  duplicate(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+    @Body() body: DuplicateClassDto,
+  ) {
+    return this.classesService.duplicateClass(req.user, id, body);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
+  @Post(':id/copy-gradebook-settings')
+  copyGradebookSettings(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+    @Body() body: CopyGradebookSettingsDto,
+  ) {
+    return this.classesService.copyGradebookSettings(req.user, id, body);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

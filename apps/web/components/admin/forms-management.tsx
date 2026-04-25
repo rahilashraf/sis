@@ -35,7 +35,11 @@ import {
   updateForm,
 } from "@/lib/api/forms";
 import { listSchools, type School } from "@/lib/api/schools";
-import { formatDateLabel, formatDateTimeLabel, getDisplayText } from "@/lib/utils";
+import {
+  formatDateLabel,
+  formatDateTimeLabel,
+  getDisplayText,
+} from "@/lib/utils";
 
 const manageRoles = new Set(["OWNER", "SUPER_ADMIN", "ADMIN"]);
 
@@ -242,7 +246,9 @@ function FormFieldBuilder({
     fieldId: string,
     updater: (field: EditableField) => EditableField,
   ) {
-    onChange(fields.map((field) => (field.id === fieldId ? updater(field) : field)));
+    onChange(
+      fields.map((field) => (field.id === fieldId ? updater(field) : field)),
+    );
   }
 
   function addField() {
@@ -262,7 +268,10 @@ function FormFieldBuilder({
       {fields.map((field, index) => (
         <div className="rounded-xl border border-slate-200 p-4" key={field.id}>
           <div className="grid gap-3 md:grid-cols-2">
-            <Field htmlFor={`field-label-${field.id}`} label={`Field ${index + 1} label`}>
+            <Field
+              htmlFor={`field-label-${field.id}`}
+              label={`Field ${index + 1} label`}
+            >
               <Input
                 disabled={disabled}
                 id={`field-label-${field.id}`}
@@ -302,7 +311,9 @@ function FormFieldBuilder({
                     ...current,
                     type: event.target.value as FormFieldType,
                     optionsText:
-                      event.target.value === "SELECT" ? current.optionsText : "",
+                      event.target.value === "SELECT"
+                        ? current.optionsText
+                        : "",
                   }))
                 }
                 value={field.type}
@@ -391,7 +402,12 @@ function FormFieldBuilder({
       ))}
 
       <div className="flex justify-end">
-        <Button disabled={disabled} onClick={addField} type="button" variant="secondary">
+        <Button
+          disabled={disabled}
+          onClick={addField}
+          type="button"
+          variant="secondary"
+        >
           Add field
         </Button>
       </div>
@@ -408,7 +424,8 @@ export function FormsManagement() {
   const [includeInactive, setIncludeInactive] = useState(false);
   const [forms, setForms] = useState<FormSummary[]>([]);
   const [selectedFormId, setSelectedFormId] = useState("");
-  const [createEditor, setCreateEditor] = useState<FormEditorState>(createEmptyEditor());
+  const [createEditor, setCreateEditor] =
+    useState<FormEditorState>(createEmptyEditor());
   const [editEditor, setEditEditor] = useState<FormEditorState | null>(null);
   const [responses, setResponses] = useState<FormResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -443,9 +460,15 @@ export function FormsManagement() {
       try {
         const schoolResponse = await listSchools({ includeInactive: false });
         setSchools(schoolResponse);
-        setSelectedSchoolId((current) => current || schoolResponse[0]?.id || "");
+        setSelectedSchoolId(
+          (current) => current || schoolResponse[0]?.id || "",
+        );
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load schools.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load schools.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -486,7 +509,11 @@ export function FormsManagement() {
     setSuccessMessage(null);
 
     loadForms().catch((loadError) => {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load forms.");
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load forms.",
+      );
       setForms([]);
       setSelectedFormId("");
       setEditEditor(null);
@@ -513,7 +540,11 @@ export function FormsManagement() {
       } catch (loadError) {
         setEditEditor(null);
         setResponses([]);
-        setError(loadError instanceof Error ? loadError.message : "Unable to load form details.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load form details.",
+        );
       } finally {
         setIsLoadingResponses(false);
       }
@@ -560,7 +591,11 @@ export function FormsManagement() {
       await loadForms();
       setSuccessMessage("Form created.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to create form.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to create form.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -610,7 +645,11 @@ export function FormsManagement() {
       setResponses(formResponses);
       setSuccessMessage("Form updated.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update form.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update form.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -632,7 +671,9 @@ export function FormsManagement() {
       setSuccessMessage(form.isActive ? "Form archived." : "Form activated.");
     } catch (saveError) {
       setError(
-        saveError instanceof Error ? saveError.message : "Unable to update form status.",
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update form status.",
       );
     } finally {
       setIsSaving(false);
@@ -659,7 +700,9 @@ export function FormsManagement() {
       setSuccessMessage("Form deleted.");
     } catch (saveError) {
       setDeleteError(
-        saveError instanceof Error ? saveError.message : "Unable to delete form.",
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to delete form.",
       );
     } finally {
       setIsDeleting(false);
@@ -692,7 +735,9 @@ export function FormsManagement() {
         description="Manage parent-facing forms and review submitted responses."
         meta={
           <>
-            <Badge variant="neutral">{selectedSchool?.name ?? "Select school"}</Badge>
+            <Badge variant="neutral">
+              {selectedSchool?.name ?? "Select school"}
+            </Badge>
             <Badge variant="neutral">{forms.length} forms</Badge>
           </>
         }
@@ -704,7 +749,9 @@ export function FormsManagement() {
       <Card>
         <CardHeader>
           <CardTitle>School Context</CardTitle>
-          <CardDescription>Pick a school and choose whether archived forms are listed.</CardDescription>
+          <CardDescription>
+            Pick a school and choose whether archived forms are listed.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <Field htmlFor="forms-school" label="School">
@@ -725,7 +772,9 @@ export function FormsManagement() {
           <Field htmlFor="forms-include-inactive" label="Include archived">
             <Select
               id="forms-include-inactive"
-              onChange={(event) => setIncludeInactive(event.target.value === "true")}
+              onChange={(event) =>
+                setIncludeInactive(event.target.value === "true")
+              }
               value={includeInactive ? "true" : "false"}
             >
               <option value="false">Active only</option>
@@ -739,7 +788,9 @@ export function FormsManagement() {
         <Card>
           <CardHeader>
             <CardTitle>Create Form</CardTitle>
-            <CardDescription>Build a simple parent-facing form with supported field types.</CardDescription>
+            <CardDescription>
+              Build a simple parent-facing form with supported field types.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {!selectedSchoolId ? (
@@ -789,7 +840,11 @@ export function FormsManagement() {
                       value={createEditor.closesAt}
                     />
                   </Field>
-                  <Field className="md:col-span-2" htmlFor="create-form-description" label="Description">
+                  <Field
+                    className="md:col-span-2"
+                    htmlFor="create-form-description"
+                    label="Description"
+                  >
                     <Textarea
                       id="create-form-description"
                       onChange={(event) =>
@@ -851,7 +906,9 @@ export function FormsManagement() {
         <Card>
           <CardHeader>
             <CardTitle>Existing Forms</CardTitle>
-            <CardDescription>Select a form to edit it or review responses.</CardDescription>
+            <CardDescription>
+              Select a form to edit it or review responses.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {forms.length === 0 ? (
@@ -895,7 +952,9 @@ export function FormsManagement() {
                           {form.title}
                         </button>
                         <div className="flex items-center gap-2">
-                          <Badge variant="neutral">{form.isActive ? "Active" : "Archived"}</Badge>
+                          <Badge variant="neutral">
+                            {form.isActive ? "Active" : "Archived"}
+                          </Badge>
                           <Badge variant="neutral">
                             {(form._count?.responses ?? 0) > 0
                               ? `${form._count?.responses ?? 0} responses`
@@ -904,8 +963,13 @@ export function FormsManagement() {
                         </div>
                       </div>
                       <p className="mt-1 text-xs text-slate-500">
-                        {form.opensAt ? `Opens ${formatDateLabel(form.opensAt)}` : "No open date"} •{" "}
-                        {form.closesAt ? `Closes ${formatDateLabel(form.closesAt)}` : "No close date"}
+                        {form.opensAt
+                          ? `Opens ${formatDateLabel(form.opensAt)}`
+                          : "No open date"}{" "}
+                        •{" "}
+                        {form.closesAt
+                          ? `Closes ${formatDateLabel(form.closesAt)}`
+                          : "No close date"}
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <Button
@@ -953,7 +1017,8 @@ export function FormsManagement() {
             <div>
               <CardTitle>Edit Form</CardTitle>
               <CardDescription>
-                Update title, dates, and field definitions for {selectedForm.title}.
+                Update title, dates, and field definitions for{" "}
+                {selectedForm.title}.
               </CardDescription>
             </div>
             <Button
@@ -1021,7 +1086,11 @@ export function FormsManagement() {
                       value={editEditor.closesAt}
                     />
                   </Field>
-                  <Field className="md:col-span-2" htmlFor="edit-form-description" label="Description">
+                  <Field
+                    className="md:col-span-2"
+                    htmlFor="edit-form-description"
+                    label="Description"
+                  >
                     <Textarea
                       id="edit-form-description"
                       onChange={(event) =>
@@ -1075,7 +1144,9 @@ export function FormsManagement() {
                   disabled={isSaving}
                   fields={editEditor.fields}
                   onChange={(fields) =>
-                    setEditEditor((current) => (current ? { ...current, fields } : current))
+                    setEditEditor((current) =>
+                      current ? { ...current, fields } : current,
+                    )
                   }
                 />
 
@@ -1094,7 +1165,9 @@ export function FormsManagement() {
         <Card>
           <CardHeader>
             <CardTitle>Responses</CardTitle>
-            <CardDescription>Simple response view for operational follow-up.</CardDescription>
+            <CardDescription>
+              Simple response view for operational follow-up.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {isLoadingResponses ? (
@@ -1111,15 +1184,26 @@ export function FormsManagement() {
                   <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                     <thead className="bg-slate-50/80">
                       <tr>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Submitted</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Parent</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Values</th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Submitted
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Parent
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Student
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Values
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white">
                       {responses.map((response) => (
-                        <tr className="align-top hover:bg-slate-50" key={response.id}>
+                        <tr
+                          className="align-top hover:bg-slate-50"
+                          key={response.id}
+                        >
                           <td className="px-4 py-3 text-slate-700">
                             {formatDateTimeLabel(response.submittedAt)}
                           </td>

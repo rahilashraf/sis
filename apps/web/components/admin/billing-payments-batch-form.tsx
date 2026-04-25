@@ -170,13 +170,18 @@ export function BillingPaymentsBatchForm() {
         ...row,
         studentId: validStudentIds.has(row.studentId)
           ? row.studentId
-          : filteredStudents[0]?.id ?? "",
+          : (filteredStudents[0]?.id ?? ""),
       })),
     );
   }, [schoolId, filteredStudents]);
 
-  function updateRow(rowId: string, updater: (row: BatchPaymentRow) => BatchPaymentRow) {
-    setRows((current) => current.map((row) => (row.id === rowId ? updater(row) : row)));
+  function updateRow(
+    rowId: string,
+    updater: (row: BatchPaymentRow) => BatchPaymentRow,
+  ) {
+    setRows((current) =>
+      current.map((row) => (row.id === rowId ? updater(row) : row)),
+    );
   }
 
   function addRow() {
@@ -184,7 +189,9 @@ export function BillingPaymentsBatchForm() {
   }
 
   function removeRow(rowId: string) {
-    setRows((current) => (current.length > 1 ? current.filter((row) => row.id !== rowId) : current));
+    setRows((current) =>
+      current.length > 1 ? current.filter((row) => row.id !== rowId) : current,
+    );
     setRowErrors((current) => {
       const next = { ...current };
       delete next[rowId];
@@ -263,13 +270,16 @@ export function BillingPaymentsBatchForm() {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-sm text-slate-500">Loading batch payment form...</p>
+          <p className="text-sm text-slate-500">
+            Loading batch payment form...
+          </p>
         </CardContent>
       </Card>
     );
   }
 
-  const selectedSchool = schools.find((school) => school.id === schoolId) ?? null;
+  const selectedSchool =
+    schools.find((school) => school.id === schoolId) ?? null;
 
   return (
     <div className="space-y-6">
@@ -277,18 +287,26 @@ export function BillingPaymentsBatchForm() {
         title="Batch Payment Entry"
         description="Enter multiple payment rows. Each row creates its own payment and receipt."
         actions={
-          <Link className={buttonClassName({ variant: "secondary" })} href="/admin/billing/charges">
+          <Link
+            className={buttonClassName({ variant: "secondary" })}
+            href="/admin/billing/charges"
+          >
             Back to charges
           </Link>
         }
-        meta={selectedSchool ? <Badge variant="neutral">{selectedSchool.name}</Badge> : null}
+        meta={
+          selectedSchool ? (
+            <Badge variant="neutral">{selectedSchool.name}</Badge>
+          ) : null
+        }
       />
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
 
       {result ? (
         <Notice tone="success">
-          Processed {result.totalRows} row(s): {result.successCount} succeeded, {result.failedCount} failed.
+          Processed {result.totalRows} row(s): {result.successCount} succeeded,{" "}
+          {result.failedCount} failed.
         </Notice>
       ) : null}
 
@@ -296,7 +314,8 @@ export function BillingPaymentsBatchForm() {
         <CardHeader>
           <CardTitle>Batch rows</CardTitle>
           <CardDescription>
-            Enter one payment per row. Manual allocations are optional and omitted in v1.
+            Enter one payment per row. Manual allocations are optional and
+            omitted in v1.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -320,13 +339,27 @@ export function BillingPaymentsBatchForm() {
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Student</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Date</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Amount</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Method</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Reference</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Notes</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">Actions</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                      Student
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                      Date
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                      Amount
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                      Method
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                      Reference
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                      Notes
+                    </th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -337,7 +370,11 @@ export function BillingPaymentsBatchForm() {
                       <tr key={row.id}>
                         <td className="px-3 py-2 align-top min-w-56">
                           <Select
-                            className={errorsForRow.studentId ? "border-rose-400" : undefined}
+                            className={
+                              errorsForRow.studentId
+                                ? "border-rose-400"
+                                : undefined
+                            }
                             value={row.studentId}
                             onChange={(event) =>
                               updateRow(row.id, (current) => ({
@@ -354,12 +391,18 @@ export function BillingPaymentsBatchForm() {
                             ))}
                           </Select>
                           {errorsForRow.studentId ? (
-                            <p className="mt-1 text-xs text-rose-600">{errorsForRow.studentId}</p>
+                            <p className="mt-1 text-xs text-rose-600">
+                              {errorsForRow.studentId}
+                            </p>
                           ) : null}
                         </td>
                         <td className="px-3 py-2 align-top min-w-40">
                           <Input
-                            className={errorsForRow.paymentDate ? "border-rose-400" : undefined}
+                            className={
+                              errorsForRow.paymentDate
+                                ? "border-rose-400"
+                                : undefined
+                            }
                             type="date"
                             value={row.paymentDate}
                             onChange={(event) =>
@@ -370,12 +413,18 @@ export function BillingPaymentsBatchForm() {
                             }
                           />
                           {errorsForRow.paymentDate ? (
-                            <p className="mt-1 text-xs text-rose-600">{errorsForRow.paymentDate}</p>
+                            <p className="mt-1 text-xs text-rose-600">
+                              {errorsForRow.paymentDate}
+                            </p>
                           ) : null}
                         </td>
                         <td className="px-3 py-2 align-top min-w-40">
                           <Input
-                            className={errorsForRow.amount ? "border-rose-400" : undefined}
+                            className={
+                              errorsForRow.amount
+                                ? "border-rose-400"
+                                : undefined
+                            }
                             inputMode="decimal"
                             placeholder="0.00"
                             value={row.amount}
@@ -387,12 +436,18 @@ export function BillingPaymentsBatchForm() {
                             }
                           />
                           {errorsForRow.amount ? (
-                            <p className="mt-1 text-xs text-rose-600">{errorsForRow.amount}</p>
+                            <p className="mt-1 text-xs text-rose-600">
+                              {errorsForRow.amount}
+                            </p>
                           ) : null}
                         </td>
                         <td className="px-3 py-2 align-top min-w-44">
                           <Select
-                            className={errorsForRow.method ? "border-rose-400" : undefined}
+                            className={
+                              errorsForRow.method
+                                ? "border-rose-400"
+                                : undefined
+                            }
                             value={row.method}
                             onChange={(event) =>
                               updateRow(row.id, (current) => ({
@@ -408,7 +463,9 @@ export function BillingPaymentsBatchForm() {
                             ))}
                           </Select>
                           {errorsForRow.method ? (
-                            <p className="mt-1 text-xs text-rose-600">{errorsForRow.method}</p>
+                            <p className="mt-1 text-xs text-rose-600">
+                              {errorsForRow.method}
+                            </p>
                           ) : null}
                         </td>
                         <td className="px-3 py-2 align-top min-w-44">
@@ -482,18 +539,34 @@ export function BillingPaymentsBatchForm() {
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Row</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Student</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Receipt</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Error</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                      Row
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                      Student
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                      Status
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                      Receipt
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                      Error
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {result.results.map((row) => (
-                    <tr key={`${row.rowIndex}-${row.studentId}-${row.success ? "ok" : "err"}`}>
-                      <td className="px-3 py-2 text-sm text-slate-600">{row.rowIndex + 1}</td>
-                      <td className="px-3 py-2 text-sm font-mono text-slate-700">{row.studentId}</td>
+                    <tr
+                      key={`${row.rowIndex}-${row.studentId}-${row.success ? "ok" : "err"}`}
+                    >
+                      <td className="px-3 py-2 text-sm text-slate-600">
+                        {row.rowIndex + 1}
+                      </td>
+                      <td className="px-3 py-2 text-sm font-mono text-slate-700">
+                        {row.studentId}
+                      </td>
                       <td className="px-3 py-2 text-sm">
                         {row.success ? (
                           <Badge variant="success">Success</Badge>
@@ -501,8 +574,12 @@ export function BillingPaymentsBatchForm() {
                           <Badge variant="danger">Failed</Badge>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-sm font-mono text-slate-700">{row.receiptNumber ?? "—"}</td>
-                      <td className="px-3 py-2 text-sm text-rose-700">{row.error ?? "—"}</td>
+                      <td className="px-3 py-2 text-sm font-mono text-slate-700">
+                        {row.receiptNumber ?? "—"}
+                      </td>
+                      <td className="px-3 py-2 text-sm text-rose-700">
+                        {row.error ?? "—"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -131,14 +131,20 @@ export function listAuditLogs(options: {
   }
 
   const queryStr = query.toString();
-  return apiFetch<{ rows: AuditLog[]; total: number; page: number; pageSize: number }>(
-    `/audit/logs${queryStr ? `?${queryStr}` : ""}`,
-  ).then((raw) => ({
+  return apiFetch<{
+    rows: AuditLog[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }>(`/audit/logs${queryStr ? `?${queryStr}` : ""}`).then((raw) => ({
     logs: raw.rows ?? [],
     total: raw.total ?? 0,
     page: raw.page ?? 1,
     pageSize: raw.pageSize ?? 50,
-    pageCount: raw.pageSize > 0 ? Math.max(1, Math.ceil((raw.total ?? 0) / raw.pageSize)) : 1,
+    pageCount:
+      raw.pageSize > 0
+        ? Math.max(1, Math.ceil((raw.total ?? 0) / raw.pageSize))
+        : 1,
   }));
 }
 
@@ -174,12 +180,14 @@ export function getAuditSummary(options?: {
   const queryStr = query.toString();
   return apiFetch<RawAuditSummary>(
     `/audit/summary${queryStr ? `?${queryStr}` : ""}`,
-  ).then((raw): AuditSummary => ({
-    total: raw.total ?? 0,
-    bySeverity: toCountMap(raw.severityCounts ?? [], "severity"),
-    byAction: toCountMap(raw.actionCounts ?? [], "action"),
-    byEntity: toCountMap(raw.entityCounts ?? [], "entityType"),
-  }));
+  ).then(
+    (raw): AuditSummary => ({
+      total: raw.total ?? 0,
+      bySeverity: toCountMap(raw.severityCounts ?? [], "severity"),
+      byAction: toCountMap(raw.actionCounts ?? [], "action"),
+      byEntity: toCountMap(raw.entityCounts ?? [], "entityType"),
+    }),
+  );
 }
 
 export function exportAuditLogsAsPdf(options: {

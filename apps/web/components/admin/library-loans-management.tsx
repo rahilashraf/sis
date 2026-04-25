@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -58,7 +64,9 @@ function userBelongsToSchool(user: ManagedUser, schoolId: string) {
     return true;
   }
 
-  return user.memberships.some((membership) => membership.schoolId === schoolId);
+  return user.memberships.some(
+    (membership) => membership.schoolId === schoolId,
+  );
 }
 
 function getStudentOptionLabel(student: ManagedUser) {
@@ -70,7 +78,9 @@ function getStudentOptionLabel(student: ManagedUser) {
   return `${name} (${student.username})`;
 }
 
-function getStatusVariant(status: LibraryLoan["status"]): "neutral" | "warning" | "success" | "danger" {
+function getStatusVariant(
+  status: LibraryLoan["status"],
+): "neutral" | "warning" | "success" | "danger" {
   if (status === "RETURNED") {
     return "success";
   }
@@ -101,14 +111,19 @@ export function LibraryLoansManagement() {
 
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loans, setLoans] = useState<LibraryLoan[]>([]);
-  const [checkoutForm, setCheckoutForm] = useState<CheckoutForm>(emptyCheckoutForm);
+  const [checkoutForm, setCheckoutForm] =
+    useState<CheckoutForm>(emptyCheckoutForm);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [returningLoanId, setReturningLoanId] = useState<string | null>(null);
-  const [markingLostLoanId, setMarkingLostLoanId] = useState<string | null>(null);
-  const [markingFoundLoanId, setMarkingFoundLoanId] = useState<string | null>(null);
+  const [markingLostLoanId, setMarkingLostLoanId] = useState<string | null>(
+    null,
+  );
+  const [markingFoundLoanId, setMarkingFoundLoanId] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -122,7 +137,13 @@ export function LibraryLoansManagement() {
   );
 
   const selectableItems = useMemo(
-    () => items.filter((item) => item.status !== "ARCHIVED" && item.status !== "LOST" && item.availableCopies > 0),
+    () =>
+      items.filter(
+        (item) =>
+          item.status !== "ARCHIVED" &&
+          item.status !== "LOST" &&
+          item.availableCopies > 0,
+      ),
     [items],
   );
 
@@ -143,11 +164,19 @@ export function LibraryLoansManagement() {
         setSchools(schoolList);
         setStudents(studentList);
 
-        const defaultSchoolId = getDefaultSchoolContextId(session?.user) ?? schoolList[0]?.id ?? "";
-        const resolved = schoolList.find((school) => school.id === defaultSchoolId)?.id ?? schoolList[0]?.id ?? "";
+        const defaultSchoolId =
+          getDefaultSchoolContextId(session?.user) ?? schoolList[0]?.id ?? "";
+        const resolved =
+          schoolList.find((school) => school.id === defaultSchoolId)?.id ??
+          schoolList[0]?.id ??
+          "";
         setSchoolId(resolved);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load schools.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load schools.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -163,7 +192,9 @@ export function LibraryLoansManagement() {
 
     const nextStudentId = filteredStudents[0]?.id ?? "";
     if (
-      !filteredStudents.some((student) => student.id === checkoutForm.studentId) &&
+      !filteredStudents.some(
+        (student) => student.id === checkoutForm.studentId,
+      ) &&
       checkoutForm.studentId !== nextStudentId
     ) {
       setCheckoutForm((current) => ({
@@ -193,12 +224,19 @@ export function LibraryLoansManagement() {
 
         setCheckoutForm((current) => ({
           ...current,
-          itemId: itemRows.find((item) => item.id === current.itemId)?.id ?? itemRows[0]?.id ?? "",
+          itemId:
+            itemRows.find((item) => item.id === current.itemId)?.id ??
+            itemRows[0]?.id ??
+            "",
         }));
       } catch (loadError) {
         setLoans([]);
         setItems([]);
-        setError(loadError instanceof Error ? loadError.message : "Unable to load library loans.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load library loans.",
+        );
       } finally {
         setIsRefreshing(false);
       }
@@ -252,11 +290,19 @@ export function LibraryLoansManagement() {
         dueDate: new Date(`${checkoutForm.dueDate}T23:59:59`).toISOString(),
       });
 
-      setCheckoutForm((current) => ({ ...current, studentId: "", dueDate: "" }));
+      setCheckoutForm((current) => ({
+        ...current,
+        studentId: "",
+        dueDate: "",
+      }));
       setSuccessMessage("Loan checked out successfully.");
       await refreshLoansAndItems();
     } catch (checkoutError) {
-      setError(checkoutError instanceof Error ? checkoutError.message : "Unable to checkout item.");
+      setError(
+        checkoutError instanceof Error
+          ? checkoutError.message
+          : "Unable to checkout item.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -272,7 +318,11 @@ export function LibraryLoansManagement() {
       setSuccessMessage("Loan returned.");
       await refreshLoansAndItems();
     } catch (returnError) {
-      setError(returnError instanceof Error ? returnError.message : "Unable to return loan.");
+      setError(
+        returnError instanceof Error
+          ? returnError.message
+          : "Unable to return loan.",
+      );
     } finally {
       setReturningLoanId(null);
     }
@@ -300,7 +350,11 @@ export function LibraryLoansManagement() {
       );
       await refreshLoansAndItems();
     } catch (markLostError) {
-      setError(markLostError instanceof Error ? markLostError.message : "Unable to mark loan as lost.");
+      setError(
+        markLostError instanceof Error
+          ? markLostError.message
+          : "Unable to mark loan as lost.",
+      );
     } finally {
       setMarkingLostLoanId(null);
     }
@@ -328,7 +382,11 @@ export function LibraryLoansManagement() {
       );
       await refreshLoansAndItems();
     } catch (markFoundError) {
-      setError(markFoundError instanceof Error ? markFoundError.message : "Unable to mark loan as found.");
+      setError(
+        markFoundError instanceof Error
+          ? markFoundError.message
+          : "Unable to mark loan as found.",
+      );
     } finally {
       setMarkingFoundLoanId(null);
     }
@@ -358,7 +416,11 @@ export function LibraryLoansManagement() {
       <PageHeader
         title="Library Loans"
         description="Checkout and return books for students."
-        meta={<Badge variant="neutral">{selectedSchool?.name ?? "All schools"}</Badge>}
+        meta={
+          <Badge variant="neutral">
+            {selectedSchool?.name ?? "All schools"}
+          </Badge>
+        }
       />
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
@@ -367,7 +429,9 @@ export function LibraryLoansManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Checkout</CardTitle>
-          <CardDescription>Assign an available item to a student.</CardDescription>
+          <CardDescription>
+            Assign an available item to a student.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-4" onSubmit={handleCheckout}>
@@ -397,7 +461,12 @@ export function LibraryLoansManagement() {
               <Select
                 id="library-loans-item"
                 value={checkoutForm.itemId}
-                onChange={(event) => setCheckoutForm((current) => ({ ...current, itemId: event.target.value }))}
+                onChange={(event) =>
+                  setCheckoutForm((current) => ({
+                    ...current,
+                    itemId: event.target.value,
+                  }))
+                }
               >
                 <option value="">Select item</option>
                 {selectableItems.map((item) => (
@@ -412,7 +481,12 @@ export function LibraryLoansManagement() {
               <Select
                 id="library-loans-student"
                 value={checkoutForm.studentId}
-                onChange={(event) => setCheckoutForm((current) => ({ ...current, studentId: event.target.value }))}
+                onChange={(event) =>
+                  setCheckoutForm((current) => ({
+                    ...current,
+                    studentId: event.target.value,
+                  }))
+                }
                 disabled={!schoolId || filteredStudents.length === 0}
               >
                 <option value="">Select student</option>
@@ -423,7 +497,9 @@ export function LibraryLoansManagement() {
                 ))}
               </Select>
               {schoolId && filteredStudents.length === 0 ? (
-                <p className="mt-1 text-xs text-slate-500">No students found in the selected school.</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  No students found in the selected school.
+                </p>
               ) : null}
             </Field>
 
@@ -432,7 +508,12 @@ export function LibraryLoansManagement() {
                 id="library-loans-due-date"
                 type="date"
                 value={checkoutForm.dueDate}
-                onChange={(event) => setCheckoutForm((current) => ({ ...current, dueDate: event.target.value }))}
+                onChange={(event) =>
+                  setCheckoutForm((current) => ({
+                    ...current,
+                    dueDate: event.target.value,
+                  }))
+                }
               />
             </Field>
 
@@ -455,7 +536,9 @@ export function LibraryLoansManagement() {
             <Select
               id="library-loans-active-only"
               value={activeOnly ? "active" : "all"}
-              onChange={(event) => setActiveOnly(event.target.value === "active")}
+              onChange={(event) =>
+                setActiveOnly(event.target.value === "active")
+              }
             >
               <option value="active">Active loans only</option>
               <option value="all">All loans</option>
@@ -465,19 +548,35 @@ export function LibraryLoansManagement() {
           {isRefreshing ? (
             <p className="text-sm text-slate-500">Loading loans...</p>
           ) : loans.length === 0 ? (
-            <EmptyState compact title="No loans found" description="No loans match the selected filters." />
+            <EmptyState
+              compact
+              title="No loans found"
+              description="No loans match the selected filters."
+            />
           ) : (
             <div className="overflow-hidden rounded-xl border border-slate-200">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Item</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Checkout</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Due</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Student
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Item
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Checkout
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Due
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
@@ -487,19 +586,32 @@ export function LibraryLoansManagement() {
                           <p className="font-medium text-slate-900">
                             {loan.student.firstName} {loan.student.lastName}
                           </p>
-                          <p className="mt-1 text-xs text-slate-500">{loan.student.username}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {loan.student.username}
+                          </p>
                         </td>
                         <td className="px-4 py-4">
-                          <p className="font-medium text-slate-900">{loan.item.title}</p>
-                          <p className="mt-1 text-xs text-slate-500">{loan.item.author ?? "Unknown author"}</p>
+                          <p className="font-medium text-slate-900">
+                            {loan.item.title}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {loan.item.author ?? "Unknown author"}
+                          </p>
                         </td>
-                        <td className="px-4 py-4 text-slate-700">{formatDateLabel(loan.checkoutDate)}</td>
-                        <td className="px-4 py-4 text-slate-700">{formatDateLabel(loan.dueDate)}</td>
-                        <td className="px-4 py-4">
-                          <Badge variant={getStatusVariant(loan.status)}>{loan.status.replace("_", " ")}</Badge>
+                        <td className="px-4 py-4 text-slate-700">
+                          {formatDateLabel(loan.checkoutDate)}
+                        </td>
+                        <td className="px-4 py-4 text-slate-700">
+                          {formatDateLabel(loan.dueDate)}
                         </td>
                         <td className="px-4 py-4">
-                          {loan.status === "ACTIVE" || loan.status === "OVERDUE" ? (
+                          <Badge variant={getStatusVariant(loan.status)}>
+                            {loan.status.replace("_", " ")}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-4">
+                          {loan.status === "ACTIVE" ||
+                          loan.status === "OVERDUE" ? (
                             <div className="flex flex-wrap gap-2">
                               <Button
                                 disabled={
@@ -511,7 +623,9 @@ export function LibraryLoansManagement() {
                                 variant="secondary"
                                 onClick={() => void handleReturn(loan.id)}
                               >
-                                {returningLoanId === loan.id ? "Returning..." : "Return"}
+                                {returningLoanId === loan.id
+                                  ? "Returning..."
+                                  : "Return"}
                               </Button>
                               <Button
                                 disabled={
@@ -523,20 +637,29 @@ export function LibraryLoansManagement() {
                                 variant="danger"
                                 onClick={() => void handleMarkLost(loan)}
                               >
-                                {markingLostLoanId === loan.id ? "Updating..." : "Mark lost"}
+                                {markingLostLoanId === loan.id
+                                  ? "Updating..."
+                                  : "Mark lost"}
                               </Button>
                             </div>
                           ) : loan.status === "LOST" ? (
                             <Button
-                              disabled={markingFoundLoanId === loan.id || returningLoanId === loan.id}
+                              disabled={
+                                markingFoundLoanId === loan.id ||
+                                returningLoanId === loan.id
+                              }
                               size="sm"
                               variant="secondary"
                               onClick={() => void handleMarkFound(loan)}
                             >
-                              {markingFoundLoanId === loan.id ? "Updating..." : "Mark found"}
+                              {markingFoundLoanId === loan.id
+                                ? "Updating..."
+                                : "Mark found"}
                             </Button>
                           ) : (
-                            <span className="text-xs text-slate-500">Returned</span>
+                            <span className="text-xs text-slate-500">
+                              Returned
+                            </span>
                           )}
                         </td>
                       </tr>

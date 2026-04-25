@@ -41,18 +41,21 @@ type EnrollmentHistoryFormState = {
   notes: string;
 };
 
-const statusOptions: Array<{ value: EnrollmentHistoryStatus; label: string }> = [
-  { value: "ACTIVE", label: "Active" },
-  { value: "WITHDRAWN", label: "Withdrawn" },
-  { value: "TRANSFERRED", label: "Transferred" },
-  { value: "GRADUATED", label: "Graduated" },
-];
+const statusOptions: Array<{ value: EnrollmentHistoryStatus; label: string }> =
+  [
+    { value: "ACTIVE", label: "Active" },
+    { value: "WITHDRAWN", label: "Withdrawn" },
+    { value: "TRANSFERRED", label: "Transferred" },
+    { value: "GRADUATED", label: "Graduated" },
+  ];
 
 function toDateInputValue(value: string | null) {
   return normalizeDateOnlyPayload(value);
 }
 
-function buildFormState(history: EnrollmentHistoryRecord | null): EnrollmentHistoryFormState {
+function buildFormState(
+  history: EnrollmentHistoryRecord | null,
+): EnrollmentHistoryFormState {
   if (!history) {
     return {
       dateOfEnrollment: "",
@@ -82,7 +85,9 @@ function mapSubjectNamesToOptionIds(
   subjectOptions: EnrollmentSubjectOption[],
 ) {
   const idsByName = new Map(
-    subjectOptions.filter((entry) => entry.isActive).map((entry) => [entry.name, entry.id]),
+    subjectOptions
+      .filter((entry) => entry.isActive)
+      .map((entry) => [entry.name, entry.id]),
   );
 
   const selectedIds: string[] = [];
@@ -104,11 +109,20 @@ function toggleSelection(current: string[], value: string) {
   return [...current, value];
 }
 
-export function EnrollmentHistoryPanel({ studentId, canManage }: EnrollmentHistoryPanelProps) {
+export function EnrollmentHistoryPanel({
+  studentId,
+  canManage,
+}: EnrollmentHistoryPanelProps) {
   const [history, setHistory] = useState<EnrollmentHistoryRecord | null>(null);
-  const [subjectOptions, setSubjectOptions] = useState<EnrollmentSubjectOption[]>([]);
-  const [selectedSubjectOptionIds, setSelectedSubjectOptionIds] = useState<string[]>([]);
-  const [form, setForm] = useState<EnrollmentHistoryFormState>(buildFormState(null));
+  const [subjectOptions, setSubjectOptions] = useState<
+    EnrollmentSubjectOption[]
+  >([]);
+  const [selectedSubjectOptionIds, setSelectedSubjectOptionIds] = useState<
+    string[]
+  >([]);
+  const [form, setForm] = useState<EnrollmentHistoryFormState>(
+    buildFormState(null),
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingDetails, setIsSavingDetails] = useState(false);
   const [isSavingSubjects, setIsSavingSubjects] = useState(false);
@@ -125,8 +139,12 @@ export function EnrollmentHistoryPanel({ studentId, canManage }: EnrollmentHisto
       return [] as string[];
     }
 
-    const activeNames = new Set(activeSubjectOptions.map((entry) => entry.name));
-    return history.selectedSubjects.filter((subjectName) => !activeNames.has(subjectName));
+    const activeNames = new Set(
+      activeSubjectOptions.map((entry) => entry.name),
+    );
+    return history.selectedSubjects.filter(
+      (subjectName) => !activeNames.has(subjectName),
+    );
   }, [activeSubjectOptions, history]);
 
   const hasSubjectChanges = useMemo(() => {
@@ -134,8 +152,13 @@ export function EnrollmentHistoryPanel({ studentId, canManage }: EnrollmentHisto
       return false;
     }
 
-    const savedIds = mapSubjectNamesToOptionIds(history.selectedSubjects, activeSubjectOptions);
-    return JSON.stringify(savedIds) !== JSON.stringify(selectedSubjectOptionIds);
+    const savedIds = mapSubjectNamesToOptionIds(
+      history.selectedSubjects,
+      activeSubjectOptions,
+    );
+    return (
+      JSON.stringify(savedIds) !== JSON.stringify(selectedSubjectOptionIds)
+    );
   }, [activeSubjectOptions, history, selectedSubjectOptionIds]);
 
   useEffect(() => {
@@ -154,11 +177,18 @@ export function EnrollmentHistoryPanel({ studentId, canManage }: EnrollmentHisto
         setForm(buildFormState(historyResponse));
         setSelectedSubjectOptionIds(
           historyResponse
-            ? mapSubjectNamesToOptionIds(historyResponse.selectedSubjects, optionsResponse)
+            ? mapSubjectNamesToOptionIds(
+                historyResponse.selectedSubjects,
+                optionsResponse,
+              )
             : [],
         );
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load enrollment history.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load enrollment history.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -200,11 +230,20 @@ export function EnrollmentHistoryPanel({ studentId, canManage }: EnrollmentHisto
       setHistory(response);
       setForm(buildFormState(response));
       setSelectedSubjectOptionIds(
-        mapSubjectNamesToOptionIds(response.selectedSubjects, activeSubjectOptions),
+        mapSubjectNamesToOptionIds(
+          response.selectedSubjects,
+          activeSubjectOptions,
+        ),
       );
-      setSuccessMessage(history ? "Enrollment history updated." : "Enrollment history created.");
+      setSuccessMessage(
+        history ? "Enrollment history updated." : "Enrollment history created.",
+      );
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to save enrollment history.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save enrollment history.",
+      );
     } finally {
       setIsSavingDetails(false);
     }
@@ -225,11 +264,18 @@ export function EnrollmentHistoryPanel({ studentId, canManage }: EnrollmentHisto
       });
       setHistory(response);
       setSelectedSubjectOptionIds(
-        mapSubjectNamesToOptionIds(response.selectedSubjects, activeSubjectOptions),
+        mapSubjectNamesToOptionIds(
+          response.selectedSubjects,
+          activeSubjectOptions,
+        ),
       );
       setSuccessMessage("Selected subjects updated.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to save subjects.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save subjects.",
+      );
     } finally {
       setIsSavingSubjects(false);
     }
@@ -239,7 +285,9 @@ export function EnrollmentHistoryPanel({ studentId, canManage }: EnrollmentHisto
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-sm text-slate-500">Loading enrollment history...</p>
+          <p className="text-sm text-slate-500">
+            Loading enrollment history...
+          </p>
         </CardContent>
       </Card>
     );
@@ -255,7 +303,9 @@ export function EnrollmentHistoryPanel({ studentId, canManage }: EnrollmentHisto
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? <Notice tone="danger">{error}</Notice> : null}
-        {successMessage ? <Notice tone="success">{successMessage}</Notice> : null}
+        {successMessage ? (
+          <Notice tone="success">{successMessage}</Notice>
+        ) : null}
 
         {!history && !canManage ? (
           <EmptyState
@@ -266,7 +316,10 @@ export function EnrollmentHistoryPanel({ studentId, canManage }: EnrollmentHisto
         ) : null}
 
         {canManage ? (
-          <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSaveDetails}>
+          <form
+            className="grid gap-4 md:grid-cols-2"
+            onSubmit={handleSaveDetails}
+          >
             <Field htmlFor="enrollment-date" label="Date of enrollment">
               <Input
                 id="enrollment-date"
@@ -327,7 +380,11 @@ export function EnrollmentHistoryPanel({ studentId, canManage }: EnrollmentHisto
               </Select>
             </Field>
 
-            <Field className="md:col-span-2" htmlFor="enrollment-notes" label="Notes">
+            <Field
+              className="md:col-span-2"
+              htmlFor="enrollment-notes"
+              label="Notes"
+            >
               <Textarea
                 id="enrollment-notes"
                 rows={3}
@@ -382,24 +439,30 @@ export function EnrollmentHistoryPanel({ studentId, canManage }: EnrollmentHisto
                 Status
               </p>
               <p className="mt-1 text-sm text-slate-900">
-                {statusOptions.find((option) => option.value === history.status)?.label ??
-                  history.status}
+                {statusOptions.find((option) => option.value === history.status)
+                  ?.label ?? history.status}
               </p>
             </div>
             <div className="md:col-span-2">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                 Notes
               </p>
-              <p className="mt-1 text-sm text-slate-900">{history.notes ?? "No notes"}</p>
+              <p className="mt-1 text-sm text-slate-900">
+                {history.notes ?? "No notes"}
+              </p>
             </div>
           </div>
         ) : null}
 
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-slate-900">Selected Subjects</p>
+            <p className="text-sm font-semibold text-slate-900">
+              Selected Subjects
+            </p>
             <Badge variant="neutral">
-              {history ? history.selectedSubjects.length : selectedSubjectOptionIds.length}
+              {history
+                ? history.selectedSubjects.length
+                : selectedSubjectOptionIds.length}
             </Badge>
           </div>
 
@@ -429,7 +492,8 @@ export function EnrollmentHistoryPanel({ studentId, canManage }: EnrollmentHisto
 
           {inactiveSavedSubjects.length > 0 ? (
             <Notice tone="info">
-              Saved subjects not in active options: {inactiveSavedSubjects.join(", ")}
+              Saved subjects not in active options:{" "}
+              {inactiveSavedSubjects.join(", ")}
             </Notice>
           ) : null}
 

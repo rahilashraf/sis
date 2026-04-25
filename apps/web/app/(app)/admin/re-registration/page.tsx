@@ -3,4 +3,3 @@ import { ReRegistrationManagement } from "@/components/admin/re-registration-man
 export default function AdminReRegistrationPage() {
   return <ReRegistrationManagement />;
 }
-

@@ -16,6 +16,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import type { AuthenticatedRequest } from '../common/auth/auth-user';
 import { NonEmptyStringPipe } from '../common/pipes/non-empty-string.pipe';
 import { BulkGenerateInterviewSlotsDto } from './dto/bulk-generate-interview-slots.dto';
+import { AdminBookInterviewSlotDto } from './dto/admin-book-interview-slot.dto';
 import { BookInterviewSlotDto } from './dto/book-interview-slot.dto';
 import { CreateInterviewSlotDto } from './dto/create-interview-slot.dto';
 import { ListInterviewSlotsQueryDto } from './dto/list-interview-slots-query.dto';
@@ -55,6 +56,16 @@ export class InterviewSlotsController {
     @Body() body: BookInterviewSlotDto,
   ) {
     return this.service.bookSlot(req.user, id, body);
+  }
+
+  @Post(':id/book-for-parent')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  bookForParent(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+    @Body() body: AdminBookInterviewSlotDto,
+  ) {
+    return this.service.bookSlotByAdmin(req.user, id, body);
   }
 
   @Post(':id/cancel-booking')

@@ -41,7 +41,8 @@ export function BehaviorRecordsPanel({
       [...records]
         .sort(
           (left, right) =>
-            new Date(right.incidentAt).getTime() - new Date(left.incidentAt).getTime(),
+            new Date(right.incidentAt).getTime() -
+            new Date(left.incidentAt).getTime(),
         )
         .slice(0, 5),
     [records],
@@ -100,8 +101,8 @@ export function BehaviorRecordsPanel({
       <CardHeader>
         <CardTitle>Incident Reports</CardTitle>
         <CardDescription>
-          Student-level summary for quick context. Use the full incident workspace
-          for filing, editing, filtering, and attachments.
+          Student-level summary for quick context. Use the full incident
+          workspace for filing, editing, filtering, and attachments.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -136,22 +137,29 @@ export function BehaviorRecordsPanel({
                 key={record.id}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-900">{record.title}</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {record.title}
+                  </p>
                   <div className="flex items-center gap-2">
                     <Badge
-                      variant={record.incidentLevel === "MAJOR" ? "danger" : "warning"}
+                      variant={
+                        record.incidentLevel === "MAJOR" ? "danger" : "warning"
+                      }
                     >
                       {getIncidentLevelLabel(record.incidentLevel)}
                     </Badge>
                     <Badge
-                      variant={record.status === "RESOLVED" ? "success" : "warning"}
+                      variant={
+                        record.status === "RESOLVED" ? "success" : "warning"
+                      }
                     >
                       {record.status === "RESOLVED" ? "Resolved" : "Open"}
                     </Badge>
                   </div>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
-                  {formatDateTimeLabel(record.incidentAt)} • {record.categoryName}
+                  {formatDateTimeLabel(record.incidentAt)} •{" "}
+                  {record.categoryName}
                 </p>
                 <p className="mt-2 text-sm text-slate-700 line-clamp-2">
                   {record.description}

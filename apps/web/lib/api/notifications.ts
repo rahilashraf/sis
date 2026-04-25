@@ -29,7 +29,10 @@ export type UnreadCountResult = {
   count: number;
 };
 
-export function listNotifications(options?: { unreadOnly?: boolean; limit?: number }) {
+export function listNotifications(options?: {
+  unreadOnly?: boolean;
+  limit?: number;
+}) {
   const query = new URLSearchParams();
   if (options?.unreadOnly) query.set("unreadOnly", "true");
   if (options?.limit !== undefined) query.set("limit", String(options.limit));
@@ -42,14 +45,18 @@ export function getUnreadNotificationsCount() {
 }
 
 export function markNotificationAsRead(id: string) {
-  return apiFetch<Notification>(`/notifications/${id}/read`, { method: "POST" });
+  return apiFetch<Notification>(`/notifications/${id}/read`, {
+    method: "POST",
+  });
 }
 
 /**
  * Resolve a best-effort deep link for a notification based on its entityType.
  * Returns null when no specific route is known.
  */
-export function resolveNotificationHref(notification: Notification): string | null {
+export function resolveNotificationHref(
+  notification: Notification,
+): string | null {
   const { entityType, entityId } = notification;
 
   if (!entityType || !entityId) return null;

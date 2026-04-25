@@ -40,7 +40,9 @@ function buildCreateForm(): SubjectOptionFormState {
   };
 }
 
-function buildEditForm(option: EnrollmentSubjectOption): SubjectOptionFormState {
+function buildEditForm(
+  option: EnrollmentSubjectOption,
+): SubjectOptionFormState {
   return {
     name: option.name,
     sortOrder: String(option.sortOrder),
@@ -59,7 +61,8 @@ export function EnrollmentSubjectOptionsManagement() {
   const { session } = useAuth();
   const role = session?.user.role;
   const [options, setOptions] = useState<EnrollmentSubjectOption[]>([]);
-  const [createForm, setCreateForm] = useState<SubjectOptionFormState>(buildCreateForm());
+  const [createForm, setCreateForm] =
+    useState<SubjectOptionFormState>(buildCreateForm());
   const [editingOptionId, setEditingOptionId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<SubjectOptionFormState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,7 +72,9 @@ export function EnrollmentSubjectOptionsManagement() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   async function refreshOptions() {
-    const response = await listEnrollmentSubjectOptions({ includeInactive: true });
+    const response = await listEnrollmentSubjectOptions({
+      includeInactive: true,
+    });
     setOptions(response);
     return response;
   }
@@ -82,7 +87,11 @@ export function EnrollmentSubjectOptionsManagement() {
       try {
         await refreshOptions();
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load subject options.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load subject options.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -118,7 +127,11 @@ export function EnrollmentSubjectOptionsManagement() {
       setCreateForm(buildCreateForm());
       setSuccessMessage("Subject option created.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to create subject option.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to create subject option.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -151,7 +164,11 @@ export function EnrollmentSubjectOptionsManagement() {
       setEditForm(updated ? buildEditForm(updated) : null);
       setSuccessMessage("Subject option updated.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update subject option.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update subject option.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -170,7 +187,11 @@ export function EnrollmentSubjectOptionsManagement() {
       }
 
       await refreshOptions();
-      setSuccessMessage(option.isActive ? "Subject option deactivated." : "Subject option activated.");
+      setSuccessMessage(
+        option.isActive
+          ? "Subject option deactivated."
+          : "Subject option activated.",
+      );
     } catch (saveError) {
       setError(
         saveError instanceof Error
@@ -191,13 +212,17 @@ export function EnrollmentSubjectOptionsManagement() {
     );
   }
 
-  const visibleOptions = showInactive ? options : options.filter((entry) => entry.isActive);
+  const visibleOptions = showInactive
+    ? options
+    : options.filter((entry) => entry.isActive);
 
   if (isLoading) {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-sm text-slate-500">Loading enrollment subject options...</p>
+          <p className="text-sm text-slate-500">
+            Loading enrollment subject options...
+          </p>
         </CardContent>
       </Card>
     );
@@ -217,7 +242,9 @@ export function EnrollmentSubjectOptionsManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Create Subject Option</CardTitle>
-          <CardDescription>Add a new checkbox option for enrollment history subject tracking.</CardDescription>
+          <CardDescription>
+            Add a new checkbox option for enrollment history subject tracking.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-3" onSubmit={handleCreate}>
@@ -235,7 +262,10 @@ export function EnrollmentSubjectOptionsManagement() {
               />
             </Field>
 
-            <Field htmlFor="create-subject-option-sort-order" label="Sort order">
+            <Field
+              htmlFor="create-subject-option-sort-order"
+              label="Sort order"
+            >
               <Input
                 id="create-subject-option-sort-order"
                 inputMode="numeric"
@@ -262,7 +292,8 @@ export function EnrollmentSubjectOptionsManagement() {
         <CardHeader>
           <CardTitle>Subject Options</CardTitle>
           <CardDescription>
-            Inactive options are hidden from enrollment-history selection but remain in historical records.
+            Inactive options are hidden from enrollment-history selection but
+            remain in historical records.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -270,7 +301,9 @@ export function EnrollmentSubjectOptionsManagement() {
             <Select
               id="show-inactive-options"
               value={showInactive ? "all" : "active"}
-              onChange={(event) => setShowInactive(event.target.value === "all")}
+              onChange={(event) =>
+                setShowInactive(event.target.value === "all")
+              }
             >
               <option value="all">Show active and inactive</option>
               <option value="active">Show active only</option>
@@ -286,7 +319,8 @@ export function EnrollmentSubjectOptionsManagement() {
           ) : (
             <div className="space-y-3">
               {visibleOptions.map((option) => {
-                const isEditing = editingOptionId === option.id && editForm !== null;
+                const isEditing =
+                  editingOptionId === option.id && editForm !== null;
 
                 return (
                   <div
@@ -294,8 +328,14 @@ export function EnrollmentSubjectOptionsManagement() {
                     key={option.id}
                   >
                     {isEditing ? (
-                      <form className="grid gap-3 md:grid-cols-3" onSubmit={handleSaveEdit}>
-                        <Field htmlFor={`edit-name-${option.id}`} label="Subject name">
+                      <form
+                        className="grid gap-3 md:grid-cols-3"
+                        onSubmit={handleSaveEdit}
+                      >
+                        <Field
+                          htmlFor={`edit-name-${option.id}`}
+                          label="Subject name"
+                        >
                           <Input
                             id={`edit-name-${option.id}`}
                             value={editForm.name}
@@ -312,7 +352,10 @@ export function EnrollmentSubjectOptionsManagement() {
                           />
                         </Field>
 
-                        <Field htmlFor={`edit-sort-order-${option.id}`} label="Sort order">
+                        <Field
+                          htmlFor={`edit-sort-order-${option.id}`}
+                          label="Sort order"
+                        >
                           <Input
                             id={`edit-sort-order-${option.id}`}
                             inputMode="numeric"
@@ -350,13 +393,17 @@ export function EnrollmentSubjectOptionsManagement() {
                     ) : (
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-slate-900">{option.name}</p>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {option.name}
+                          </p>
                           <p className="mt-1 text-xs text-slate-500">
                             Sort order: {option.sortOrder}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge variant={option.isActive ? "success" : "neutral"}>
+                          <Badge
+                            variant={option.isActive ? "success" : "neutral"}
+                          >
                             {option.isActive ? "Active" : "Inactive"}
                           </Badge>
                           <Button

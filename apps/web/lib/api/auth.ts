@@ -20,6 +20,7 @@ export function getCurrentUser() {
 export type UpdateMyProfileInput = {
   firstName?: string;
   lastName?: string;
+  phone?: string;
 };
 
 export type ChangeMyPasswordInput = {

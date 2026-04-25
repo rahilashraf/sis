@@ -5,7 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { buttonClassName } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -23,7 +29,10 @@ import {
   type InterviewEvent,
   type InterviewSlotParent,
 } from "@/lib/api/interviews";
-import { listMyParentStudents, type ParentStudentLink } from "@/lib/api/students";
+import {
+  listMyParentStudents,
+  type ParentStudentLink,
+} from "@/lib/api/students";
 import { formatDateTimeLabel } from "@/lib/utils";
 
 function getStatusVariant(status: InterviewSlotParent["status"]) {
@@ -67,7 +76,8 @@ export function ParentInterviewEventDetail({ eventId }: { eventId: string }) {
     }
 
     return slots.filter((slot) => {
-      const teacher = `${slot.teacher.firstName} ${slot.teacher.lastName}`.toLowerCase();
+      const teacher =
+        `${slot.teacher.firstName} ${slot.teacher.lastName}`.toLowerCase();
       const className = (slot.class?.name ?? "").toLowerCase();
       return teacher.includes(query) || className.includes(query);
     });
@@ -88,13 +98,18 @@ export function ParentInterviewEventDetail({ eventId }: { eventId: string }) {
 
         const requestedStudentId = searchParams.get("studentId") ?? "";
         const resolvedStudentId =
-          requestedStudentId && response.some((entry) => entry.studentId === requestedStudentId)
+          requestedStudentId &&
+          response.some((entry) => entry.studentId === requestedStudentId)
             ? requestedStudentId
-            : response[0]?.studentId ?? "";
+            : (response[0]?.studentId ?? "");
 
         setSelectedStudentId((current) => current || resolvedStudentId);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load linked students.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load linked students.",
+        );
       } finally {
         setIsLoadingStudents(false);
       }
@@ -122,7 +137,10 @@ export function ParentInterviewEventDetail({ eventId }: { eventId: string }) {
       const [eventResponse, slotResponse, bookingResponse] = await Promise.all([
         listParentInterviewEvents(selectedStudentId),
         listParentInterviewEventSlots(eventId, selectedStudentId),
-        listParentInterviewBookings({ interviewEventId: eventId, studentId: selectedStudentId }),
+        listParentInterviewBookings({
+          interviewEventId: eventId,
+          studentId: selectedStudentId,
+        }),
       ]);
 
       setEvent(eventResponse.find((entry) => entry.id === eventId) ?? null);
@@ -132,7 +150,11 @@ export function ParentInterviewEventDetail({ eventId }: { eventId: string }) {
       setEvent(null);
       setSlots([]);
       setBookings([]);
-      setError(loadError instanceof Error ? loadError.message : "Unable to load event slots.");
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load event slots.",
+      );
     } finally {
       setIsLoadingData(false);
     }
@@ -152,7 +174,11 @@ export function ParentInterviewEventDetail({ eventId }: { eventId: string }) {
       setSuccessMessage("Interview slot booked.");
       await refreshCurrentStudentData();
     } catch (bookError) {
-      setError(bookError instanceof Error ? bookError.message : "Unable to book interview slot.");
+      setError(
+        bookError instanceof Error
+          ? bookError.message
+          : "Unable to book interview slot.",
+      );
     } finally {
       setActiveSlotId(null);
     }
@@ -168,7 +194,11 @@ export function ParentInterviewEventDetail({ eventId }: { eventId: string }) {
       setSuccessMessage("Interview booking cancelled.");
       await refreshCurrentStudentData();
     } catch (cancelError) {
-      setError(cancelError instanceof Error ? cancelError.message : "Unable to cancel booking.");
+      setError(
+        cancelError instanceof Error
+          ? cancelError.message
+          : "Unable to cancel booking.",
+      );
     } finally {
       setActiveSlotId(null);
     }
@@ -230,7 +260,9 @@ export function ParentInterviewEventDetail({ eventId }: { eventId: string }) {
           <Field htmlFor="parent-event-student" label="Student">
             <Select
               id="parent-event-student"
-              onChange={(changeEvent) => setSelectedStudentId(changeEvent.target.value)}
+              onChange={(changeEvent) =>
+                setSelectedStudentId(changeEvent.target.value)
+              }
               value={selectedStudentId}
             >
               {links.map((link) => (
@@ -256,7 +288,9 @@ export function ParentInterviewEventDetail({ eventId }: { eventId: string }) {
         <CardHeader>
           <CardTitle>Available Slots</CardTitle>
           <CardDescription>
-            {isLoadingData ? "Loading..." : `${slots.length} slot${slots.length === 1 ? "" : "s"} visible for this student`}
+            {isLoadingData
+              ? "Loading..."
+              : `${slots.length} slot${slots.length === 1 ? "" : "s"} visible for this student`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -264,7 +298,9 @@ export function ParentInterviewEventDetail({ eventId }: { eventId: string }) {
             <Field htmlFor="parent-event-slot-query" label="Search slots">
               <Input
                 id="parent-event-slot-query"
-                onChange={(changeEvent) => setSlotQuery(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setSlotQuery(changeEvent.target.value)
+                }
                 placeholder="Search by teacher or class"
                 value={slotQuery}
               />
@@ -275,7 +311,9 @@ export function ParentInterviewEventDetail({ eventId }: { eventId: string }) {
           ) : filteredSlots.length === 0 ? (
             <EmptyState
               compact
-              title={slots.length === 0 ? "No slots available" : "No matching slots"}
+              title={
+                slots.length === 0 ? "No slots available" : "No matching slots"
+              }
               description={
                 slots.length === 0
                   ? "No interview slots are currently available for this student in this event."
@@ -288,11 +326,21 @@ export function ParentInterviewEventDetail({ eventId }: { eventId: string }) {
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Teacher</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Class</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Time</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Action</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Teacher
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Class
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Time
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
@@ -303,15 +351,24 @@ export function ParentInterviewEventDetail({ eventId }: { eventId: string }) {
                         slot.bookedStudentId === selectedStudentId;
 
                       return (
-                        <tr className="align-top hover:bg-slate-50" key={slot.id}>
+                        <tr
+                          className="align-top hover:bg-slate-50"
+                          key={slot.id}
+                        >
                           <td className="px-4 py-3 text-slate-900">
                             {slot.teacher.firstName} {slot.teacher.lastName}
                           </td>
-                          <td className="px-4 py-3 text-slate-600">{slot.class?.name ?? "—"}</td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {slot.class?.name ?? "—"}
+                          </td>
                           <td className="px-4 py-3 text-slate-600">
                             <p>{formatDateTimeLabel(slot.startTime)}</p>
-                            <p className="mt-1">{formatDateTimeLabel(slot.endTime)}</p>
-                            {slot.location ? <p className="mt-1 text-xs">{slot.location}</p> : null}
+                            <p className="mt-1">
+                              {formatDateTimeLabel(slot.endTime)}
+                            </p>
+                            {slot.location ? (
+                              <p className="mt-1 text-xs">{slot.location}</p>
+                            ) : null}
                           </td>
                           <td className="px-4 py-3">
                             <Badge variant={getStatusVariant(slot.status)}>
@@ -321,24 +378,36 @@ export function ParentInterviewEventDetail({ eventId }: { eventId: string }) {
                           <td className="px-4 py-3">
                             {slot.status === "AVAILABLE" ? (
                               <button
-                                className={buttonClassName({ size: "sm", variant: "primary" })}
+                                className={buttonClassName({
+                                  size: "sm",
+                                  variant: "primary",
+                                })}
                                 disabled={activeSlotId === slot.id}
                                 onClick={() => void handleBook(slot.id)}
                                 type="button"
                               >
-                                {activeSlotId === slot.id ? "Booking..." : "Book"}
+                                {activeSlotId === slot.id
+                                  ? "Booking..."
+                                  : "Book"}
                               </button>
                             ) : isMyBooking ? (
                               <button
-                                className={buttonClassName({ size: "sm", variant: "secondary" })}
+                                className={buttonClassName({
+                                  size: "sm",
+                                  variant: "secondary",
+                                })}
                                 disabled={activeSlotId === slot.id}
                                 onClick={() => void handleCancel(slot.id)}
                                 type="button"
                               >
-                                {activeSlotId === slot.id ? "Cancelling..." : "Cancel booking"}
+                                {activeSlotId === slot.id
+                                  ? "Cancelling..."
+                                  : "Cancel booking"}
                               </button>
                             ) : (
-                              <span className="text-xs text-slate-500">Unavailable</span>
+                              <span className="text-xs text-slate-500">
+                                Unavailable
+                              </span>
                             )}
                           </td>
                         </tr>

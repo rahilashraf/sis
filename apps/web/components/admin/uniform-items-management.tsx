@@ -64,7 +64,9 @@ export function UniformItemsManagement() {
         setSchools(schoolResponse);
 
         const defaultSchoolId =
-          getDefaultSchoolContextId(session?.user) ?? schoolResponse[0]?.id ?? "";
+          getDefaultSchoolContextId(session?.user) ??
+          schoolResponse[0]?.id ??
+          "";
         const resolvedSchoolId =
           schoolResponse.find((school) => school.id === defaultSchoolId)?.id ??
           schoolResponse[0]?.id ??
@@ -72,7 +74,11 @@ export function UniformItemsManagement() {
 
         setSchoolId(resolvedSchoolId);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load schools.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load schools.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -165,11 +171,18 @@ export function UniformItemsManagement() {
         title="Uniform Items"
         description="Manage school uniform catalog items and availability."
         actions={
-          <Link className={buttonClassName({ variant: "primary" })} href="/admin/uniform/items/new">
+          <Link
+            className={buttonClassName({ variant: "primary" })}
+            href="/admin/uniform/items/new"
+          >
             Add item
           </Link>
         }
-        meta={<Badge variant="neutral">{selectedSchool?.name ?? "All schools"}</Badge>}
+        meta={
+          <Badge variant="neutral">
+            {selectedSchool?.name ?? "All schools"}
+          </Badge>
+        }
       />
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
@@ -178,7 +191,9 @@ export function UniformItemsManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Filters</CardTitle>
-          <CardDescription>Filter by school or search item details.</CardDescription>
+          <CardDescription>
+            Filter by school or search item details.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
           <Field htmlFor="uniform-items-school" label="School">
@@ -219,7 +234,9 @@ export function UniformItemsManagement() {
         <CardHeader>
           <CardTitle>Catalog</CardTitle>
           <CardDescription>
-            {isRefreshing ? "Refreshing..." : `${items.length} item${items.length === 1 ? "" : "s"}`}
+            {isRefreshing
+              ? "Refreshing..."
+              : `${items.length} item${items.length === 1 ? "" : "s"}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -235,51 +252,85 @@ export function UniformItemsManagement() {
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Item</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Category</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Price</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Options</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Item
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Category
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Price
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Options
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {items.map((item) => (
                       <tr className="align-top hover:bg-slate-50" key={item.id}>
                         <td className="px-4 py-3">
-                          <p className="font-medium text-slate-900">{item.name}</p>
+                          <p className="font-medium text-slate-900">
+                            {item.name}
+                          </p>
                           <p className="mt-1 text-xs text-slate-500">
                             {item.sku ? `SKU: ${item.sku}` : "No SKU"}
                           </p>
                           {item.description ? (
-                            <p className="mt-1 text-xs text-slate-500">{item.description}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {item.description}
+                            </p>
                           ) : null}
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{item.category || "—"}</td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {item.category || "—"}
+                        </td>
                         <td className="px-4 py-3 font-medium text-slate-900">
                           {formatUniformMoney(item.price)}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600">
-                          <p>Sizes: {item.availableSizes.length ? item.availableSizes.join(", ") : "—"}</p>
+                          <p>
+                            Sizes:{" "}
+                            {item.availableSizes.length
+                              ? item.availableSizes.join(", ")
+                              : "—"}
+                          </p>
                           <p className="mt-1">
-                            Colors: {item.availableColors.length ? item.availableColors.join(", ") : "—"}
+                            Colors:{" "}
+                            {item.availableColors.length
+                              ? item.availableColors.join(", ")
+                              : "—"}
                           </p>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge variant={item.isActive ? "success" : "neutral"}>
+                          <Badge
+                            variant={item.isActive ? "success" : "neutral"}
+                          >
                             {item.isActive ? "Active" : "Inactive"}
                           </Badge>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-2">
                             <Link
-                              className={buttonClassName({ size: "sm", variant: "secondary" })}
+                              className={buttonClassName({
+                                size: "sm",
+                                variant: "secondary",
+                              })}
                               href={`/admin/uniform/items/${encodeURIComponent(item.id)}/edit`}
                             >
                               Edit
                             </Link>
                             <button
-                              className={buttonClassName({ size: "sm", variant: "secondary" })}
+                              className={buttonClassName({
+                                size: "sm",
+                                variant: "secondary",
+                              })}
                               onClick={() => void handleToggleActive(item)}
                               type="button"
                             >

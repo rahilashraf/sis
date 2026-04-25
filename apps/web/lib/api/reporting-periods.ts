@@ -69,9 +69,9 @@ export function listReportingPeriods(options: {
     query.set("includeInactive", "true");
   }
 
-  return apiFetch<RawReportingPeriod[]>(`/reporting-periods?${query.toString()}`).then(
-    (response) => response.map(normalizeReportingPeriod),
-  );
+  return apiFetch<RawReportingPeriod[]>(
+    `/reporting-periods?${query.toString()}`,
+  ).then((response) => response.map(normalizeReportingPeriod));
 }
 
 export function createReportingPeriod(input: CreateReportingPeriodInput) {
@@ -85,27 +85,40 @@ export function createReportingPeriod(input: CreateReportingPeriodInput) {
   }).then(normalizeReportingPeriod);
 }
 
-export function updateReportingPeriod(periodId: string, input: UpdateReportingPeriodInput) {
+export function updateReportingPeriod(
+  periodId: string,
+  input: UpdateReportingPeriodInput,
+) {
   return apiFetch<RawReportingPeriod>(`/reporting-periods/${periodId}`, {
     method: "PATCH",
     json: {
       ...input,
-      ...(input.startsAt !== undefined ? { startsAt: toDateOnly(input.startsAt) } : {}),
-      ...(input.endsAt !== undefined ? { endsAt: toDateOnly(input.endsAt) } : {}),
+      ...(input.startsAt !== undefined
+        ? { startsAt: toDateOnly(input.startsAt) }
+        : {}),
+      ...(input.endsAt !== undefined
+        ? { endsAt: toDateOnly(input.endsAt) }
+        : {}),
     },
   }).then(normalizeReportingPeriod);
 }
 
 export function archiveReportingPeriod(periodId: string) {
-  return apiFetch<RawReportingPeriod>(`/reporting-periods/${periodId}/archive`, {
-    method: "PATCH",
-  }).then(normalizeReportingPeriod);
+  return apiFetch<RawReportingPeriod>(
+    `/reporting-periods/${periodId}/archive`,
+    {
+      method: "PATCH",
+    },
+  ).then(normalizeReportingPeriod);
 }
 
 export function activateReportingPeriod(periodId: string) {
-  return apiFetch<RawReportingPeriod>(`/reporting-periods/${periodId}/activate`, {
-    method: "PATCH",
-  }).then(normalizeReportingPeriod);
+  return apiFetch<RawReportingPeriod>(
+    `/reporting-periods/${periodId}/activate`,
+    {
+      method: "PATCH",
+    },
+  ).then(normalizeReportingPeriod);
 }
 
 export function lockReportingPeriod(periodId: string) {

@@ -57,17 +57,26 @@ export function ParentStudentTimetable({ studentId }: { studentId: string }) {
         setBlocks([]);
       }
 
-      if (studentResult.status === "rejected" || timetableResult.status === "rejected") {
+      if (
+        studentResult.status === "rejected" ||
+        timetableResult.status === "rejected"
+      ) {
         const studentMessage =
-          studentResult.status === "rejected" && studentResult.reason instanceof Error
+          studentResult.status === "rejected" &&
+          studentResult.reason instanceof Error
             ? studentResult.reason.message
             : null;
         const timetableMessage =
-          timetableResult.status === "rejected" && timetableResult.reason instanceof Error
+          timetableResult.status === "rejected" &&
+          timetableResult.reason instanceof Error
             ? timetableResult.reason.message
             : null;
 
-        setError(studentMessage ?? timetableMessage ?? "Unable to load student timetable.");
+        setError(
+          studentMessage ??
+            timetableMessage ??
+            "Unable to load student timetable.",
+        );
       }
 
       setIsLoading(false);
@@ -78,7 +87,8 @@ export function ParentStudentTimetable({ studentId }: { studentId: string }) {
 
   const groupedBlocks = useMemo(() => {
     const sorted = [...blocks].sort((a, b) => {
-      const dayOrder = daysOfWeek.indexOf(a.dayOfWeek) - daysOfWeek.indexOf(b.dayOfWeek);
+      const dayOrder =
+        daysOfWeek.indexOf(a.dayOfWeek) - daysOfWeek.indexOf(b.dayOfWeek);
       if (dayOrder !== 0) {
         return dayOrder;
       }
@@ -108,7 +118,10 @@ export function ParentStudentTimetable({ studentId }: { studentId: string }) {
         description="Read-only timetable view for the selected student."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link className={buttonClassName({ variant: "secondary" })} href="/parent">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/parent"
+            >
               Back to my students
             </Link>
             <Link
@@ -133,7 +146,9 @@ export function ParentStudentTimetable({ studentId }: { studentId: string }) {
       {isLoading ? (
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Loading student timetable...</p>
+            <p className="text-sm text-slate-500">
+              Loading student timetable...
+            </p>
           </CardContent>
         </Card>
       ) : groupedBlocks.length === 0 ? (
@@ -160,7 +175,9 @@ export function ParentStudentTimetable({ studentId }: { studentId: string }) {
                           {block.startTime} - {block.endTime}
                         </Badge>
                         {block.roomLabel ? (
-                          <Badge variant="neutral">Room: {block.roomLabel}</Badge>
+                          <Badge variant="neutral">
+                            Room: {block.roomLabel}
+                          </Badge>
                         ) : null}
                         <Badge variant="neutral">
                           {block.teacher.firstName} {block.teacher.lastName}
@@ -178,7 +195,9 @@ export function ParentStudentTimetable({ studentId }: { studentId: string }) {
                       ) : null}
 
                       {block.notes ? (
-                        <p className="mt-3 text-sm text-slate-700">{block.notes}</p>
+                        <p className="mt-3 text-sm text-slate-700">
+                          {block.notes}
+                        </p>
                       ) : null}
                     </div>
                   ))}

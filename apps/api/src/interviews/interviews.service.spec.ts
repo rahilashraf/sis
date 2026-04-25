@@ -9,6 +9,7 @@ import { InterviewsService } from './interviews.service';
 
 describe('InterviewsService', () => {
   let service: InterviewsService;
+  let auditService: { log: jest.Mock };
   let prisma: {
     school: { findUnique: jest.Mock };
     user: { findUnique: jest.Mock };
@@ -74,7 +75,11 @@ describe('InterviewsService', () => {
       }),
     };
 
-    service = new InterviewsService(prisma as never);
+    auditService = {
+      log: jest.fn(),
+    };
+
+    service = new InterviewsService(prisma as never, auditService as never);
   });
 
   function mockParentLink(studentId = 'student-1') {
@@ -238,5 +243,125 @@ describe('InterviewsService', () => {
         studentId: 'student-1',
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('allows admin to book for linked parent/student and records audit metadata', async () => {
+    prisma.studentParentLink.findUnique.mockResolvedValue({
+      parent: {
+        id: 'parent-1',
+        role: UserRole.PARENT,
+        schoolId: 'school-1',
+        memberships: [{ schoolId: 'school-1', isActive: true }],
+      },
+      student: {
+        id: 'student-1',
+        role: UserRole.STUDENT,
+        schoolId: 'school-1',
+        memberships: [{ schoolId: 'school-1', isActive: true }],
+      },
+    });
+
+    prisma.interviewSlot.findUnique.mockResolvedValue({
+      id: 'slot-1',
+      interviewEventId: 'event-1',
+      schoolId: 'school-1',
+      teacherId: 'teacher-1',
+      classId: null,
+      startTime: new Date('2099-01-10T10:00:00.000Z'),
+      endTime: new Date('2099-01-10T10:15:00.000Z'),
+      status: 'AVAILABLE',
+      bookedParentId: null,
+      bookedStudentId: null,
+      interviewEvent: {
+        id: 'event-1',
+        startsAt: new Date('2099-01-01T00:00:00.000Z'),
+        endsAt: new Date('2099-01-31T23:59:59.000Z'),
+        bookingOpensAt: null,
+        bookingClosesAt: null,
+        isPublished: true,
+        isActive: true,
+      },
+    });
+
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assign-1' });
+    prisma.interviewSlot.findFirst.mockResolvedValue(null);
+    prisma.interviewSlot.updateMany.mockResolvedValue({ count: 1 });
+    prisma.interviewSlot.findUniqueOrThrow.mockResolvedValue({
+      id: 'slot-1',
+      interviewEventId: 'event-1',
+      schoolId: 'school-1',
+      teacherId: 'teacher-1',
+      classId: null,
+      startTime: new Date('2099-01-10T10:00:00.000Z'),
+      endTime: new Date('2099-01-10T10:15:00.000Z'),
+      location: null,
+      meetingMode: null,
+      notes: null,
+      status: 'BOOKED',
+      bookedParentId: 'parent-1',
+      bookedStudentId: 'student-1',
+      bookedAt: new Date('2099-01-01T00:00:00.000Z'),
+      bookingNotes: null,
+      createdAt: new Date('2099-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2099-01-01T00:00:00.000Z'),
+      interviewEvent: {
+        id: 'event-1',
+        title: 'Fall Interviews',
+        bookingOpensAt: null,
+        bookingClosesAt: null,
+        startsAt: new Date('2099-01-01T00:00:00.000Z'),
+        endsAt: new Date('2099-01-31T23:59:59.000Z'),
+        isPublished: true,
+        isActive: true,
+      },
+      teacher: {
+        id: 'teacher-1',
+        firstName: 'T',
+        lastName: 'One',
+        email: null,
+        username: 'teacher1',
+        role: UserRole.TEACHER,
+      },
+      class: null,
+      bookedParent: {
+        id: 'parent-1',
+        firstName: 'Parent',
+        lastName: 'One',
+        email: null,
+        username: 'parent1',
+      },
+      bookedStudent: {
+        id: 'student-1',
+        firstName: 'Student',
+        lastName: 'One',
+        email: null,
+        username: 'student1',
+      },
+    });
+
+    const result = await service.bookSlotByAdmin(
+      {
+        id: 'admin-1',
+        role: UserRole.ADMIN,
+        memberships: [{ schoolId: 'school-1', isActive: true }],
+      } as never,
+      'slot-1',
+      {
+        studentId: 'student-1',
+        parentId: 'parent-1',
+      },
+    );
+
+    expect(result.id).toBe('slot-1');
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'ADMIN_BOOK_FOR_PARENT',
+        metadataJson: expect.objectContaining({
+          slotId: 'slot-1',
+          studentId: 'student-1',
+          parentId: 'parent-1',
+        }),
+      }),
+    );
   });
 });

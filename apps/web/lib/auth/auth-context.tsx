@@ -3,10 +3,8 @@
 import {
   createContext,
   useCallback,
-  useEffect,
   useContext,
   useMemo,
-  useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
@@ -38,7 +36,11 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const sessionSnapshot = useSyncExternalStore<SessionSnapshot>(
     subscribeToStoredSession,
     getStoredSessionSnapshot,
@@ -50,29 +52,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => null,
   );
 
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
-
   const setSession = useCallback((session: StoredSession) => {
     storeSession(session);
   }, []);
 
-  const updateUser = useCallback(
-    (user: AuthenticatedUser) => {
-      const currentSession = getStoredSessionSnapshot();
+  const updateUser = useCallback((user: AuthenticatedUser) => {
+    const currentSession = getStoredSessionSnapshot();
 
-      if (!currentSession) {
-        return;
-      }
+    if (!currentSession) {
+      return;
+    }
 
-      storeSession({
-        ...currentSession,
-        user,
-      });
-    },
-    [],
-  );
+    storeSession({
+      ...currentSession,
+      user,
+    });
+  }, []);
 
   const logout = useCallback(() => {
     clearStoredSession();

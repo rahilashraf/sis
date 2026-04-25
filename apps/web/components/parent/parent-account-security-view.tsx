@@ -19,7 +19,10 @@ export function ParentAccountSecurityView() {
             >
               Back to account
             </Link>
-            <Link className={buttonClassName({ variant: "secondary" })} href="/parent">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/parent"
+            >
               Back to parent portal
             </Link>
           </div>

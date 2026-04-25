@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { buttonClassName } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { CheckboxField, Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
@@ -116,14 +122,20 @@ export function InterviewEventForm({ eventId }: { eventId?: string }) {
         }
 
         const defaultSchoolId =
-          getDefaultSchoolContextId(session?.user) ?? schoolResponse[0]?.id ?? "";
+          getDefaultSchoolContextId(session?.user) ??
+          schoolResponse[0]?.id ??
+          "";
         const resolvedSchoolId =
           schoolResponse.find((school) => school.id === defaultSchoolId)?.id ??
           schoolResponse[0]?.id ??
           "";
         setSchoolId(resolvedSchoolId);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load event form.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load event form.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -221,7 +233,10 @@ export function InterviewEventForm({ eventId }: { eventId?: string }) {
         title={eventId ? "Edit Interview Event" : "New Interview Event"}
         description="Configure booking window and event dates."
         actions={
-          <Link className={buttonClassName({ variant: "secondary" })} href="/admin/interviews">
+          <Link
+            className={buttonClassName({ variant: "secondary" })}
+            href="/admin/interviews"
+          >
             Back to events
           </Link>
         }
@@ -243,7 +258,9 @@ export function InterviewEventForm({ eventId }: { eventId?: string }) {
               <Select
                 disabled={Boolean(eventId)}
                 id="interview-event-school"
-                onChange={(changeEvent) => setSchoolId(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setSchoolId(changeEvent.target.value)
+                }
                 value={schoolId}
               >
                 <option value="">Select school</option>
@@ -269,7 +286,9 @@ export function InterviewEventForm({ eventId }: { eventId?: string }) {
               <Field htmlFor="interview-event-description" label="Description">
                 <Textarea
                   id="interview-event-description"
-                  onChange={(changeEvent) => setDescription(changeEvent.target.value)}
+                  onChange={(changeEvent) =>
+                    setDescription(changeEvent.target.value)
+                  }
                   placeholder="Optional context for parents and teachers"
                   rows={3}
                   value={description}
@@ -277,19 +296,29 @@ export function InterviewEventForm({ eventId }: { eventId?: string }) {
               </Field>
             </div>
 
-            <Field htmlFor="interview-event-booking-opens" label="Booking opens at">
+            <Field
+              htmlFor="interview-event-booking-opens"
+              label="Booking opens at"
+            >
               <Input
                 id="interview-event-booking-opens"
-                onChange={(changeEvent) => setBookingOpensAt(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setBookingOpensAt(changeEvent.target.value)
+                }
                 type="datetime-local"
                 value={bookingOpensAt}
               />
             </Field>
 
-            <Field htmlFor="interview-event-booking-closes" label="Booking closes at">
+            <Field
+              htmlFor="interview-event-booking-closes"
+              label="Booking closes at"
+            >
               <Input
                 id="interview-event-booking-closes"
-                onChange={(changeEvent) => setBookingClosesAt(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setBookingClosesAt(changeEvent.target.value)
+                }
                 type="datetime-local"
                 value={bookingClosesAt}
               />
@@ -298,7 +327,9 @@ export function InterviewEventForm({ eventId }: { eventId?: string }) {
             <Field htmlFor="interview-event-starts" label="Event starts at">
               <Input
                 id="interview-event-starts"
-                onChange={(changeEvent) => setStartsAt(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setStartsAt(changeEvent.target.value)
+                }
                 required
                 type="datetime-local"
                 value={startsAt}
@@ -319,12 +350,16 @@ export function InterviewEventForm({ eventId }: { eventId?: string }) {
               <CheckboxField
                 checked={isPublished}
                 label="Published (visible to parents)"
-                onChange={(changeEvent) => setIsPublished(changeEvent.target.checked)}
+                onChange={(changeEvent) =>
+                  setIsPublished(changeEvent.target.checked)
+                }
               />
               <CheckboxField
                 checked={isActive}
                 label="Active"
-                onChange={(changeEvent) => setIsActive(changeEvent.target.checked)}
+                onChange={(changeEvent) =>
+                  setIsActive(changeEvent.target.checked)
+                }
               />
             </div>
 
@@ -342,7 +377,10 @@ export function InterviewEventForm({ eventId }: { eventId?: string }) {
                     ? "Save changes"
                     : "Create event"}
               </button>
-              <Link className={buttonClassName({ variant: "secondary" })} href="/admin/interviews">
+              <Link
+                className={buttonClassName({ variant: "secondary" })}
+                href="/admin/interviews"
+              >
                 Cancel
               </Link>
             </div>

@@ -102,7 +102,12 @@ export function AuditManagement() {
     pageSize: 50,
   });
 
-  const emptySummary: AuditSummary = { total: 0, bySeverity: {}, byAction: {}, byEntity: {} };
+  const emptySummary: AuditSummary = {
+    total: 0,
+    bySeverity: {},
+    byAction: {},
+    byEntity: {},
+  };
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [summary, setSummary] = useState<AuditSummary>(emptySummary);
   const [total, setTotal] = useState(0);
@@ -159,7 +164,9 @@ export function AuditManagement() {
       setPageCount(logsResult.pageCount ?? 1);
       setSummary(summaryResult);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load audit logs");
+      setError(
+        err instanceof Error ? err.message : "Failed to load audit logs",
+      );
     } finally {
       setLoading(false);
     }
@@ -171,10 +178,12 @@ export function AuditManagement() {
   ) {
     setFilters((prev) => {
       const newValue =
-        key === "pageSize" ? Number(value) : 
-        key === "page" ? Number(value) :
-        String(value);
-      
+        key === "pageSize"
+          ? Number(value)
+          : key === "page"
+            ? Number(value)
+            : String(value);
+
       return {
         ...prev,
         [key]: newValue,
@@ -317,9 +326,7 @@ export function AuditManagement() {
               <Input
                 type="date"
                 value={filters.fromDate}
-                onChange={(e) =>
-                  handleFilterChange("fromDate", e.target.value)
-                }
+                onChange={(e) => handleFilterChange("fromDate", e.target.value)}
               />
             </Field>
 
@@ -380,9 +387,7 @@ export function AuditManagement() {
             <Field label="Severity">
               <Select
                 value={filters.severity}
-                onChange={(e) =>
-                  handleFilterChange("severity", e.target.value)
-                }
+                onChange={(e) => handleFilterChange("severity", e.target.value)}
               >
                 <option value="">All severities</option>
                 {SEVERITIES.map((severity) => (
@@ -419,10 +424,7 @@ export function AuditManagement() {
             <Button disabled={exporting} onClick={() => handleExport("csv")}>
               {exporting ? "Exporting..." : "Export CSV"}
             </Button>
-            <Button
-              variant="danger"
-              onClick={() => setShowPurgeDialog(true)}
-            >
+            <Button variant="danger" onClick={() => setShowPurgeDialog(true)}>
               Purge Logs
             </Button>
           </div>
@@ -456,7 +458,9 @@ export function AuditManagement() {
                     <th className="text-left py-3 px-2 font-medium">Actor</th>
                     <th className="text-left py-3 px-2 font-medium">Entity</th>
                     <th className="text-left py-3 px-2 font-medium">Action</th>
-                    <th className="text-left py-3 px-2 font-medium">Severity</th>
+                    <th className="text-left py-3 px-2 font-medium">
+                      Severity
+                    </th>
                     <th className="text-left py-3 px-2 font-medium">Summary</th>
                   </tr>
                 </thead>
@@ -531,9 +535,7 @@ export function AuditManagement() {
               <div className="flex gap-2">
                 <Button
                   disabled={filters.page === 1}
-                  onClick={() =>
-                    handleFilterChange("page", filters.page - 1)
-                  }
+                  onClick={() => handleFilterChange("page", filters.page - 1)}
                 >
                   Previous
                 </Button>
@@ -542,9 +544,7 @@ export function AuditManagement() {
                 </span>
                 <Button
                   disabled={filters.page >= pageCount}
-                  onClick={() =>
-                    handleFilterChange("page", filters.page + 1)
-                  }
+                  onClick={() => handleFilterChange("page", filters.page + 1)}
                 >
                   Next
                 </Button>

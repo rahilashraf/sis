@@ -1,6 +1,6 @@
-import { apiFetch } from './client';
+import { apiFetch } from "./client";
 
-export type InterviewSlotStatus = 'AVAILABLE' | 'BOOKED' | 'CANCELLED';
+export type InterviewSlotStatus = "AVAILABLE" | "BOOKED" | "CANCELLED";
 
 export type InterviewEvent = {
   id: string;
@@ -233,11 +233,17 @@ export type BookInterviewSlotInput = {
   bookingNotes?: string | null;
 };
 
+export type AdminBookInterviewSlotInput = {
+  studentId: string;
+  parentId: string;
+  bookingNotes?: string | null;
+};
+
 export function formatInterviewSlotStatusLabel(status: InterviewSlotStatus) {
   const labels: Record<InterviewSlotStatus, string> = {
-    AVAILABLE: 'Available',
-    BOOKED: 'Booked',
-    CANCELLED: 'Cancelled',
+    AVAILABLE: "Available",
+    BOOKED: "Booked",
+    CANCELLED: "Cancelled",
   };
 
   return labels[status] ?? status;
@@ -251,19 +257,22 @@ export function listInterviewEvents(options?: {
   const query = new URLSearchParams();
 
   if (options?.schoolId) {
-    query.set('schoolId', options.schoolId);
+    query.set("schoolId", options.schoolId);
   }
 
   if (options?.includeInactive !== undefined) {
-    query.set('includeInactive', options.includeInactive ? 'true' : 'false');
+    query.set("includeInactive", options.includeInactive ? "true" : "false");
   }
 
   if (options?.includeUnpublished !== undefined) {
-    query.set('includeUnpublished', options.includeUnpublished ? 'true' : 'false');
+    query.set(
+      "includeUnpublished",
+      options.includeUnpublished ? "true" : "false",
+    );
   }
 
   return apiFetch<InterviewEvent[]>(
-    `/interview-events${query.size ? `?${query.toString()}` : ''}`,
+    `/interview-events${query.size ? `?${query.toString()}` : ""}`,
   );
 }
 
@@ -272,15 +281,18 @@ export function getInterviewEvent(eventId: string) {
 }
 
 export function createInterviewEvent(input: CreateInterviewEventInput) {
-  return apiFetch<InterviewEvent>('/interview-events', {
-    method: 'POST',
+  return apiFetch<InterviewEvent>("/interview-events", {
+    method: "POST",
     json: input,
   });
 }
 
-export function updateInterviewEvent(eventId: string, input: UpdateInterviewEventInput) {
+export function updateInterviewEvent(
+  eventId: string,
+  input: UpdateInterviewEventInput,
+) {
   return apiFetch<InterviewEvent>(`/interview-events/${eventId}`, {
-    method: 'PATCH',
+    method: "PATCH",
     json: input,
   });
 }
@@ -289,17 +301,20 @@ export function listParentInterviewEvents(studentId?: string) {
   const query = new URLSearchParams();
 
   if (studentId) {
-    query.set('studentId', studentId);
+    query.set("studentId", studentId);
   }
 
   return apiFetch<InterviewEvent[]>(
-    `/interview-events/parent${query.size ? `?${query.toString()}` : ''}`,
+    `/interview-events/parent${query.size ? `?${query.toString()}` : ""}`,
   );
 }
 
-export function listParentInterviewEventSlots(eventId: string, studentId: string) {
+export function listParentInterviewEventSlots(
+  eventId: string,
+  studentId: string,
+) {
   const query = new URLSearchParams();
-  query.set('studentId', studentId);
+  query.set("studentId", studentId);
 
   return apiFetch<InterviewSlotParent[]>(
     `/interview-events/${eventId}/parent-slots?${query.toString()}`,
@@ -316,74 +331,98 @@ export function listInterviewSlots(options?: {
   const query = new URLSearchParams();
 
   if (options?.schoolId) {
-    query.set('schoolId', options.schoolId);
+    query.set("schoolId", options.schoolId);
   }
 
   if (options?.interviewEventId) {
-    query.set('interviewEventId', options.interviewEventId);
+    query.set("interviewEventId", options.interviewEventId);
   }
 
   if (options?.teacherId) {
-    query.set('teacherId', options.teacherId);
+    query.set("teacherId", options.teacherId);
   }
 
   if (options?.status) {
-    query.set('status', options.status);
+    query.set("status", options.status);
   }
 
   if (options?.booked !== undefined) {
-    query.set('booked', options.booked ? 'true' : 'false');
+    query.set("booked", options.booked ? "true" : "false");
   }
 
   return apiFetch<InterviewSlotAdmin[]>(
-    `/interview-slots${query.size ? `?${query.toString()}` : ''}`,
+    `/interview-slots${query.size ? `?${query.toString()}` : ""}`,
   );
 }
 
 export function createInterviewSlot(input: CreateInterviewSlotInput) {
-  return apiFetch<InterviewSlotAdmin>('/interview-slots', {
-    method: 'POST',
+  return apiFetch<InterviewSlotAdmin>("/interview-slots", {
+    method: "POST",
     json: input,
   });
 }
 
-export function bulkGenerateInterviewSlots(input: BulkGenerateInterviewSlotsInput) {
-  return apiFetch<{ createdCount: number }>('/interview-slots/bulk-generate', {
-    method: 'POST',
+export function bulkGenerateInterviewSlots(
+  input: BulkGenerateInterviewSlotsInput,
+) {
+  return apiFetch<{ createdCount: number }>("/interview-slots/bulk-generate", {
+    method: "POST",
     json: input,
   });
 }
 
-export function updateInterviewSlot(slotId: string, input: UpdateInterviewSlotInput) {
+export function updateInterviewSlot(
+  slotId: string,
+  input: UpdateInterviewSlotInput,
+) {
   return apiFetch<InterviewSlotAdmin>(`/interview-slots/${slotId}`, {
-    method: 'PATCH',
+    method: "PATCH",
     json: input,
   });
 }
 
 export function deleteInterviewSlot(slotId: string) {
   return apiFetch<{ success: boolean }>(`/interview-slots/${slotId}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
 }
 
 export function unbookInterviewSlot(slotId: string) {
   return apiFetch<InterviewSlotAdmin>(`/interview-slots/${slotId}/unbook`, {
-    method: 'POST',
+    method: "POST",
   });
 }
 
-export function bookInterviewSlot(slotId: string, input: BookInterviewSlotInput) {
+export function bookInterviewSlot(
+  slotId: string,
+  input: BookInterviewSlotInput,
+) {
   return apiFetch<InterviewSlotParent>(`/interview-slots/${slotId}/book`, {
-    method: 'POST',
+    method: "POST",
     json: input,
   });
 }
 
+export function bookInterviewSlotForParent(
+  slotId: string,
+  input: AdminBookInterviewSlotInput,
+) {
+  return apiFetch<InterviewSlotAdmin>(
+    `/interview-slots/${slotId}/book-for-parent`,
+    {
+      method: "POST",
+      json: input,
+    },
+  );
+}
+
 export function cancelMyInterviewBooking(slotId: string) {
-  return apiFetch<InterviewSlotParent>(`/interview-slots/${slotId}/cancel-booking`, {
-    method: 'POST',
-  });
+  return apiFetch<InterviewSlotParent>(
+    `/interview-slots/${slotId}/cancel-booking`,
+    {
+      method: "POST",
+    },
+  );
 }
 
 export function listParentInterviewBookings(options?: {
@@ -393,26 +432,28 @@ export function listParentInterviewBookings(options?: {
   const query = new URLSearchParams();
 
   if (options?.studentId) {
-    query.set('studentId', options.studentId);
+    query.set("studentId", options.studentId);
   }
 
   if (options?.interviewEventId) {
-    query.set('interviewEventId', options.interviewEventId);
+    query.set("interviewEventId", options.interviewEventId);
   }
 
   return apiFetch<InterviewSlotParent[]>(
-    `/interview-slots/parent-bookings${query.size ? `?${query.toString()}` : ''}`,
+    `/interview-slots/parent-bookings${query.size ? `?${query.toString()}` : ""}`,
   );
 }
 
-export function listTeacherInterviewSlots(options?: { interviewEventId?: string }) {
+export function listTeacherInterviewSlots(options?: {
+  interviewEventId?: string;
+}) {
   const query = new URLSearchParams();
 
   if (options?.interviewEventId) {
-    query.set('interviewEventId', options.interviewEventId);
+    query.set("interviewEventId", options.interviewEventId);
   }
 
   return apiFetch<InterviewSlotTeacher[]>(
-    `/interview-slots/teacher${query.size ? `?${query.toString()}` : ''}`,
+    `/interview-slots/teacher${query.size ? `?${query.toString()}` : ""}`,
   );
 }

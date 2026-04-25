@@ -53,6 +53,18 @@ export type StudentParentLink = {
   parent: AuthenticatedUser;
 };
 
+export type StudentLinkedParentContact = {
+  linkId: string;
+  parentId: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  username: string;
+  isActive: boolean;
+  linkedAt: string;
+};
+
 export type ParentStudentLink = {
   id: string;
   parentId: string;
@@ -109,7 +121,9 @@ export type ReRegistrationInput = Omit<
   nonReturningComment?: string | null;
 };
 
-function normalizeStudentProfile(student: Partial<StudentProfile>): StudentProfile {
+function normalizeStudentProfile(
+  student: Partial<StudentProfile>,
+): StudentProfile {
   const dateOfBirth = normalizeDateOnlyPayload(student.dateOfBirth);
 
   return {
@@ -117,6 +131,7 @@ function normalizeStudentProfile(student: Partial<StudentProfile>): StudentProfi
     schoolId: student.schoolId ?? null,
     username: student.username ?? "",
     email: student.email ?? null,
+    phone: student.phone ?? null,
     firstName: student.firstName ?? "",
     lastName: student.lastName ?? "",
     role: student.role ?? "STUDENT",
@@ -158,7 +173,9 @@ function normalizeStudentProfile(student: Partial<StudentProfile>): StudentProfi
 }
 
 export async function getStudentById(studentId: string) {
-  const response = await apiFetch<Partial<StudentProfile>>(`/students/${studentId}`);
+  const response = await apiFetch<Partial<StudentProfile>>(
+    `/students/${studentId}`,
+  );
   return normalizeStudentProfile(response);
 }
 
@@ -182,14 +199,31 @@ export function reRegisterStudent(
   return apiFetch<StudentProfile>(
     `/students/${studentId}/re-registration${query.size ? `?${query.toString()}` : ""}`,
     {
-    method: "PATCH",
-    json: input,
+      method: "PATCH",
+      json: input,
     },
   );
 }
 
 export function listStudentParents(studentId: string) {
   return apiFetch<StudentParentLink[]>(`/students/${studentId}/parents`);
+}
+
+export async function listStudentLinkedParentContacts(studentId: string) {
+  const links = await listStudentParents(studentId);
+  return links.map(
+    (link): StudentLinkedParentContact => ({
+      linkId: link.id,
+      parentId: link.parentId,
+      firstName: link.parent.firstName,
+      lastName: link.parent.lastName,
+      email: link.parent.email,
+      phone: link.parent.phone,
+      username: link.parent.username,
+      isActive: link.parent.isActive,
+      linkedAt: link.createdAt,
+    }),
+  );
 }
 
 export function createStudentParentLink(parentId: string, studentId: string) {
@@ -217,12 +251,10 @@ export function listParentStudents(parentId: string) {
   return apiFetch<ParentStudentLink[]>(`/parents/${parentId}/students`);
 }
 
-let parentStudentsCache:
-  | {
-      expiresAt: number;
-      data: ParentStudentLink[];
-    }
-  | null = null;
+let parentStudentsCache: {
+  expiresAt: number;
+  data: ParentStudentLink[];
+} | null = null;
 let parentStudentsInFlight: Promise<ParentStudentLink[]> | null = null;
 
 export function clearParentStudentsCache() {
@@ -230,11 +262,17 @@ export function clearParentStudentsCache() {
   parentStudentsInFlight = null;
 }
 
-export async function listMyParentStudents(options?: { forceRefresh?: boolean }) {
+export async function listMyParentStudents(options?: {
+  forceRefresh?: boolean;
+}) {
   const forceRefresh = options?.forceRefresh ?? false;
   const now = Date.now();
 
-  if (!forceRefresh && parentStudentsCache && parentStudentsCache.expiresAt > now) {
+  if (
+    !forceRefresh &&
+    parentStudentsCache &&
+    parentStudentsCache.expiresAt > now
+  ) {
     return parentStudentsCache.data;
   }
 

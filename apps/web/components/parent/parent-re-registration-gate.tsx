@@ -28,7 +28,9 @@ export function ParentReRegistrationGate({ studentId }: { studentId: string }) {
         setWindowStatus(status);
       } catch (loadError) {
         setError(
-          loadError instanceof Error ? loadError.message : "Unable to load re-registration.",
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load re-registration.",
         );
         setWindowStatus(null);
       } finally {
@@ -101,7 +103,8 @@ export function ParentReRegistrationGate({ studentId }: { studentId: string }) {
         <div className="space-y-6">
           {pageHeader}
           <Notice tone="info">
-            This re-registration window has closed. You can review your submitted response below.
+            This re-registration window has closed. You can review your
+            submitted response below.
           </Notice>
           <ParentReRegistrationForm
             studentId={studentId}
@@ -137,7 +140,8 @@ export function ParentReRegistrationGate({ studentId }: { studentId: string }) {
         <div className="space-y-6">
           {pageHeader}
           <Notice tone="info">
-            This re-registration window has not opened yet. You can review your last submitted response below.
+            This re-registration window has not opened yet. You can review your
+            last submitted response below.
           </Notice>
           <ParentReRegistrationForm
             studentId={studentId}

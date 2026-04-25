@@ -16,6 +16,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ClassesController } from './classes.controller';
 import { ClassesService } from './classes.service';
 import { GradebookService } from '../gradebook/gradebook.service';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 class TestJwtAuthGuard implements CanActivate {
@@ -74,6 +75,7 @@ describe('ClassesController (HTTP)', () => {
   let gradebook: { getClassSummary: jest.Mock };
   let prisma: {
     class: { findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
+    user: { findMany: jest.Mock };
     teacherClassAssignment: {
       findMany: jest.Mock;
       findFirst: jest.Mock;
@@ -83,7 +85,9 @@ describe('ClassesController (HTTP)', () => {
       findMany: jest.Mock;
       findFirst: jest.Mock;
       delete: jest.Mock;
+      create: jest.Mock;
     };
+    timetableBlockClass: { findMany: jest.Mock };
     studentParentLink: { findUnique: jest.Mock };
   };
 
@@ -94,6 +98,7 @@ describe('ClassesController (HTTP)', () => {
 
     prisma = {
       class: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+      user: { findMany: jest.fn() },
       teacherClassAssignment: {
         findMany: jest.fn(),
         findFirst: jest.fn(),
@@ -103,7 +108,9 @@ describe('ClassesController (HTTP)', () => {
         findMany: jest.fn(),
         findFirst: jest.fn(),
         delete: jest.fn(),
+        create: jest.fn(),
       },
+      timetableBlockClass: { findMany: jest.fn() },
       studentParentLink: { findUnique: jest.fn() },
     };
 
@@ -119,6 +126,10 @@ describe('ClassesController (HTTP)', () => {
         {
           provide: PrismaService,
           useValue: prisma,
+        },
+        {
+          provide: AuditService,
+          useValue: { log: jest.fn() },
         },
       ],
     })
@@ -413,6 +424,77 @@ describe('ClassesController (HTTP)', () => {
     expect(prisma.studentClassEnrollment.delete).not.toHaveBeenCalled();
   });
 
+  it('bulk enrolls one student into multiple classes for admin access', async () => {
+    prisma.class.findMany.mockResolvedValue([
+      {
+        id: 'class-1',
+        schoolId: 'school-1',
+        schoolYearId: 'year-1',
+        name: 'Math',
+        isActive: true,
+      },
+      {
+        id: 'class-2',
+        schoolId: 'school-1',
+        schoolYearId: 'year-1',
+        name: 'Science',
+        isActive: true,
+      },
+    ]);
+    prisma.user.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        role: UserRole.STUDENT,
+        isActive: true,
+        schoolId: 'school-1',
+        memberships: [{ schoolId: 'school-1' }],
+      },
+    ]);
+    prisma.studentClassEnrollment.findMany.mockResolvedValue([]);
+    prisma.studentClassEnrollment.create
+      .mockResolvedValueOnce({
+        id: 'enrollment-1',
+        classId: 'class-1',
+        studentId: 'student-1',
+        createdAt: new Date().toISOString(),
+        student: { firstName: 'Ada', lastName: 'Lovelace' },
+        class: { schoolId: 'school-1', name: 'Math' },
+      })
+      .mockResolvedValueOnce({
+        id: 'enrollment-2',
+        classId: 'class-2',
+        studentId: 'student-1',
+        createdAt: new Date().toISOString(),
+        student: { firstName: 'Ada', lastName: 'Lovelace' },
+        class: { schoolId: 'school-1', name: 'Science' },
+      });
+    prisma.timetableBlockClass.findMany.mockResolvedValue([]);
+
+    const response = await request(app.getHttpServer())
+      .post('/classes/bulk-enroll')
+      .set('x-test-user-id', 'admin-1')
+      .set('x-test-role', UserRole.ADMIN)
+      .set('x-test-school-ids', 'school-1')
+      .send({
+        studentId: 'student-1',
+        classIds: ['class-1', 'class-2'],
+      })
+      .expect(201);
+
+    expect(response.body.success).toHaveLength(2);
+    expect(response.body.skipped).toEqual([]);
+    expect(response.body.failed).toEqual([]);
+  });
+
+  it('returns 403 when staff attempts bulk enrollment endpoint', async () => {
+    await request(app.getHttpServer())
+      .post('/classes/class-1/bulk-enroll-students')
+      .set('x-test-user-id', 'staff-1')
+      .set('x-test-role', UserRole.STAFF)
+      .send({ studentIds: ['student-1'] })
+      .expect(403);
+  });
+
   it('archives a class for admin access', async () => {
     prisma.class.findUnique.mockResolvedValue({ id: 'class-1' });
     prisma.class.update.mockResolvedValue({
@@ -477,5 +559,28 @@ describe('ClassesController (HTTP)', () => {
       .expect(403);
 
     expect(prisma.class.update).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when a teacher tries to duplicate a class', async () => {
+    await request(app.getHttpServer())
+      .post('/classes/class-1/duplicate')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .send({
+        targetSchoolId: 'school-1',
+        targetSchoolYearId: 'year-1',
+      })
+      .expect(403);
+  });
+
+  it('returns 403 when a teacher tries to copy gradebook settings', async () => {
+    await request(app.getHttpServer())
+      .post('/classes/class-1/copy-gradebook-settings')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .send({
+        targetClassId: 'class-2',
+      })
+      .expect(403);
   });
 });

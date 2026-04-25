@@ -116,7 +116,15 @@ export class StudentsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'PARENT')
+  @Roles(
+    'OWNER',
+    'SUPER_ADMIN',
+    'ADMIN',
+    'STAFF',
+    'TEACHER',
+    'SUPPLY_TEACHER',
+    'PARENT',
+  )
   @Get(':id')
   findOne(
     @Req() req: AuthenticatedRequest,

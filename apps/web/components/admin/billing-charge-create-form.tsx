@@ -25,7 +25,12 @@ import {
   listBillingCategories,
   type BillingCategory,
 } from "@/lib/api/billing";
-import { listSchools, listSchoolYears, type School, type SchoolYear } from "@/lib/api/schools";
+import {
+  listSchools,
+  listSchoolYears,
+  type School,
+  type SchoolYear,
+} from "@/lib/api/schools";
 import { listUsers, type ManagedUser } from "@/lib/api/users";
 
 const manageRoles = new Set(["OWNER", "SUPER_ADMIN", "ADMIN"]);
@@ -76,7 +81,9 @@ function userBelongsToSchool(user: ManagedUser, schoolId: string) {
     return true;
   }
 
-  return user.memberships.some((membership) => membership.schoolId === schoolId);
+  return user.memberships.some(
+    (membership) => membership.schoolId === schoolId,
+  );
 }
 
 function validate(form: CreateChargeFormState): FieldErrors {
@@ -125,7 +132,8 @@ export function BillingChargeCreateForm() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const filteredStudents = useMemo(
-    () => students.filter((student) => userBelongsToSchool(student, form.schoolId)),
+    () =>
+      students.filter((student) => userBelongsToSchool(student, form.schoolId)),
     [students, form.schoolId],
   );
 
@@ -147,17 +155,26 @@ export function BillingChargeCreateForm() {
         setSchools(schoolResponse);
         setStudents(userResponse);
 
-        const defaultSchoolId = getDefaultSchoolContextId(session?.user) ?? schoolResponse[0]?.id ?? "";
+        const defaultSchoolId =
+          getDefaultSchoolContextId(session?.user) ??
+          schoolResponse[0]?.id ??
+          "";
 
         const schoolId =
-          schoolResponse.find((school) => school.id === defaultSchoolId)?.id ?? schoolResponse[0]?.id ?? "";
+          schoolResponse.find((school) => school.id === defaultSchoolId)?.id ??
+          schoolResponse[0]?.id ??
+          "";
 
         setForm((current) => ({
           ...current,
           schoolId,
         }));
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load form options.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load form options.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -188,12 +205,14 @@ export function BillingChargeCreateForm() {
         setForm((current) => ({
           ...current,
           categoryId:
-            categoryResponse.find((entry) => entry.id === current.categoryId)?.id ??
+            categoryResponse.find((entry) => entry.id === current.categoryId)
+              ?.id ??
             categoryResponse[0]?.id ??
             "",
           schoolYearId:
-            schoolYearResponse.find((entry) => entry.id === current.schoolYearId)?.id ??
-            "",
+            schoolYearResponse.find(
+              (entry) => entry.id === current.schoolYearId,
+            )?.id ?? "",
         }));
       } catch (loadError) {
         setError(
@@ -258,14 +277,20 @@ export function BillingChargeCreateForm() {
 
       router.push("/admin/billing/charges?created=1");
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Unable to create charge.");
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Unable to create charge.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   }
 
   function fieldClassName(field: keyof CreateChargeFormState) {
-    return fieldErrors[field] ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/15" : undefined;
+    return fieldErrors[field]
+      ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/15"
+      : undefined;
   }
 
   if (!role || !manageRoles.has(role)) {
@@ -314,7 +339,9 @@ export function BillingChargeCreateForm() {
       <Card>
         <CardHeader>
           <CardTitle>Charge details</CardTitle>
-          <CardDescription>Enter billing details and submit to create the charge.</CardDescription>
+          <CardDescription>
+            Enter billing details and submit to create the charge.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
@@ -340,7 +367,9 @@ export function BillingChargeCreateForm() {
                 ))}
               </Select>
               {fieldErrors.schoolId ? (
-                <p className="mt-1 text-xs text-rose-600">{fieldErrors.schoolId}</p>
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.schoolId}
+                </p>
               ) : null}
             </Field>
 
@@ -350,7 +379,10 @@ export function BillingChargeCreateForm() {
                 disabled={!form.schoolId}
                 id="create-charge-student"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, studentId: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    studentId: event.target.value,
+                  }))
                 }
                 value={form.studentId}
               >
@@ -362,7 +394,9 @@ export function BillingChargeCreateForm() {
                 ))}
               </Select>
               {fieldErrors.studentId ? (
-                <p className="mt-1 text-xs text-rose-600">{fieldErrors.studentId}</p>
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.studentId}
+                </p>
               ) : null}
             </Field>
 
@@ -372,7 +406,10 @@ export function BillingChargeCreateForm() {
                 disabled={!form.schoolId || isLoadingSchoolMeta}
                 id="create-charge-category"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, categoryId: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    categoryId: event.target.value,
+                  }))
                 }
                 value={form.categoryId}
               >
@@ -384,7 +421,9 @@ export function BillingChargeCreateForm() {
                 ))}
               </Select>
               {fieldErrors.categoryId ? (
-                <p className="mt-1 text-xs text-rose-600">{fieldErrors.categoryId}</p>
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.categoryId}
+                </p>
               ) : null}
             </Field>
 
@@ -397,7 +436,10 @@ export function BillingChargeCreateForm() {
                 disabled={!form.schoolId || isLoadingSchoolMeta}
                 id="create-charge-school-year"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, schoolYearId: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    schoolYearId: event.target.value,
+                  }))
                 }
                 value={form.schoolYearId}
               >
@@ -415,13 +457,18 @@ export function BillingChargeCreateForm() {
                 className={fieldClassName("title")}
                 id="create-charge-title"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, title: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
                 }
                 placeholder="Lab materials fee"
                 value={form.title}
               />
               {fieldErrors.title ? (
-                <p className="mt-1 text-xs text-rose-600">{fieldErrors.title}</p>
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.title}
+                </p>
               ) : null}
             </Field>
 
@@ -431,13 +478,18 @@ export function BillingChargeCreateForm() {
                 id="create-charge-amount"
                 inputMode="decimal"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, amount: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    amount: event.target.value,
+                  }))
                 }
                 placeholder="125.00"
                 value={form.amount}
               />
               {fieldErrors.amount ? (
-                <p className="mt-1 text-xs text-rose-600">{fieldErrors.amount}</p>
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.amount}
+                </p>
               ) : null}
             </Field>
 
@@ -445,7 +497,10 @@ export function BillingChargeCreateForm() {
               <Input
                 id="create-charge-due-date"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, dueDate: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    dueDate: event.target.value,
+                  }))
                 }
                 type="date"
                 value={form.dueDate}
@@ -468,11 +523,18 @@ export function BillingChargeCreateForm() {
               </Select>
             </Field>
 
-            <Field className="md:col-span-2" htmlFor="create-charge-description" label="Description (optional)">
+            <Field
+              className="md:col-span-2"
+              htmlFor="create-charge-description"
+              label="Description (optional)"
+            >
               <Input
                 id="create-charge-description"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, description: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
                 }
                 placeholder="Optional internal or parent-facing note"
                 value={form.description}
@@ -485,7 +547,10 @@ export function BillingChargeCreateForm() {
               label="Notify parents when charge is created"
               checked={form.sendNotifications}
               onChange={(event) =>
-                setForm((current) => ({ ...current, sendNotifications: event.target.checked }))
+                setForm((current) => ({
+                  ...current,
+                  sendNotifications: event.target.checked,
+                }))
               }
             />
 

@@ -26,7 +26,12 @@ import {
   type AccountSummaryCharge,
   type PaymentMethod,
 } from "@/lib/api/billing";
-import { listSchools, listSchoolYears, type School, type SchoolYear } from "@/lib/api/schools";
+import {
+  listSchools,
+  listSchoolYears,
+  type School,
+  type SchoolYear,
+} from "@/lib/api/schools";
 import { listUsers, type ManagedUser } from "@/lib/api/users";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -46,7 +51,10 @@ const paymentMethods: Array<{ value: PaymentMethod; label: string }> = [
 function formatCurrency(value: string) {
   const num = parseFloat(value);
   if (isNaN(num)) return value;
-  return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(num);
+  return new Intl.NumberFormat("en-CA", {
+    style: "currency",
+    currency: "CAD",
+  }).format(num);
 }
 
 function getStudentLabel(student: ManagedUser) {
@@ -163,7 +171,9 @@ export function BillingPaymentCreateForm() {
   const [students, setStudents] = useState<ManagedUser[]>([]);
 
   const [allocationMode, setAllocationMode] = useState<AllocationMode>("auto");
-  const [outstandingCharges, setOutstandingCharges] = useState<AccountSummaryCharge[]>([]);
+  const [outstandingCharges, setOutstandingCharges] = useState<
+    AccountSummaryCharge[]
+  >([]);
   const [allocationDraft, setAllocationDraft] = useState<AllocationDraft>({});
   const [isLoadingCharges, setIsLoadingCharges] = useState(false);
   const [chargesError, setChargesError] = useState<string | null>(null);
@@ -196,7 +206,8 @@ export function BillingPaymentCreateForm() {
           getDefaultSchoolContextId(session?.user) ?? schoolList[0]?.id ?? "";
         const resolvedSchoolId =
           schoolList.find((s) => s.id === defaultSchoolId)?.id ??
-          schoolList[0]?.id ?? "";
+          schoolList[0]?.id ??
+          "";
 
         // If prefillStudentId given, find their school
         let resolvedStudentSchoolId = resolvedSchoolId;
@@ -219,7 +230,9 @@ export function BillingPaymentCreateForm() {
           studentId: prefillStudentId || f.studentId,
         }));
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to load form options.");
+        setError(
+          err instanceof Error ? err.message : "Unable to load form options.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -241,12 +254,13 @@ export function BillingPaymentCreateForm() {
       setIsLoadingSchoolMeta(true);
 
       try {
-        const syList = await listSchoolYears(form.schoolId, { includeInactive: false });
+        const syList = await listSchoolYears(form.schoolId, {
+          includeInactive: false,
+        });
         setSchoolYears(syList);
         setForm((f) => ({
           ...f,
-          schoolYearId:
-            syList.find((sy) => sy.id === f.schoolYearId)?.id ?? "",
+          schoolYearId: syList.find((sy) => sy.id === f.schoolYearId)?.id ?? "",
         }));
       } catch {
         setSchoolYears([]);
@@ -300,7 +314,9 @@ export function BillingPaymentCreateForm() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setChargesError(err instanceof Error ? err.message : "Failed to load charges.");
+        setChargesError(
+          err instanceof Error ? err.message : "Failed to load charges.",
+        );
         setIsLoadingCharges(false);
       });
 
@@ -326,7 +342,11 @@ export function BillingPaymentCreateForm() {
 
     // Validate manual allocations
     if (allocationMode === "manual") {
-      const allocErr = validateAllocations(form.amount, allocationDraft, outstandingCharges);
+      const allocErr = validateAllocations(
+        form.amount,
+        allocationDraft,
+        outstandingCharges,
+      );
       if (allocErr) {
         setFieldErrors((e) => ({ ...e, allocations: allocErr }));
         setError("Please fix the allocation amounts before submitting.");
@@ -342,7 +362,10 @@ export function BillingPaymentCreateForm() {
         allocationMode === "manual"
           ? Object.entries(allocationDraft)
               .filter(([, v]) => v.trim() && parseFloat(v) > 0)
-              .map(([chargeId, amount]) => ({ chargeId, amount: parseFloat(amount).toFixed(2) }))
+              .map(([chargeId, amount]) => ({
+                chargeId,
+                amount: parseFloat(amount).toFixed(2),
+              }))
           : undefined;
 
       await createBillingPayment({
@@ -359,12 +382,16 @@ export function BillingPaymentCreateForm() {
       });
 
       if (form.studentId) {
-        router.push(`/admin/billing/students/${form.studentId}?paymentRecorded=1`);
+        router.push(
+          `/admin/billing/students/${form.studentId}?paymentRecorded=1`,
+        );
       } else {
         router.push("/admin/billing/charges?paymentRecorded=1");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to record payment.");
+      setError(
+        err instanceof Error ? err.message : "Unable to record payment.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -401,10 +428,9 @@ export function BillingPaymentCreateForm() {
 
   const selectedSchool = schools.find((s) => s.id === form.schoolId);
 
-  const cancelHref =
-    prefillStudentId
-      ? `/admin/billing/students/${prefillStudentId}`
-      : "/admin/billing/charges";
+  const cancelHref = prefillStudentId
+    ? `/admin/billing/students/${prefillStudentId}`
+    : "/admin/billing/charges";
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -414,7 +440,10 @@ export function BillingPaymentCreateForm() {
         title="Record Payment"
         description="Record a payment against a student's billing account."
         actions={
-          <Link className={buttonClassName({ variant: "secondary" })} href={cancelHref}>
+          <Link
+            className={buttonClassName({ variant: "secondary" })}
+            href={cancelHref}
+          >
             Cancel
           </Link>
         }
@@ -432,7 +461,9 @@ export function BillingPaymentCreateForm() {
         <Card>
           <CardHeader>
             <CardTitle>Payment details</CardTitle>
-            <CardDescription>Enter the payment information below.</CardDescription>
+            <CardDescription>
+              Enter the payment information below.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
@@ -459,7 +490,9 @@ export function BillingPaymentCreateForm() {
                   ))}
                 </Select>
                 {fieldErrors.schoolId && (
-                  <p className="mt-1 text-xs text-rose-600">{fieldErrors.schoolId}</p>
+                  <p className="mt-1 text-xs text-rose-600">
+                    {fieldErrors.schoolId}
+                  </p>
                 )}
               </Field>
 
@@ -482,7 +515,9 @@ export function BillingPaymentCreateForm() {
                   ))}
                 </Select>
                 {fieldErrors.studentId && (
-                  <p className="mt-1 text-xs text-rose-600">{fieldErrors.studentId}</p>
+                  <p className="mt-1 text-xs text-rose-600">
+                    {fieldErrors.studentId}
+                  </p>
                 )}
               </Field>
 
@@ -498,7 +533,9 @@ export function BillingPaymentCreateForm() {
                   }
                 />
                 {fieldErrors.paymentDate && (
-                  <p className="mt-1 text-xs text-rose-600">{fieldErrors.paymentDate}</p>
+                  <p className="mt-1 text-xs text-rose-600">
+                    {fieldErrors.paymentDate}
+                  </p>
                 )}
               </Field>
 
@@ -515,7 +552,9 @@ export function BillingPaymentCreateForm() {
                   }
                 />
                 {fieldErrors.amount && (
-                  <p className="mt-1 text-xs text-rose-600">{fieldErrors.amount}</p>
+                  <p className="mt-1 text-xs text-rose-600">
+                    {fieldErrors.amount}
+                  </p>
                 )}
               </Field>
 
@@ -526,7 +565,10 @@ export function BillingPaymentCreateForm() {
                   id="pay-method"
                   value={form.method}
                   onChange={(e) =>
-                    setForm((f) => ({ ...f, method: e.target.value as PaymentMethod }))
+                    setForm((f) => ({
+                      ...f,
+                      method: e.target.value as PaymentMethod,
+                    }))
                   }
                 >
                   {paymentMethods.map((m) => (
@@ -536,7 +578,9 @@ export function BillingPaymentCreateForm() {
                   ))}
                 </Select>
                 {fieldErrors.method && (
-                  <p className="mt-1 text-xs text-rose-600">{fieldErrors.method}</p>
+                  <p className="mt-1 text-xs text-rose-600">
+                    {fieldErrors.method}
+                  </p>
                 )}
               </Field>
 
@@ -627,8 +671,8 @@ export function BillingPaymentCreateForm() {
 
             {allocationMode === "auto" && (
               <p className="text-sm text-slate-500">
-                Payment will be automatically applied to the student&apos;s oldest
-                outstanding charges first (by due date, then issue date).
+                Payment will be automatically applied to the student&apos;s
+                oldest outstanding charges first (by due date, then issue date).
               </p>
             )}
 
@@ -636,10 +680,13 @@ export function BillingPaymentCreateForm() {
               <>
                 {!form.studentId || !form.schoolId ? (
                   <Notice tone="info">
-                    Select a school and student above to see their outstanding charges.
+                    Select a school and student above to see their outstanding
+                    charges.
                   </Notice>
                 ) : isLoadingCharges ? (
-                  <p className="text-sm text-slate-500">Loading outstanding charges…</p>
+                  <p className="text-sm text-slate-500">
+                    Loading outstanding charges…
+                  </p>
                 ) : chargesError ? (
                   <Notice tone="danger">{chargesError}</Notice>
                 ) : outstandingCharges.length === 0 ? (
@@ -710,7 +757,10 @@ export function BillingPaymentCreateForm() {
                             <td className="px-4 py-3 text-sm font-bold text-right tabular-nums text-slate-900">
                               {formatCurrency(
                                 Object.values(allocationDraft)
-                                  .reduce((sum, v) => sum + (parseFloat(v) || 0), 0)
+                                  .reduce(
+                                    (sum, v) => sum + (parseFloat(v) || 0),
+                                    0,
+                                  )
                                   .toFixed(2),
                               )}
                             </td>
@@ -719,8 +769,8 @@ export function BillingPaymentCreateForm() {
                       </table>
                     </div>
                     <p className="text-xs text-slate-500">
-                      Allocations must total exactly the payment amount above. Leave
-                      a row blank to skip that charge.
+                      Allocations must total exactly the payment amount above.
+                      Leave a row blank to skip that charge.
                     </p>
                   </>
                 )}
@@ -734,13 +784,19 @@ export function BillingPaymentCreateForm() {
           label="Notify parents when payment is recorded"
           checked={form.sendNotifications}
           onChange={(event) =>
-            setForm((current) => ({ ...current, sendNotifications: event.target.checked }))
+            setForm((current) => ({
+              ...current,
+              sendNotifications: event.target.checked,
+            }))
           }
         />
 
         {/* ── Actions ── */}
         <div className="flex justify-end gap-2">
-          <Link className={buttonClassName({ variant: "secondary" })} href={cancelHref}>
+          <Link
+            className={buttonClassName({ variant: "secondary" })}
+            href={cancelHref}
+          >
             Cancel
           </Link>
           <Button disabled={isSubmitting} type="submit" variant="primary">

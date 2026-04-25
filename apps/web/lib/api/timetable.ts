@@ -131,7 +131,7 @@ export async function listTimetableBlocks(options?: ListTimetableQueryInput) {
   }
 
   const response = await apiFetch<TimetableBlockListResponse>(
-    `/timetable${query.size ? `?${query.toString()}` : ""}`
+    `/timetable${query.size ? `?${query.toString()}` : ""}`,
   );
 
   // Return just the rows array for backward compatibility with component expectations
@@ -150,7 +150,7 @@ export function createTimetableBlock(input: CreateTimetableBlockInput) {
 }
 
 export function createBulkTimetableBlocks(
-  input: CreateBulkTimetableBlockInput
+  input: CreateBulkTimetableBlockInput,
 ) {
   return apiFetch<CreateBulkTimetableBlockResponse>("/timetable/bulk", {
     method: "POST",
@@ -160,7 +160,7 @@ export function createBulkTimetableBlocks(
 
 export function updateTimetableBlock(
   blockId: string,
-  input: UpdateTimetableBlockInput
+  input: UpdateTimetableBlockInput,
 ) {
   return apiFetch<TimetableBlock>(`/timetable/${blockId}`, {
     method: "PATCH",

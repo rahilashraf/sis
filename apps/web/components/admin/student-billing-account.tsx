@@ -89,10 +89,7 @@ function ChargesTable({
 }) {
   if (charges.length === 0) {
     return (
-      <EmptyState
-        title={emptyMessage}
-        description="No charges to display."
-      />
+      <EmptyState title={emptyMessage} description="No charges to display." />
     );
   }
 
@@ -130,7 +127,9 @@ function ChargesTable({
               <td className="px-4 py-3 text-sm font-medium text-slate-900">
                 <div className="flex flex-wrap items-center gap-2">
                   <span>{charge.title}</span>
-                  {charge.libraryFine ? <Badge variant="primary">Library fine</Badge> : null}
+                  {charge.libraryFine ? (
+                    <Badge variant="primary">Library fine</Badge>
+                  ) : null}
                 </div>
               </td>
               <td className="px-4 py-3 text-sm text-slate-600">
@@ -151,9 +150,7 @@ function ChargesTable({
                 </Badge>
               </td>
               <td className="px-4 py-3 text-sm text-slate-600">
-                {charge.dueDate
-                  ? formatDateLabel(charge.dueDate)
-                  : "—"}
+                {charge.dueDate ? formatDateLabel(charge.dueDate) : "—"}
               </td>
             </tr>
           ))}
@@ -215,7 +212,14 @@ function PaymentsTable({
         </thead>
         <tbody className="bg-white divide-y divide-slate-100">
           {payments.map((payment) => (
-            <tr key={payment.id} className={payment.isVoided ? "opacity-60 bg-slate-50" : "hover:bg-slate-50"}>
+            <tr
+              key={payment.id}
+              className={
+                payment.isVoided
+                  ? "opacity-60 bg-slate-50"
+                  : "hover:bg-slate-50"
+              }
+            >
               <td className="px-4 py-3 text-sm font-mono text-slate-900">
                 {payment.receiptNumber}
               </td>
@@ -306,12 +310,16 @@ export function StudentBillingAccount({ studentId }: { studentId: string }) {
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   // Void payment state
-  const [voidTarget, setVoidTarget] = useState<AccountSummaryPayment | null>(null);
+  const [voidTarget, setVoidTarget] = useState<AccountSummaryPayment | null>(
+    null,
+  );
   const [voidReason, setVoidReason] = useState("");
   const [voidNotifyParents, setVoidNotifyParents] = useState(false);
   const [isVoiding, setIsVoiding] = useState(false);
   const [voidError, setVoidError] = useState<string | null>(null);
-  const [voidSuccessMessage, setVoidSuccessMessage] = useState<string | null>(null);
+  const [voidSuccessMessage, setVoidSuccessMessage] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!readRoles.has(role)) return;
@@ -329,7 +337,11 @@ export function StudentBillingAccount({ studentId }: { studentId: string }) {
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load billing account.");
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to load billing account.",
+          );
           setLoading(false);
         }
       });
@@ -342,7 +354,9 @@ export function StudentBillingAccount({ studentId }: { studentId: string }) {
   if (!readRoles.has(role)) {
     return (
       <div className="p-6">
-        <Notice tone="danger">You do not have permission to view billing data.</Notice>
+        <Notice tone="danger">
+          You do not have permission to view billing data.
+        </Notice>
       </div>
     );
   }
@@ -368,7 +382,9 @@ export function StudentBillingAccount({ studentId }: { studentId: string }) {
       setVoidNotifyParents(false);
       setRefreshNonce((n) => n + 1);
     } catch (err) {
-      setVoidError(err instanceof Error ? err.message : "Unable to void payment.");
+      setVoidError(
+        err instanceof Error ? err.message : "Unable to void payment.",
+      );
     } finally {
       setIsVoiding(false);
     }
@@ -523,7 +539,9 @@ export function StudentBillingAccount({ studentId }: { studentId: string }) {
       <Card>
         <CardHeader>
           <CardTitle>Recent payments</CardTitle>
-          <CardDescription>Last 10 payments recorded for this student.</CardDescription>
+          <CardDescription>
+            Last 10 payments recorded for this student.
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <PaymentsTable
@@ -539,13 +557,12 @@ export function StudentBillingAccount({ studentId }: { studentId: string }) {
           <CardHeader>
             <CardTitle>Void payment?</CardTitle>
             <CardDescription>
-              This will reverse payment {voidTarget.receiptNumber} and recalculate all affected charge balances. This cannot be undone.
+              This will reverse payment {voidTarget.receiptNumber} and
+              recalculate all affected charge balances. This cannot be undone.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {voidError ? (
-              <Notice tone="danger">{voidError}</Notice>
-            ) : null}
+            {voidError ? <Notice tone="danger">{voidError}</Notice> : null}
 
             <Field htmlFor="void-reason" label="Void reason (optional)">
               <Input

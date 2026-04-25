@@ -60,7 +60,8 @@ export function AssessmentTypesManagement() {
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState("");
   const [types, setTypes] = useState<AssessmentType[]>([]);
-  const [createForm, setCreateForm] = useState<TypeFormState>(buildCreateForm());
+  const [createForm, setCreateForm] =
+    useState<TypeFormState>(buildCreateForm());
   const [editingType, setEditingType] = useState<AssessmentType | null>(null);
   const [editForm, setEditForm] = useState<TypeFormState | null>(null);
   const [includeInactive, setIncludeInactive] = useState(true);
@@ -84,7 +85,11 @@ export function AssessmentTypesManagement() {
         setSchools(response);
         setSelectedSchoolId((current) => current || response[0]?.id || "");
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load schools.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load schools.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -109,7 +114,11 @@ export function AssessmentTypesManagement() {
         });
         setTypes(response);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load assessment types.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load assessment types.",
+        );
         setTypes([]);
       }
     }
@@ -157,7 +166,11 @@ export function AssessmentTypesManagement() {
       setCreateForm(buildCreateForm());
       setSuccessMessage("Assessment type created.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to create assessment type.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to create assessment type.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -189,7 +202,11 @@ export function AssessmentTypesManagement() {
       setEditForm(editingType ? buildEditForm(editingType) : null);
       setSuccessMessage("Assessment type updated.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update assessment type.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update assessment type.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -208,9 +225,17 @@ export function AssessmentTypesManagement() {
       }
 
       await refreshTypes();
-      setSuccessMessage(type.isActive ? "Assessment type archived." : "Assessment type activated.");
+      setSuccessMessage(
+        type.isActive
+          ? "Assessment type archived."
+          : "Assessment type activated.",
+      );
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update assessment type.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update assessment type.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -256,7 +281,9 @@ export function AssessmentTypesManagement() {
       <Card>
         <CardHeader>
           <CardTitle>School Context</CardTitle>
-          <CardDescription>Pick the school scope to view types (global + school).</CardDescription>
+          <CardDescription>
+            Pick the school scope to view types (global + school).
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <Field htmlFor="assessment-type-school" label="School">
@@ -274,10 +301,15 @@ export function AssessmentTypesManagement() {
             </Select>
           </Field>
 
-          <Field htmlFor="assessment-type-include-inactive" label="Include inactive">
+          <Field
+            htmlFor="assessment-type-include-inactive"
+            label="Include inactive"
+          >
             <Select
               id="assessment-type-include-inactive"
-              onChange={(event) => setIncludeInactive(event.target.value === "true")}
+              onChange={(event) =>
+                setIncludeInactive(event.target.value === "true")
+              }
               value={includeInactive ? "true" : "false"}
             >
               <option value="true">Show inactive</option>
@@ -301,12 +333,18 @@ export function AssessmentTypesManagement() {
                 description="Select a school before creating a school-scoped type."
               />
             ) : (
-              <form className="grid gap-4 md:grid-cols-2" onSubmit={handleCreate}>
+              <form
+                className="grid gap-4 md:grid-cols-2"
+                onSubmit={handleCreate}
+              >
                 <Field htmlFor="create-type-name" label="Name">
                   <Input
                     id="create-type-name"
                     onChange={(event) =>
-                      setCreateForm((current) => ({ ...current, name: event.target.value }))
+                      setCreateForm((current) => ({
+                        ...current,
+                        name: event.target.value,
+                      }))
                     }
                     placeholder="Quiz"
                     value={createForm.name}
@@ -353,7 +391,9 @@ export function AssessmentTypesManagement() {
         <Card>
           <CardHeader>
             <CardTitle>Types</CardTitle>
-            <CardDescription>Inactive types remain valid for existing assessments.</CardDescription>
+            <CardDescription>
+              Inactive types remain valid for existing assessments.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {types.length === 0 ? (
@@ -368,17 +408,30 @@ export function AssessmentTypesManagement() {
                   <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                     <thead className="bg-slate-50/80">
                       <tr>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Name</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Scope</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Name
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Scope
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white">
                       {types.map((type) => (
-                        <tr className="align-top hover:bg-slate-50" key={type.id}>
+                        <tr
+                          className="align-top hover:bg-slate-50"
+                          key={type.id}
+                        >
                           <td className="px-4 py-4">
-                            <p className="font-medium text-slate-900">{type.name}</p>
+                            <p className="font-medium text-slate-900">
+                              {type.name}
+                            </p>
                             <p className="mt-1 text-xs text-slate-500">
                               {type.key} • Order {type.sortOrder}
                             </p>
@@ -387,7 +440,9 @@ export function AssessmentTypesManagement() {
                             {type.schoolId ? "School" : "Global"}
                           </td>
                           <td className="px-4 py-4">
-                            <Badge variant={type.isActive ? "success" : "neutral"}>
+                            <Badge
+                              variant={type.isActive ? "success" : "neutral"}
+                            >
                               {type.isActive ? "Active" : "Inactive"}
                             </Badge>
                           </td>
@@ -445,13 +500,18 @@ export function AssessmentTypesManagement() {
             </Button>
           </CardHeader>
           <CardContent>
-            <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSaveEdit}>
+            <form
+              className="grid gap-4 md:grid-cols-2"
+              onSubmit={handleSaveEdit}
+            >
               <Field htmlFor="edit-type-name" label="Name">
                 <Input
                   id="edit-type-name"
                   onChange={(event) =>
                     setEditForm((current) =>
-                      current ? { ...current, name: event.target.value } : current,
+                      current
+                        ? { ...current, name: event.target.value }
+                        : current,
                     )
                   }
                   value={editForm.name}
@@ -463,7 +523,9 @@ export function AssessmentTypesManagement() {
                   inputMode="numeric"
                   onChange={(event) =>
                     setEditForm((current) =>
-                      current ? { ...current, sortOrder: event.target.value } : current,
+                      current
+                        ? { ...current, sortOrder: event.target.value }
+                        : current,
                     )
                   }
                   value={editForm.sortOrder}
@@ -481,4 +543,3 @@ export function AssessmentTypesManagement() {
     </div>
   );
 }
-

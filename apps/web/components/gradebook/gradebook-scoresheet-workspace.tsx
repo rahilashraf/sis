@@ -13,7 +13,11 @@ import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth/auth-context";
-import { listClasses, listMyClasses, type SchoolClass } from "@/lib/api/classes";
+import {
+  listClasses,
+  listMyClasses,
+  type SchoolClass,
+} from "@/lib/api/classes";
 import {
   listAssessmentResultStatusLabels,
   upsertAssessmentGrades,
@@ -30,9 +34,16 @@ import {
   type ClassGradebookGrid,
   type ClassGradeSummary,
 } from "@/lib/api/gradebook";
-import { listReportingPeriods, type ReportingPeriod } from "@/lib/api/reporting-periods";
+import {
+  listReportingPeriods,
+  type ReportingPeriod,
+} from "@/lib/api/reporting-periods";
 import { formatDateOnly } from "@/lib/date";
-import { formatDisplayedPercent, getDisplayText, roundDisplayedPercent } from "@/lib/utils";
+import {
+  formatDisplayedPercent,
+  getDisplayText,
+  roundDisplayedPercent,
+} from "@/lib/utils";
 
 type Mode = "teacher" | "admin";
 
@@ -55,13 +66,19 @@ function getFullName(firstName: unknown, lastName: unknown, fallback = "—") {
 function getClassOptionLabel(schoolClass: SchoolClass) {
   const className = getDisplayText(schoolClass.name);
   const gradeLevel = getDisplayText(schoolClass.gradeLevel?.name, "");
-  const subject = getDisplayText(schoolClass.subjectOption?.name ?? schoolClass.subject, "");
+  const subject = getDisplayText(
+    schoolClass.subjectOption?.name ?? schoolClass.subject,
+    "",
+  );
 
   return `${className}${gradeLevel ? ` • ${gradeLevel}` : ""}${subject ? ` • ${subject}` : ""}${schoolClass.isActive ? "" : " • Inactive"}`;
 }
 
 export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
-  const { selectedSchoolId: schoolContextId, setSelectedSchoolId: setSchoolContextId } = useAuth();
+  const {
+    selectedSchoolId: schoolContextId,
+    setSelectedSchoolId: setSchoolContextId,
+  } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedClassId = searchParams.get("classId") ?? "";
@@ -73,25 +90,46 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
   const [selectedClassId, setSelectedClassId] = useState("");
   const [includeInactiveClasses, setIncludeInactiveClasses] = useState(false);
 
-  const [reportingPeriods, setReportingPeriods] = useState<ReportingPeriod[]>([]);
-  const [reportingPeriodError, setReportingPeriodError] = useState<string | null>(null);
-  const [selectedGridReportingPeriodId, setSelectedGridReportingPeriodId] = useState<string>("all");
+  const [reportingPeriods, setReportingPeriods] = useState<ReportingPeriod[]>(
+    [],
+  );
+  const [reportingPeriodError, setReportingPeriodError] = useState<
+    string | null
+  >(null);
+  const [selectedGridReportingPeriodId, setSelectedGridReportingPeriodId] =
+    useState<string>("all");
 
   const [summary, setSummary] = useState<ClassGradeSummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [grid, setGrid] = useState<ClassGradebookGrid | null>(null);
   const [gridError, setGridError] = useState<string | null>(null);
 
-  const [draftGridScores, setDraftGridScores] = useState<Record<string, string>>({});
-  const [draftGridStatuses, setDraftGridStatuses] = useState<Record<string, string>>({});
-  const [draftGridComments, setDraftGridComments] = useState<Record<string, string>>({});
+  const [draftGridScores, setDraftGridScores] = useState<
+    Record<string, string>
+  >({});
+  const [draftGridStatuses, setDraftGridStatuses] = useState<
+    Record<string, string>
+  >({});
+  const [draftGridComments, setDraftGridComments] = useState<
+    Record<string, string>
+  >({});
   const [gridSaveError, setGridSaveError] = useState<string | null>(null);
-  const [overrideSaveError, setOverrideSaveError] = useState<string | null>(null);
+  const [overrideSaveError, setOverrideSaveError] = useState<string | null>(
+    null,
+  );
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-  const [savingOverrideStudentId, setSavingOverrideStudentId] = useState<string | null>(null);
-  const [overridePercentByStudentId, setOverridePercentByStudentId] = useState<Record<string, string>>({});
-  const [overrideReasonByStudentId, setOverrideReasonByStudentId] = useState<Record<string, string>>({});
-  const [statusLabels, setStatusLabels] = useState<AssessmentResultStatusLabel[]>([]);
+  const [savingOverrideStudentId, setSavingOverrideStudentId] = useState<
+    string | null
+  >(null);
+  const [overridePercentByStudentId, setOverridePercentByStudentId] = useState<
+    Record<string, string>
+  >({});
+  const [overrideReasonByStudentId, setOverrideReasonByStudentId] = useState<
+    Record<string, string>
+  >({});
+  const [statusLabels, setStatusLabels] = useState<
+    AssessmentResultStatusLabel[]
+  >([]);
   const [statusLabelError, setStatusLabelError] = useState<string | null>(null);
   const [categories, setCategories] = useState<AssessmentCategory[]>([]);
 
@@ -111,7 +149,9 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
       });
     }
 
-    return Array.from(schoolMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(schoolMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
   }, [classes]);
 
   const visibleClasses = useMemo(() => {
@@ -119,27 +159,45 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
       mode === "teacher"
         ? classes
         : selectedSchoolId
-          ? classes.filter((schoolClass) => schoolClass.schoolId === selectedSchoolId)
+          ? classes.filter(
+              (schoolClass) => schoolClass.schoolId === selectedSchoolId,
+            )
           : classes;
 
     return schoolFiltered.filter((schoolClass) => {
-      if (selectedGradeLevelId && schoolClass.gradeLevelId !== selectedGradeLevelId) {
+      if (
+        selectedGradeLevelId &&
+        schoolClass.gradeLevelId !== selectedGradeLevelId
+      ) {
         return false;
       }
 
-      if (selectedSubjectOptionId && schoolClass.subjectOptionId !== selectedSubjectOptionId) {
+      if (
+        selectedSubjectOptionId &&
+        schoolClass.subjectOptionId !== selectedSubjectOptionId
+      ) {
         return false;
       }
 
       return true;
     });
-  }, [classes, mode, selectedGradeLevelId, selectedSchoolId, selectedSubjectOptionId]);
+  }, [
+    classes,
+    mode,
+    selectedGradeLevelId,
+    selectedSchoolId,
+    selectedSubjectOptionId,
+  ]);
 
   const availableGradeLevelOptions = useMemo(() => {
     const map = new Map<string, string>();
 
     for (const schoolClass of classes) {
-      if (mode === "admin" && selectedSchoolId && schoolClass.schoolId !== selectedSchoolId) {
+      if (
+        mode === "admin" &&
+        selectedSchoolId &&
+        schoolClass.schoolId !== selectedSchoolId
+      ) {
         continue;
       }
 
@@ -149,7 +207,8 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
 
       map.set(
         schoolClass.gradeLevelId,
-        schoolClass.gradeLevel?.name ?? `Grade level ${schoolClass.gradeLevelId}`,
+        schoolClass.gradeLevel?.name ??
+          `Grade level ${schoolClass.gradeLevelId}`,
       );
     }
 
@@ -162,7 +221,11 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
     const map = new Map<string, string>();
 
     for (const schoolClass of classes) {
-      if (mode === "admin" && selectedSchoolId && schoolClass.schoolId !== selectedSchoolId) {
+      if (
+        mode === "admin" &&
+        selectedSchoolId &&
+        schoolClass.schoolId !== selectedSchoolId
+      ) {
         continue;
       }
 
@@ -182,7 +245,10 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
   }, [classes, mode, selectedSchoolId]);
 
   const selectedClass = useMemo(
-    () => visibleClasses.find((schoolClass) => schoolClass.id === selectedClassId) ?? null,
+    () =>
+      visibleClasses.find(
+        (schoolClass) => schoolClass.id === selectedClassId,
+      ) ?? null,
     [selectedClassId, visibleClasses],
   );
 
@@ -207,11 +273,27 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
 
     const byAssessmentId = new Map<
       string,
-      Map<string, { score: number | null; statusKey: string | null; statusBehavior: string | null; comment: string | null }>
+      Map<
+        string,
+        {
+          score: number | null;
+          statusKey: string | null;
+          statusBehavior: string | null;
+          comment: string | null;
+        }
+      >
     >();
 
     for (const assessment of grid.assessments) {
-      const byStudent = new Map<string, { score: number | null; statusKey: string | null; statusBehavior: string | null; comment: string | null }>();
+      const byStudent = new Map<
+        string,
+        {
+          score: number | null;
+          statusKey: string | null;
+          statusBehavior: string | null;
+          comment: string | null;
+        }
+      >();
 
       for (const result of assessment.results) {
         byStudent.set(result.studentId, {
@@ -260,11 +342,14 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
     }
 
     if (selectedGridReportingPeriodId === "unassigned") {
-      return grid.assessments.filter((assessment) => !assessment.reportingPeriod);
+      return grid.assessments.filter(
+        (assessment) => !assessment.reportingPeriod,
+      );
     }
 
     return grid.assessments.filter(
-      (assessment) => assessment.reportingPeriod?.id === selectedGridReportingPeriodId,
+      (assessment) =>
+        assessment.reportingPeriod?.id === selectedGridReportingPeriodId,
     );
   }, [grid, selectedGridReportingPeriodId]);
 
@@ -280,19 +365,22 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
           label:
             selectedGridReportingPeriodId === "unassigned"
               ? "Unassigned"
-              : reportingPeriods.find((period) => period.id === selectedGridReportingPeriodId)
-                  ?.name ?? "Reporting period",
+              : (reportingPeriods.find(
+                  (period) => period.id === selectedGridReportingPeriodId,
+                )?.name ?? "Reporting period"),
           assessments: visibleGridAssessments,
           isLocked:
             selectedGridReportingPeriodId === "unassigned"
               ? false
-              : reportingPeriods.find((period) => period.id === selectedGridReportingPeriodId)
-                  ?.isLocked ?? false,
+              : (reportingPeriods.find(
+                  (period) => period.id === selectedGridReportingPeriodId,
+                )?.isLocked ?? false),
           order:
             selectedGridReportingPeriodId === "unassigned"
               ? 9999
-              : reportingPeriods.find((period) => period.id === selectedGridReportingPeriodId)
-                  ?.order ?? 9999,
+              : (reportingPeriods.find(
+                  (period) => period.id === selectedGridReportingPeriodId,
+                )?.order ?? 9999),
         },
       ];
     }
@@ -311,15 +399,13 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
     for (const assessment of visibleGridAssessments) {
       const period = assessment.reportingPeriod;
       const key = period?.id ?? "unassigned";
-      const existing =
-        byKey.get(key) ??
-        {
-          key,
-          label: period ? `${period.order}. ${period.name}` : "Unassigned",
-          order: period?.order ?? 9999,
-          isLocked: period?.isLocked ?? false,
-          assessments: [],
-        };
+      const existing = byKey.get(key) ?? {
+        key,
+        label: period ? `${period.order}. ${period.name}` : "Unassigned",
+        order: period?.order ?? 9999,
+        isLocked: period?.isLocked ?? false,
+        assessments: [],
+      };
 
       existing.assessments.push(assessment);
       byKey.set(key, existing);
@@ -332,7 +418,12 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
 
       return a.label.localeCompare(b.label);
     });
-  }, [grid, reportingPeriods, selectedGridReportingPeriodId, visibleGridAssessments]);
+  }, [
+    grid,
+    reportingPeriods,
+    selectedGridReportingPeriodId,
+    visibleGridAssessments,
+  ]);
 
   const pendingGridChangeCount = useMemo(() => {
     if (!gridResultsByAssessmentId) {
@@ -348,7 +439,8 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
 
     for (const key of touchedCellKeys) {
       const [assessmentId, studentId] = key.split(":");
-      const originalEntry = gridResultsByAssessmentId.get(assessmentId)?.get(studentId) ?? null;
+      const originalEntry =
+        gridResultsByAssessmentId.get(assessmentId)?.get(studentId) ?? null;
       const originalScore =
         originalEntry?.score === null || originalEntry?.score === undefined
           ? ""
@@ -370,7 +462,12 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
     }
 
     return count;
-  }, [draftGridComments, draftGridScores, draftGridStatuses, gridResultsByAssessmentId]);
+  }, [
+    draftGridComments,
+    draftGridScores,
+    draftGridStatuses,
+    gridResultsByAssessmentId,
+  ]);
 
   const studentIndexById = useMemo(() => {
     const map = new Map<string, number>();
@@ -404,7 +501,8 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
             : await listClasses({ includeInactive: includeInactiveClasses });
 
         const requested =
-          requestedClassId && classResponse.some((entry) => entry.id === requestedClassId)
+          requestedClassId &&
+          classResponse.some((entry) => entry.id === requestedClassId)
             ? requestedClassId
             : "";
         const initialClassId = requested || classResponse[0]?.id || "";
@@ -416,7 +514,8 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
             : "";
         const initialSchoolId =
           mode === "admin"
-            ? (classResponse.find((entry) => entry.id === initialClassId)?.schoolId ??
+            ? (classResponse.find((entry) => entry.id === initialClassId)
+                ?.schoolId ??
               contextSchoolId ??
               classResponse[0]?.schoolId ??
               "")
@@ -522,7 +621,10 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
       setStatusLabelError(null);
 
       const [statusResult, categoriesResult] = await Promise.allSettled([
-        listAssessmentResultStatusLabels({ schoolId: selectedClass.schoolId, includeInactive: false }),
+        listAssessmentResultStatusLabels({
+          schoolId: selectedClass.schoolId,
+          includeInactive: false,
+        }),
         listAssessmentCategories(selectedClassId, { includeInactive: true }),
       ]);
 
@@ -651,7 +753,10 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
     setSuccessMessage(null);
 
     try {
-      const gradesByAssessmentId = new Map<string, UpsertAssessmentGradeInput[]>();
+      const gradesByAssessmentId = new Map<
+        string,
+        UpsertAssessmentGradeInput[]
+      >();
       const touchedCellKeys = new Set([
         ...Object.keys(draftGridScores),
         ...Object.keys(draftGridStatuses),
@@ -669,14 +774,24 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
           continue;
         }
 
-        const originalEntry = gridResultsByAssessmentId.get(assessmentId)?.get(studentId) ?? null;
+        const originalEntry =
+          gridResultsByAssessmentId.get(assessmentId)?.get(studentId) ?? null;
         const originalScore = originalEntry?.score ?? null;
         const originalStatusKey = originalEntry?.statusKey ?? null;
         const originalComment = (originalEntry?.comment ?? "").trim() || null;
 
-        const scoreTouched = Object.prototype.hasOwnProperty.call(draftGridScores, key);
-        const statusTouched = Object.prototype.hasOwnProperty.call(draftGridStatuses, key);
-        const commentTouched = Object.prototype.hasOwnProperty.call(draftGridComments, key);
+        const scoreTouched = Object.prototype.hasOwnProperty.call(
+          draftGridScores,
+          key,
+        );
+        const statusTouched = Object.prototype.hasOwnProperty.call(
+          draftGridStatuses,
+          key,
+        );
+        const commentTouched = Object.prototype.hasOwnProperty.call(
+          draftGridComments,
+          key,
+        );
 
         let nextScore = originalScore;
         if (scoreTouched) {
@@ -686,11 +801,15 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
           } else {
             const parsed = Number(rawScore);
             if (!Number.isFinite(parsed) || parsed < 0) {
-              throw new Error(`Invalid score provided for ${assessment.title}.`);
+              throw new Error(
+                `Invalid score provided for ${assessment.title}.`,
+              );
             }
 
             if (parsed > assessment.maxScore) {
-              throw new Error(`Score for ${assessment.title} cannot exceed ${assessment.maxScore}.`);
+              throw new Error(
+                `Score for ${assessment.title} cannot exceed ${assessment.maxScore}.`,
+              );
             }
 
             nextScore = parsed;
@@ -698,10 +817,10 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
         }
 
         const nextStatusKey = statusTouched
-          ? ((draftGridStatuses[key] ?? "").trim().toUpperCase() || null)
+          ? (draftGridStatuses[key] ?? "").trim().toUpperCase() || null
           : originalStatusKey;
         const nextComment = commentTouched
-          ? ((draftGridComments[key] ?? "").trim() || null)
+          ? (draftGridComments[key] ?? "").trim() || null
           : originalComment;
 
         const changed =
@@ -714,7 +833,11 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
         }
 
         const bucket = gradesByAssessmentId.get(assessmentId) ?? [];
-        if (nextScore === null && nextStatusKey === null && nextComment === null) {
+        if (
+          nextScore === null &&
+          nextStatusKey === null &&
+          nextComment === null
+        ) {
           bucket.push({ studentId, clear: true });
         } else {
           bucket.push({
@@ -734,7 +857,9 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
 
       const batches = Array.from(gradesByAssessmentId.entries());
       const settled = await Promise.allSettled(
-        batches.map(([assessmentId, grades]) => upsertAssessmentGrades(assessmentId, grades)),
+        batches.map(([assessmentId, grades]) =>
+          upsertAssessmentGrades(assessmentId, grades),
+        ),
       );
 
       const failures = settled
@@ -786,7 +911,9 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
         setGridSaveError(
           failures
             .map(({ result }) =>
-              result.reason instanceof Error ? result.reason.message : "Unable to save grades.",
+              result.reason instanceof Error
+                ? result.reason.message
+                : "Unable to save grades.",
             )
             .join(" "),
         );
@@ -795,7 +922,11 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
         setLastSavedAt(new Date());
       }
     } catch (saveError) {
-      setGridSaveError(saveError instanceof Error ? saveError.message : "Unable to save grades.");
+      setGridSaveError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save grades.",
+      );
     } finally {
       setIsSavingGrid(false);
     }
@@ -812,13 +943,18 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
 
     try {
       const rawPercent = (overridePercentByStudentId[studentId] ?? "").trim();
-      const parsedPercent = rawPercent.length === 0 ? undefined : Number(rawPercent);
+      const parsedPercent =
+        rawPercent.length === 0 ? undefined : Number(rawPercent);
 
       if (parsedPercent === undefined) {
         throw new Error("Override percent is required.");
       }
 
-      if (!Number.isFinite(parsedPercent) || parsedPercent < 0 || parsedPercent > 100) {
+      if (
+        !Number.isFinite(parsedPercent) ||
+        parsedPercent < 0 ||
+        parsedPercent > 100
+      ) {
         throw new Error("Override percent must be a number between 0 and 100.");
       }
 
@@ -826,7 +962,8 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
         { classId: selectedClassId, studentId },
         {
           overridePercent: parsedPercent,
-          overrideReason: (overrideReasonByStudentId[studentId] ?? "").trim() || null,
+          overrideReason:
+            (overrideReasonByStudentId[studentId] ?? "").trim() || null,
         },
       );
 
@@ -834,7 +971,9 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
       setSuccessMessage("Grade override saved.");
     } catch (saveError) {
       setOverrideSaveError(
-        saveError instanceof Error ? saveError.message : "Unable to save override.",
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save override.",
       );
     } finally {
       setSavingOverrideStudentId(null);
@@ -856,7 +995,9 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
       setSuccessMessage("Grade override cleared.");
     } catch (clearError) {
       setOverrideSaveError(
-        clearError instanceof Error ? clearError.message : "Unable to clear override.",
+        clearError instanceof Error
+          ? clearError.message
+          : "Unable to clear override.",
       );
     } finally {
       setSavingOverrideStudentId(null);
@@ -930,8 +1071,18 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                 Class summary
               </Link>
             ) : null}
+            {mode === "admin" && selectedClassId ? (
+              <Link
+                className={buttonClassName({ variant: "secondary" })}
+                href={`/admin/classes/${selectedClassId}`}
+              >
+                Edit Class
+              </Link>
+            ) : null}
             <Button
-              disabled={isSavingGrid || isLoadingGrid || pendingGridChangeCount === 0}
+              disabled={
+                isSavingGrid || isLoadingGrid || pendingGridChangeCount === 0
+              }
               onClick={() => void handleSaveGridEdits()}
               type="button"
             >
@@ -972,7 +1123,9 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
             <Field htmlFor="scoresheet-grade-level" label="Grade level">
               <Select
                 id="scoresheet-grade-level"
-                onChange={(event) => setSelectedGradeLevelId(event.target.value)}
+                onChange={(event) =>
+                  setSelectedGradeLevelId(event.target.value)
+                }
                 value={selectedGradeLevelId}
               >
                 <option value="">All grade levels</option>
@@ -987,7 +1140,9 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
             <Field htmlFor="scoresheet-subject" label="Subject">
               <Select
                 id="scoresheet-subject"
-                onChange={(event) => setSelectedSubjectOptionId(event.target.value)}
+                onChange={(event) =>
+                  setSelectedSubjectOptionId(event.target.value)
+                }
                 value={selectedSubjectOptionId}
               >
                 <option value="">All subjects</option>
@@ -1007,7 +1162,9 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                   setSelectedClassId(event.target.value);
                   setSuccessMessage(null);
                   setGridSaveError(null);
-                  router.replace(`/${mode}/gradebook?classId=${encodeURIComponent(event.target.value)}`);
+                  router.replace(
+                    `/${mode}/gradebook?classId=${encodeURIComponent(event.target.value)}`,
+                  );
                 }}
                 value={selectedClassId}
               >
@@ -1020,11 +1177,16 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
               </Select>
             </Field>
 
-            <Field htmlFor="scoresheet-reporting-period" label="Reporting period">
+            <Field
+              htmlFor="scoresheet-reporting-period"
+              label="Reporting period"
+            >
               <Select
                 disabled={!grid}
                 id="scoresheet-reporting-period"
-                onChange={(event) => setSelectedGridReportingPeriodId(event.target.value)}
+                onChange={(event) =>
+                  setSelectedGridReportingPeriodId(event.target.value)
+                }
                 value={selectedGridReportingPeriodId}
               >
                 <option value="all">All periods</option>
@@ -1043,7 +1205,9 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
             <label className="flex items-center gap-2 text-sm text-slate-600">
               <input
                 checked={includeInactiveClasses}
-                onChange={(event) => setIncludeInactiveClasses(event.target.checked)}
+                onChange={(event) =>
+                  setIncludeInactiveClasses(event.target.checked)
+                }
                 type="checkbox"
               />
               Include inactive classes
@@ -1051,12 +1215,20 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
           ) : null}
         </CardHeader>
         <CardContent className="space-y-3">
-          {reportingPeriodError ? <Notice tone="danger">{reportingPeriodError}</Notice> : null}
-          {statusLabelError ? <Notice tone="danger">{statusLabelError}</Notice> : null}
+          {reportingPeriodError ? (
+            <Notice tone="danger">{reportingPeriodError}</Notice>
+          ) : null}
+          {statusLabelError ? (
+            <Notice tone="danger">{statusLabelError}</Notice>
+          ) : null}
           {summaryError ? <Notice tone="danger">{summaryError}</Notice> : null}
           {gridError ? <Notice tone="danger">{gridError}</Notice> : null}
-          {gridSaveError ? <Notice tone="danger">{gridSaveError}</Notice> : null}
-          {overrideSaveError ? <Notice tone="danger">{overrideSaveError}</Notice> : null}
+          {gridSaveError ? (
+            <Notice tone="danger">{gridSaveError}</Notice>
+          ) : null}
+          {overrideSaveError ? (
+            <Notice tone="danger">{overrideSaveError}</Notice>
+          ) : null}
           {grid ? (
             <div className="flex flex-wrap gap-2 text-xs">
               <Badge variant="neutral">Empty</Badge>
@@ -1090,10 +1262,14 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
-                    {selectedGridReportingPeriodId === "all" && gridAssessmentGroups.length > 1 ? (
+                    {selectedGridReportingPeriodId === "all" &&
+                    gridAssessmentGroups.length > 1 ? (
                       <>
                         <tr className="sticky top-0 z-30 bg-slate-50/80">
-                          <th className="sticky left-0 z-40 bg-slate-50/80 px-4 py-3 font-semibold text-slate-700" rowSpan={2}>
+                          <th
+                            className="sticky left-0 z-40 bg-slate-50/80 px-4 py-3 font-semibold text-slate-700"
+                            rowSpan={2}
+                          >
                             Student
                           </th>
                           {gridAssessmentGroups.map((group) => (
@@ -1104,20 +1280,34 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <span>{group.label}</span>
-                                {group.isLocked ? <Badge variant="neutral">Locked</Badge> : null}
+                                {group.isLocked ? (
+                                  <Badge variant="neutral">Locked</Badge>
+                                ) : null}
                               </div>
                             </th>
                           ))}
-                          <th className="px-4 py-3 font-semibold text-slate-700" rowSpan={2}>
+                          <th
+                            className="px-4 py-3 font-semibold text-slate-700"
+                            rowSpan={2}
+                          >
                             Avg
                           </th>
-                          <th className="px-4 py-3 font-semibold text-slate-700" rowSpan={2}>
+                          <th
+                            className="px-4 py-3 font-semibold text-slate-700"
+                            rowSpan={2}
+                          >
                             %
                           </th>
-                          <th className="px-4 py-3 font-semibold text-slate-700" rowSpan={2}>
+                          <th
+                            className="px-4 py-3 font-semibold text-slate-700"
+                            rowSpan={2}
+                          >
                             Grade
                           </th>
-                          <th className="px-4 py-3 font-semibold text-slate-700" rowSpan={2}>
+                          <th
+                            className="px-4 py-3 font-semibold text-slate-700"
+                            rowSpan={2}
+                          >
                             Override
                           </th>
                         </tr>
@@ -1131,7 +1321,9 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                                 <button
                                   className="min-w-[10rem] text-left hover:underline"
                                   onClick={() => {
-                                    void router.push(`/${mode}/classes/${grid.classId}/assignments`);
+                                    void router.push(
+                                      `/${mode}/classes/${grid.classId}/assignments`,
+                                    );
                                   }}
                                   type="button"
                                 >
@@ -1141,9 +1333,17 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                                   <span className="mt-0.5 block text-xs font-normal text-slate-500">
                                     Max {assessment.maxScore} •{" "}
                                     {assessment.categoryId
-                                      ? categoryNameById.get(assessment.categoryId) ?? "Category"
+                                      ? (categoryNameById.get(
+                                          assessment.categoryId,
+                                        ) ?? "Category")
                                       : "No category"}{" "}
-                                    • {assessment.dueAt ? formatDateOnly(assessment.dueAt, "No date") : "No date"}
+                                    •{" "}
+                                    {assessment.dueAt
+                                      ? formatDateOnly(
+                                          assessment.dueAt,
+                                          "No date",
+                                        )
+                                      : "No date"}
                                   </span>
                                   <span className="mt-0.5 block text-xs font-normal text-slate-500">
                                     {assessment.assessmentType.name}
@@ -1167,7 +1367,9 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                             <button
                               className="min-w-[10rem] text-left hover:underline"
                               onClick={() => {
-                                void router.push(`/${mode}/classes/${grid.classId}/assignments`);
+                                void router.push(
+                                  `/${mode}/classes/${grid.classId}/assignments`,
+                                );
                               }}
                               type="button"
                             >
@@ -1177,52 +1379,79 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                               <span className="mt-0.5 block text-xs font-normal text-slate-500">
                                 Max {assessment.maxScore} •{" "}
                                 {assessment.categoryId
-                                  ? categoryNameById.get(assessment.categoryId) ?? "Category"
+                                  ? (categoryNameById.get(
+                                      assessment.categoryId,
+                                    ) ?? "Category")
                                   : "No category"}{" "}
-                                • {assessment.dueAt ? formatDateOnly(assessment.dueAt, "No date") : "No date"}
+                                •{" "}
+                                {assessment.dueAt
+                                  ? formatDateOnly(assessment.dueAt, "No date")
+                                  : "No date"}
                               </span>
                               <span className="mt-0.5 block text-xs font-normal text-slate-500">
                                 {assessment.assessmentType.name}
-                                {assessment.reportingPeriod?.isLocked ? " • Locked" : ""}
+                                {assessment.reportingPeriod?.isLocked
+                                  ? " • Locked"
+                                  : ""}
                               </span>
                             </button>
                           </th>
                         ))}
-                        <th className="px-4 py-3 font-semibold text-slate-700">Avg</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">%</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Grade</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Override</th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Avg
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          %
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Grade
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Override
+                        </th>
                       </tr>
                     )}
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {grid.students.map((student) => {
                       const summaryEntry = summaryByStudentId.get(student.id);
-                      const overridePercentDraft = overridePercentByStudentId[student.id] ?? "";
-                      const overrideReasonDraft = overrideReasonByStudentId[student.id] ?? "";
-                      const isSavingStudentOverride = savingOverrideStudentId === student.id;
+                      const overridePercentDraft =
+                        overridePercentByStudentId[student.id] ?? "";
+                      const overrideReasonDraft =
+                        overrideReasonByStudentId[student.id] ?? "";
+                      const isSavingStudentOverride =
+                        savingOverrideStudentId === student.id;
 
                       return (
-                        <tr className="align-top hover:bg-slate-50" key={student.id}>
+                        <tr
+                          className="align-top hover:bg-slate-50"
+                          key={student.id}
+                        >
                           <td className="sticky left-0 z-20 bg-white px-4 py-3">
                             <button
                               className="text-left font-medium text-slate-900 hover:underline"
                               onClick={() => {
-                                router.push(`/${mode}/classes/${grid.classId}/students/${student.id}`);
+                                router.push(
+                                  `/${mode}/classes/${grid.classId}/students/${student.id}`,
+                                );
                               }}
                               type="button"
                             >
                               {getFullName(student.firstName, student.lastName)}
                             </button>
-                            <p className="mt-1 text-xs text-slate-500">@{student.username}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              @{student.username}
+                            </p>
                           </td>
                           {visibleGridAssessments.map((assessment) => {
                             const result =
-                              gridResultsByAssessmentId?.get(assessment.id)?.get(student.id) ??
-                              null;
+                              gridResultsByAssessmentId
+                                ?.get(assessment.id)
+                                ?.get(student.id) ?? null;
                             const originalScore = result?.score ?? null;
                             const originalStatusKey = result?.statusKey ?? null;
-                            const originalComment = (result?.comment ?? "").trim() || null;
+                            const originalComment =
+                              (result?.comment ?? "").trim() || null;
                             const cellKey = `${assessment.id}:${student.id}`;
                             const scoreDraft = draftGridScores[cellKey];
                             const statusDraft = draftGridStatuses[cellKey];
@@ -1230,52 +1459,68 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                             const scoreValue =
                               scoreDraft !== undefined
                                 ? scoreDraft
-                                : originalScore === null || originalScore === undefined
+                                : originalScore === null ||
+                                    originalScore === undefined
                                   ? ""
                                   : String(originalScore);
                             const statusValue =
-                              statusDraft !== undefined ? statusDraft : originalStatusKey ?? "";
+                              statusDraft !== undefined
+                                ? statusDraft
+                                : (originalStatusKey ?? "");
                             const commentValue =
                               commentDraft !== undefined
                                 ? commentDraft
-                                : originalComment ?? "";
+                                : (originalComment ?? "");
 
                             const trimmedScore = scoreValue.trim();
-                            const parsedScore = trimmedScore ? Number(trimmedScore) : null;
+                            const parsedScore = trimmedScore
+                              ? Number(trimmedScore)
+                              : null;
                             const effectiveScore =
-                              parsedScore !== null && Number.isFinite(parsedScore)
+                              parsedScore !== null &&
+                              Number.isFinite(parsedScore)
                                 ? parsedScore
                                 : trimmedScore.length === 0
                                   ? null
                                   : originalScore;
-                            const effectiveStatusKey = statusValue.trim().toUpperCase() || null;
-                            const effectiveBehavior =
-                              effectiveStatusKey
-                                ? statusLabelByKey.get(effectiveStatusKey)?.behavior ??
-                                  result?.statusBehavior ??
-                                  null
-                                : null;
+                            const effectiveStatusKey =
+                              statusValue.trim().toUpperCase() || null;
+                            const effectiveBehavior = effectiveStatusKey
+                              ? (statusLabelByKey.get(effectiveStatusKey)
+                                  ?.behavior ??
+                                result?.statusBehavior ??
+                                null)
+                              : null;
                             const percent =
-                              effectiveScore !== null && effectiveScore !== undefined
-                                ? round1((effectiveScore / assessment.maxScore) * 100)
+                              effectiveScore !== null &&
+                              effectiveScore !== undefined
+                                ? round1(
+                                    (effectiveScore / assessment.maxScore) *
+                                      100,
+                                  )
                                 : effectiveBehavior === "COUNT_AS_ZERO"
                                   ? 0
-                                  : effectiveBehavior === "EXCLUDE_FROM_CALCULATION"
+                                  : effectiveBehavior ===
+                                      "EXCLUDE_FROM_CALCULATION"
                                     ? null
                                     : null;
-                            const isLocked = assessment.reportingPeriod?.isLocked ?? false;
+                            const isLocked =
+                              assessment.reportingPeriod?.isLocked ?? false;
                             const isDirty =
                               trimmedScore !==
-                                (originalScore === null || originalScore === undefined
+                                (originalScore === null ||
+                                originalScore === undefined
                                   ? ""
                                   : String(originalScore)) ||
-                              effectiveStatusKey !== (originalStatusKey ?? null) ||
+                              effectiveStatusKey !==
+                                (originalStatusKey ?? null) ||
                               commentValue.trim() !== (originalComment ?? "");
 
                             const statusToneClass =
                               effectiveStatusKey === "MISSING" ||
                               (effectiveBehavior === "COUNT_AS_ZERO" &&
-                                (effectiveScore === null || effectiveScore === undefined))
+                                (effectiveScore === null ||
+                                  effectiveScore === undefined))
                                 ? "border-rose-200 bg-rose-50"
                                 : effectiveStatusKey === "EXEMPT"
                                   ? "border-slate-200 bg-slate-100"
@@ -1283,15 +1528,21 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                                     ? "border-amber-200 bg-amber-50"
                                     : effectiveStatusKey === "LATE"
                                       ? "border-yellow-200 bg-yellow-50"
-                                      : effectiveStatusKey === "COMPLETED" || effectiveScore !== null
+                                      : effectiveStatusKey === "COMPLETED" ||
+                                          effectiveScore !== null
                                         ? "border-emerald-200 bg-emerald-50"
                                         : "border-slate-200 bg-white";
 
-                            const studentIndex = studentIndexById.get(student.id) ?? -1;
-                            const assessmentIndex = assessmentIndexById.get(assessment.id) ?? -1;
+                            const studentIndex =
+                              studentIndexById.get(student.id) ?? -1;
+                            const assessmentIndex =
+                              assessmentIndexById.get(assessment.id) ?? -1;
 
                             return (
-                              <td className="px-2 py-2" key={`${student.id}-${assessment.id}`}>
+                              <td
+                                className="px-2 py-2"
+                                key={`${student.id}-${assessment.id}`}
+                              >
                                 <div
                                   className={[
                                     "space-y-1 rounded-lg border p-1.5",
@@ -1317,40 +1568,71 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                                         return;
                                       }
 
-                                      const baseStudentIndex = studentIndexById.get(student.id) ?? -1;
-                                      const baseAssessmentIndex = assessmentIndexById.get(assessment.id) ?? -1;
+                                      const baseStudentIndex =
+                                        studentIndexById.get(student.id) ?? -1;
+                                      const baseAssessmentIndex =
+                                        assessmentIndexById.get(
+                                          assessment.id,
+                                        ) ?? -1;
 
-                                      if (baseStudentIndex < 0 || baseAssessmentIndex < 0) {
+                                      if (
+                                        baseStudentIndex < 0 ||
+                                        baseAssessmentIndex < 0
+                                      ) {
                                         return;
                                       }
 
                                       if (event.key === "Enter") {
                                         event.preventDefault();
-                                        focusCell(Math.min(grid.students.length - 1, baseStudentIndex + 1), baseAssessmentIndex);
+                                        focusCell(
+                                          Math.min(
+                                            grid.students.length - 1,
+                                            baseStudentIndex + 1,
+                                          ),
+                                          baseAssessmentIndex,
+                                        );
                                         return;
                                       }
 
                                       if (event.key === "ArrowRight") {
                                         event.preventDefault();
-                                        focusCell(baseStudentIndex, Math.min(visibleGridAssessments.length - 1, baseAssessmentIndex + 1));
+                                        focusCell(
+                                          baseStudentIndex,
+                                          Math.min(
+                                            visibleGridAssessments.length - 1,
+                                            baseAssessmentIndex + 1,
+                                          ),
+                                        );
                                         return;
                                       }
 
                                       if (event.key === "ArrowLeft") {
                                         event.preventDefault();
-                                        focusCell(baseStudentIndex, Math.max(0, baseAssessmentIndex - 1));
+                                        focusCell(
+                                          baseStudentIndex,
+                                          Math.max(0, baseAssessmentIndex - 1),
+                                        );
                                         return;
                                       }
 
                                       if (event.key === "ArrowDown") {
                                         event.preventDefault();
-                                        focusCell(Math.min(grid.students.length - 1, baseStudentIndex + 1), baseAssessmentIndex);
+                                        focusCell(
+                                          Math.min(
+                                            grid.students.length - 1,
+                                            baseStudentIndex + 1,
+                                          ),
+                                          baseAssessmentIndex,
+                                        );
                                         return;
                                       }
 
                                       if (event.key === "ArrowUp") {
                                         event.preventDefault();
-                                        focusCell(Math.max(0, baseStudentIndex - 1), baseAssessmentIndex);
+                                        focusCell(
+                                          Math.max(0, baseStudentIndex - 1),
+                                          baseAssessmentIndex,
+                                        );
                                       }
                                     }}
                                     placeholder="—"
@@ -1367,7 +1649,11 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                                     <Select
                                       aria-label={`Status for ${getFullName(student.firstName, student.lastName)} ${assessment.title}`}
                                       className="h-8 min-w-[7.5rem] text-xs"
-                                      disabled={isSavingGrid || isLocked || statusLabels.length === 0}
+                                      disabled={
+                                        isSavingGrid ||
+                                        isLocked ||
+                                        statusLabels.length === 0
+                                      }
                                       onChange={(event) => {
                                         setDraftGridStatuses((current) => ({
                                           ...current,
@@ -1378,7 +1664,10 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                                     >
                                       <option value="">No status</option>
                                       {statusLabels.map((label) => (
-                                        <option key={label.id} value={label.key}>
+                                        <option
+                                          key={label.id}
+                                          value={label.key}
+                                        >
                                           {label.label}
                                         </option>
                                       ))}
@@ -1411,12 +1700,17 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                             );
                           })}
                           <td className="px-4 py-3 text-slate-900">
-                            {summaryEntry?.averagePercent === null || summaryEntry?.averagePercent === undefined
+                            {summaryEntry?.averagePercent === null ||
+                            summaryEntry?.averagePercent === undefined
                               ? "—"
-                              : roundDisplayedPercent(summaryEntry.averagePercent)}
+                              : roundDisplayedPercent(
+                                  summaryEntry.averagePercent,
+                                )}
                           </td>
                           <td className="px-4 py-3 text-slate-900">
-                            {formatPercent(summaryEntry?.averagePercent ?? null)}
+                            {formatPercent(
+                              summaryEntry?.averagePercent ?? null,
+                            )}
                           </td>
                           <td className="px-4 py-3 text-slate-900">
                             {summaryEntry?.averageLetterGrade ?? "—"}
@@ -1429,17 +1723,21 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                                   disabled={isSavingStudentOverride}
                                   inputMode="decimal"
                                   onChange={(event) =>
-                                    setOverridePercentByStudentId((current) => ({
-                                      ...current,
-                                      [student.id]: event.target.value,
-                                    }))
+                                    setOverridePercentByStudentId(
+                                      (current) => ({
+                                        ...current,
+                                        [student.id]: event.target.value,
+                                      }),
+                                    )
                                   }
                                   placeholder="%"
                                   value={overridePercentDraft}
                                 />
                                 <Button
                                   disabled={isSavingStudentOverride}
-                                  onClick={() => void handleSaveOverride(student.id)}
+                                  onClick={() =>
+                                    void handleSaveOverride(student.id)
+                                  }
                                   size="sm"
                                   type="button"
                                 >
@@ -1448,7 +1746,9 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                                 {summaryEntry?.override ? (
                                   <Button
                                     disabled={isSavingStudentOverride}
-                                    onClick={() => void handleClearOverride(student.id)}
+                                    onClick={() =>
+                                      void handleClearOverride(student.id)
+                                    }
                                     size="sm"
                                     type="button"
                                     variant="secondary"
@@ -1471,12 +1771,22 @@ export function GradebookScoresheetWorkspace({ mode }: { mode: Mode }) {
                               />
                               <div className="flex items-center gap-2 text-xs text-slate-500">
                                 <Badge
-                                  variant={summaryEntry?.override ? "warning" : "neutral"}
+                                  variant={
+                                    summaryEntry?.override
+                                      ? "warning"
+                                      : "neutral"
+                                  }
                                 >
-                                  {summaryEntry?.override ? "Overridden" : "Calculated"}
+                                  {summaryEntry?.override
+                                    ? "Overridden"
+                                    : "Calculated"}
                                 </Badge>
                                 <span>
-                                  Calc {formatPercent(summaryEntry?.calculatedAveragePercent ?? null)}
+                                  Calc{" "}
+                                  {formatPercent(
+                                    summaryEntry?.calculatedAveragePercent ??
+                                      null,
+                                  )}
                                 </span>
                               </div>
                             </div>

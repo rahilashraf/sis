@@ -41,9 +41,12 @@ function getFieldOptions(field: FormField) {
 export function ParentFormDetail({ formId }: { formId: string }) {
   const searchParams = useSearchParams();
   const requestedStudentId = searchParams.get("studentId") ?? "";
-  const [selectedStudentId, setSelectedStudentId] = useState(requestedStudentId);
+  const [selectedStudentId, setSelectedStudentId] =
+    useState(requestedStudentId);
   const [form, setForm] = useState<ParentFormDetail | null>(null);
-  const [valueByFieldId, setValueByFieldId] = useState<Record<string, string>>({});
+  const [valueByFieldId, setValueByFieldId] = useState<Record<string, string>>(
+    {},
+  );
   const [submitted, setSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -77,7 +80,11 @@ export function ParentFormDetail({ formId }: { formId: string }) {
       } catch (loadError) {
         setForm(null);
         setValueByFieldId({});
-        setError(loadError instanceof Error ? loadError.message : "Unable to load form.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load form.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -148,7 +155,10 @@ export function ParentFormDetail({ formId }: { formId: string }) {
         description={form?.description ?? "Complete this parent-facing form."}
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link className={buttonClassName({ variant: "secondary" })} href="/parent/forms">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/parent/forms"
+            >
               Back to forms
             </Link>
             {selectedStudentId ? (
@@ -164,7 +174,9 @@ export function ParentFormDetail({ formId }: { formId: string }) {
         meta={
           <>
             <Badge variant="neutral">
-              {form?.opensAt ? `Opens ${formatDateLabel(form.opensAt)}` : "Open date not set"}
+              {form?.opensAt
+                ? `Opens ${formatDateLabel(form.opensAt)}`
+                : "Open date not set"}
             </Badge>
             <Badge variant="neutral">
               {form?.closesAt
@@ -207,7 +219,9 @@ export function ParentFormDetail({ formId }: { formId: string }) {
                 <Field htmlFor="parent-form-student" label="Student">
                   <Select
                     id="parent-form-student"
-                    onChange={(event) => setSelectedStudentId(event.target.value)}
+                    onChange={(event) =>
+                      setSelectedStudentId(event.target.value)
+                    }
                     value={selectedStudentId}
                   >
                     <option value="">Select student</option>
@@ -236,11 +250,17 @@ export function ParentFormDetail({ formId }: { formId: string }) {
                 <form className="space-y-4" onSubmit={handleSubmit}>
                   {activeFields.map((field) => {
                     const value = valueByFieldId[field.id] ?? "";
-                    const label = field.isRequired ? `${field.label} *` : field.label;
+                    const label = field.isRequired
+                      ? `${field.label} *`
+                      : field.label;
 
                     if (field.type === "SHORT_TEXT") {
                       return (
-                        <Field htmlFor={`field-${field.id}`} key={field.id} label={label}>
+                        <Field
+                          htmlFor={`field-${field.id}`}
+                          key={field.id}
+                          label={label}
+                        >
                           <Input
                             id={`field-${field.id}`}
                             onChange={(event) =>
@@ -257,7 +277,11 @@ export function ParentFormDetail({ formId }: { formId: string }) {
 
                     if (field.type === "LONG_TEXT") {
                       return (
-                        <Field htmlFor={`field-${field.id}`} key={field.id} label={label}>
+                        <Field
+                          htmlFor={`field-${field.id}`}
+                          key={field.id}
+                          label={label}
+                        >
                           <Textarea
                             id={`field-${field.id}`}
                             onChange={(event) =>
@@ -277,7 +301,11 @@ export function ParentFormDetail({ formId }: { formId: string }) {
                       const options = getFieldOptions(field);
 
                       return (
-                        <Field htmlFor={`field-${field.id}`} key={field.id} label={label}>
+                        <Field
+                          htmlFor={`field-${field.id}`}
+                          key={field.id}
+                          label={label}
+                        >
                           <Select
                             id={`field-${field.id}`}
                             onChange={(event) =>
@@ -301,7 +329,11 @@ export function ParentFormDetail({ formId }: { formId: string }) {
 
                     if (field.type === "CHECKBOX") {
                       return (
-                        <Field htmlFor={`field-${field.id}`} key={field.id} label={label}>
+                        <Field
+                          htmlFor={`field-${field.id}`}
+                          key={field.id}
+                          label={label}
+                        >
                           <Select
                             id={`field-${field.id}`}
                             onChange={(event) =>
@@ -321,7 +353,11 @@ export function ParentFormDetail({ formId }: { formId: string }) {
                     }
 
                     return (
-                      <Field htmlFor={`field-${field.id}`} key={field.id} label={label}>
+                      <Field
+                        htmlFor={`field-${field.id}`}
+                        key={field.id}
+                        label={label}
+                      >
                         <Input
                           id={`field-${field.id}`}
                           onChange={(event) =>

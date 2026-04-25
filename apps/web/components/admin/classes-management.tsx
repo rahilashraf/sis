@@ -46,6 +46,7 @@ type CreateClassFormState = {
   subjectOptionId: string;
   name: string;
   isHomeroom: boolean;
+  takesAttendance: boolean;
 };
 
 const emptyCreateForm: CreateClassFormState = {
@@ -55,20 +56,27 @@ const emptyCreateForm: CreateClassFormState = {
   subjectOptionId: "",
   name: "",
   isHomeroom: false,
+  takesAttendance: true,
 };
 
-export function ClassesManagement({ embedded = false }: { embedded?: boolean } = {}) {
+export function ClassesManagement({
+  embedded = false,
+}: { embedded?: boolean } = {}) {
   const { session } = useAuth();
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([]);
   const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
-  const [subjectOptions, setSubjectOptions] = useState<EnrollmentSubjectOption[]>([]);
+  const [subjectOptions, setSubjectOptions] = useState<
+    EnrollmentSubjectOption[]
+  >([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState("");
-  const [selectedGradeLevelFilterId, setSelectedGradeLevelFilterId] = useState("");
+  const [selectedGradeLevelFilterId, setSelectedGradeLevelFilterId] =
+    useState("");
   const [selectedSubjectFilterId, setSelectedSubjectFilterId] = useState("");
   const [showRemoved, setShowRemoved] = useState(false);
-  const [createForm, setCreateForm] = useState<CreateClassFormState>(emptyCreateForm);
+  const [createForm, setCreateForm] =
+    useState<CreateClassFormState>(emptyCreateForm);
   const [deleteTarget, setDeleteTarget] = useState<SchoolClass | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,15 +95,18 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
       setError(null);
 
       try {
-        const [classResponse, schoolResponse, subjectOptionResponse] = await Promise.all([
-          listClasses({ includeInactive: showRemoved }),
-          listSchools(),
-          listEnrollmentSubjectOptions({ includeInactive: false }),
-        ]);
+        const [classResponse, schoolResponse, subjectOptionResponse] =
+          await Promise.all([
+            listClasses({ includeInactive: showRemoved }),
+            listSchools(),
+            listEnrollmentSubjectOptions({ includeInactive: false }),
+          ]);
 
         setClasses(classResponse);
         setSchools(schoolResponse);
-        setSubjectOptions(subjectOptionResponse.filter((entry) => entry.isActive));
+        setSubjectOptions(
+          subjectOptionResponse.filter((entry) => entry.isActive),
+        );
 
         const initialSchoolId = schoolResponse[0]?.id ?? "";
         setSelectedSchoolId(initialSchoolId);
@@ -104,7 +115,11 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
           schoolId: current.schoolId || initialSchoolId,
         }));
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load classes.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load classes.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -136,11 +151,14 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
             years[0]?.id ??
             "",
           gradeLevelId:
-            levels.find((gradeLevel) => gradeLevel.id === current.gradeLevelId)?.id ??
+            levels.find((gradeLevel) => gradeLevel.id === current.gradeLevelId)
+              ?.id ??
             levels[0]?.id ??
             "",
           subjectOptionId:
-            subjectOptions.find((option) => option.id === current.subjectOptionId)?.id ??
+            subjectOptions.find(
+              (option) => option.id === current.subjectOptionId,
+            )?.id ??
             subjectOptions[0]?.id ??
             "",
         }));
@@ -210,6 +228,7 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
         subjectOptionId: createForm.subjectOptionId,
         name: createForm.name.trim(),
         isHomeroom: createForm.isHomeroom,
+        takesAttendance: createForm.takesAttendance,
       });
 
       await refreshClasses();
@@ -237,11 +256,17 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
       return false;
     }
 
-    if (selectedGradeLevelFilterId && schoolClass.gradeLevelId !== selectedGradeLevelFilterId) {
+    if (
+      selectedGradeLevelFilterId &&
+      schoolClass.gradeLevelId !== selectedGradeLevelFilterId
+    ) {
       return false;
     }
 
-    if (selectedSubjectFilterId && schoolClass.subjectOptionId !== selectedSubjectFilterId) {
+    if (
+      selectedSubjectFilterId &&
+      schoolClass.subjectOptionId !== selectedSubjectFilterId
+    ) {
       return false;
     }
 
@@ -265,7 +290,9 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
         continue;
       }
 
-      const label = schoolClass.gradeLevel?.name ?? `Grade level ${schoolClass.gradeLevelId}`;
+      const label =
+        schoolClass.gradeLevel?.name ??
+        `Grade level ${schoolClass.gradeLevelId}`;
       map.set(schoolClass.gradeLevelId, label);
     }
 
@@ -286,7 +313,10 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
         continue;
       }
 
-      const label = schoolClass.subjectOption?.name ?? schoolClass.subject ?? "Unknown subject";
+      const label =
+        schoolClass.subjectOption?.name ??
+        schoolClass.subject ??
+        "Unknown subject";
       map.set(schoolClass.subjectOptionId, label);
     }
 
@@ -304,7 +334,9 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
           meta={
             <>
               <Badge variant="neutral">
-                {showRemoved ? `${classes.length} visible classes` : `${classes.length} active classes`}
+                {showRemoved
+                  ? `${classes.length} visible classes`
+                  : `${classes.length} active classes`}
               </Badge>
               <Badge variant="neutral">{activeClassesCount} active</Badge>
             </>
@@ -316,15 +348,19 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
       {successMessage ? <Notice tone="success">{successMessage}</Notice> : null}
 
       {canManageClasses ? (
-        <Card>
+        <Card id="create-class">
           <CardHeader>
             <CardTitle>Create Class</CardTitle>
             <CardDescription>
-              Add a new class for the selected school and school year without changing existing assignments.
+              Add a new class for the selected school and school year without
+              changing existing assignments.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form className="grid gap-4 md:grid-cols-2" onSubmit={handleCreateClass}>
+            <form
+              className="grid gap-4 md:grid-cols-2"
+              onSubmit={handleCreateClass}
+            >
               <Field htmlFor="create-class-school" label="School">
                 <Select
                   id="create-class-school"
@@ -434,6 +470,19 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
                 }
               />
 
+              <CheckboxField
+                checked={createForm.takesAttendance}
+                className="md:col-span-2"
+                description="When disabled, teachers and staff cannot take attendance for this class."
+                label="This class will take attendance"
+                onChange={(event) =>
+                  setCreateForm((current) => ({
+                    ...current,
+                    takesAttendance: event.target.checked,
+                  }))
+                }
+              />
+
               <div className="md:col-span-2 flex justify-end">
                 <Button
                   disabled={
@@ -453,8 +502,8 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
         </Card>
       ) : (
         <Notice tone="info">
-          You can review classes and attendance from this screen, but only admin-level
-          roles can create new classes.
+          You can review classes and attendance from this screen, but only
+          admin-level roles can create new classes.
         </Notice>
       )}
 
@@ -463,8 +512,8 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
           <div>
             <CardTitle>Class Directory</CardTitle>
             <CardDescription>
-              Open a class to update details, manage teacher assignments, review enrollment,
-              or remove it from active admin workflows.
+              Open a class to update details, manage teacher assignments, review
+              enrollment, or remove it from active admin workflows.
             </CardDescription>
           </div>
 
@@ -497,10 +546,15 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
               </Field>
             </div>
             <div className="w-full max-w-sm">
-              <Field htmlFor="classes-filter-grade-level" label="Filter by grade level">
+              <Field
+                htmlFor="classes-filter-grade-level"
+                label="Filter by grade level"
+              >
                 <Select
                   id="classes-filter-grade-level"
-                  onChange={(event) => setSelectedGradeLevelFilterId(event.target.value)}
+                  onChange={(event) =>
+                    setSelectedGradeLevelFilterId(event.target.value)
+                  }
                   value={selectedGradeLevelFilterId}
                 >
                   <option value="">All grade levels</option>
@@ -516,7 +570,9 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
               <Field htmlFor="classes-filter-subject" label="Filter by subject">
                 <Select
                   id="classes-filter-subject"
-                  onChange={(event) => setSelectedSubjectFilterId(event.target.value)}
+                  onChange={(event) =>
+                    setSelectedSubjectFilterId(event.target.value)
+                  }
                   value={selectedSubjectFilterId}
                 >
                   <option value="">All subjects</option>
@@ -536,23 +592,44 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
               <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                 <thead className="bg-slate-50/80">
                   <tr>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Class</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Grade level</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">School</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">School year</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Teachers</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Class
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Grade level
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      School
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      School year
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Teachers
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {filteredClasses.map((schoolClass) => (
-                    <tr className="align-top hover:bg-slate-50" key={schoolClass.id}>
+                    <tr
+                      className="align-top hover:bg-slate-50"
+                      key={schoolClass.id}
+                    >
                       <td className="px-4 py-4">
-                        <p className="font-medium text-slate-900">{schoolClass.name}</p>
+                        <p className="font-medium text-slate-900">
+                          {schoolClass.name}
+                        </p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <Badge variant="neutral">
-                            {schoolClass.subjectOption?.name ?? schoolClass.subject ?? "No subject"}
+                            {schoolClass.subjectOption?.name ??
+                              schoolClass.subject ??
+                              "No subject"}
                           </Badge>
                           {schoolClass.isHomeroom ? (
                             <Badge variant="warning">Homeroom</Badge>
@@ -562,7 +639,9 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
                       <td className="px-4 py-4 text-slate-600">
                         {schoolClass.gradeLevel?.name ?? "Not set"}
                       </td>
-                      <td className="px-4 py-4 text-slate-600">{schoolClass.school.name}</td>
+                      <td className="px-4 py-4 text-slate-600">
+                        {schoolClass.school.name}
+                      </td>
                       <td className="px-4 py-4 text-slate-600">
                         {schoolClass.schoolYear.name}
                       </td>
@@ -575,18 +654,25 @@ export function ClassesManagement({ embedded = false }: { embedded?: boolean } =
                             )
                             .join(", ")
                         ) : (
-                          <span className="text-slate-500">No teachers assigned</span>
+                          <span className="text-slate-500">
+                            No teachers assigned
+                          </span>
                         )}
                       </td>
                       <td className="px-4 py-4">
-                        <Badge variant={schoolClass.isActive ? "success" : "neutral"}>
+                        <Badge
+                          variant={schoolClass.isActive ? "success" : "neutral"}
+                        >
                           {schoolClass.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex flex-wrap gap-2">
                           <Link
-                            className={buttonClassName({ size: "sm", variant: "secondary" })}
+                            className={buttonClassName({
+                              size: "sm",
+                              variant: "secondary",
+                            })}
                             href={`/admin/classes/${schoolClass.id}`}
                           >
                             Open class

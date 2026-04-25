@@ -56,7 +56,9 @@ export function CheckboxField({
         {...props}
       />
       <span className="min-w-0">
-        <span className="block text-sm font-medium text-slate-800">{label}</span>
+        <span className="block text-sm font-medium text-slate-800">
+          {label}
+        </span>
         {description ? (
           <span className="mt-1 block text-xs leading-5 text-slate-500">
             {description}

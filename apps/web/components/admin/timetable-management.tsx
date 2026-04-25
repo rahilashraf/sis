@@ -97,7 +97,9 @@ const emptyCreateForm: CreateTimetableFormState = {
   classIds: [],
 };
 
-export function TimetableManagement({ embedded = false }: { embedded?: boolean } = {}) {
+export function TimetableManagement({
+  embedded = false,
+}: { embedded?: boolean } = {}) {
   const { session } = useAuth();
   const [blocks, setBlocks] = useState<TimetableBlock[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
@@ -114,10 +116,11 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
     includeInactive: false,
   });
   const [createForm, setCreateForm] = useState<CreateTimetableFormState>(
-    structuredClone(emptyCreateForm)
+    structuredClone(emptyCreateForm),
   );
   const [editTarget, setEditTarget] = useState<TimetableBlock | null>(null);
-  const [editForm, setEditForm] = useState<Partial<CreateTimetableFormState> | null>(null);
+  const [editForm, setEditForm] =
+    useState<Partial<CreateTimetableFormState> | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TimetableBlock | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -185,7 +188,8 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
           teacherId: filters.teacherId || undefined,
           classId: filters.classId || undefined,
           roomLabel: filters.roomLabel || undefined,
-          dayOfWeek: (filters.dayOfWeek as TimetableDayOfWeek | "") || undefined,
+          dayOfWeek:
+            (filters.dayOfWeek as TimetableDayOfWeek | "") || undefined,
           includeInactive: filters.includeInactive,
         });
 
@@ -208,7 +212,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
 
       try {
         const response = await listClasses({ includeInactive: false });
-        const filtered = response.filter((c) => c.schoolId === filters.schoolId);
+        const filtered = response.filter(
+          (c) => c.schoolId === filters.schoolId,
+        );
         setClasses(filtered);
       } catch (err) {
         console.error("Failed to load classes:", err);
@@ -240,7 +246,8 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
       return [];
     }
     return blocks.sort((a, b) => {
-      const dayOrder = daysOfWeek.indexOf(a.dayOfWeek) - daysOfWeek.indexOf(b.dayOfWeek);
+      const dayOrder =
+        daysOfWeek.indexOf(a.dayOfWeek) - daysOfWeek.indexOf(b.dayOfWeek);
       if (dayOrder !== 0) return dayOrder;
       return a.startTime.localeCompare(b.startTime);
     });
@@ -259,7 +266,11 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
   async function handleCreateBlock(e: FormEvent) {
     e.preventDefault();
 
-    if (!createForm.schoolId || !createForm.schoolYearId || !createForm.teacherId) {
+    if (
+      !createForm.schoolId ||
+      !createForm.schoolYearId ||
+      !createForm.teacherId
+    ) {
       setError("Please select school, school year, and teacher");
       return;
     }
@@ -298,14 +309,18 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
           classIds: createForm.classIds,
         });
 
-        setSuccessMessage(`Timetable block created for ${getDayOfWeekLabel(selectedDays[0])}`);
+        setSuccessMessage(
+          `Timetable block created for ${getDayOfWeekLabel(selectedDays[0])}`,
+        );
       } else {
         const response = await createBulkTimetableBlocks({
           schoolId: createForm.schoolId,
           schoolYearId: createForm.schoolYearId,
           teacherId: createForm.teacherId,
           daySelectionMode:
-            createForm.daySelectionMode === "ALL_WEEKDAYS" ? "ALL_WEEKDAYS" : "CUSTOM",
+            createForm.daySelectionMode === "ALL_WEEKDAYS"
+              ? "ALL_WEEKDAYS"
+              : "CUSTOM",
           daysOfWeek: selectedDays,
           startTime: createForm.startTime,
           endTime: createForm.endTime,
@@ -329,7 +344,10 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
 
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to create timetable blocks";
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to create timetable blocks";
       setError(message);
     } finally {
       setIsSubmitting(false);
@@ -377,7 +395,8 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
 
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to update timetable block";
+      const message =
+        err instanceof Error ? err.message : "Failed to update timetable block";
       setError(message);
     } finally {
       setIsSubmitting(false);
@@ -405,7 +424,8 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
 
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to delete timetable block";
+      const message =
+        err instanceof Error ? err.message : "Failed to delete timetable block";
       setDeleteError(message);
     } finally {
       setIsDeleting(false);
@@ -424,7 +444,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-center text-slate-600">Loading timetable data...</p>
+          <p className="text-center text-slate-600">
+            Loading timetable data...
+          </p>
         </CardContent>
       </Card>
     );
@@ -452,7 +474,11 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                 id="filter-school"
                 value={filters.schoolId}
                 onChange={(e) => {
-                  setFilters((f) => ({ ...f, schoolId: e.target.value, schoolYearId: "" }));
+                  setFilters((f) => ({
+                    ...f,
+                    schoolId: e.target.value,
+                    schoolYearId: "",
+                  }));
                 }}
               >
                 <option value="">Select school</option>
@@ -468,7 +494,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
               <Select
                 id="filter-year"
                 value={filters.schoolYearId}
-                onChange={(e) => setFilters((f) => ({ ...f, schoolYearId: e.target.value }))}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, schoolYearId: e.target.value }))
+                }
               >
                 <option value="">Select year</option>
                 {schoolYears.map((year) => (
@@ -483,7 +511,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
               <Select
                 id="filter-teacher"
                 value={filters.teacherId}
-                onChange={(e) => setFilters((f) => ({ ...f, teacherId: e.target.value }))}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, teacherId: e.target.value }))
+                }
               >
                 <option value="">All teachers</option>
                 {teachers.map((teacher) => (
@@ -498,7 +528,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
               <Select
                 id="filter-class"
                 value={filters.classId}
-                onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value }))}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, classId: e.target.value }))
+                }
               >
                 <option value="">All classes</option>
                 {classes.map((cls) => (
@@ -513,7 +545,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
               <Select
                 id="filter-day"
                 value={filters.dayOfWeek}
-                onChange={(e) => setFilters((f) => ({ ...f, dayOfWeek: e.target.value }))}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, dayOfWeek: e.target.value }))
+                }
               >
                 <option value="">All days</option>
                 {daysOfWeek.map((day) => (
@@ -530,14 +564,18 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                 type="text"
                 placeholder="Room label"
                 value={filters.roomLabel}
-                onChange={(e) => setFilters((f) => ({ ...f, roomLabel: e.target.value }))}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, roomLabel: e.target.value }))
+                }
               />
             </Field>
 
             <CheckboxField
               label="Include inactive"
               checked={filters.includeInactive}
-              onChange={(e) => setFilters((f) => ({ ...f, includeInactive: e.target.checked }))}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, includeInactive: e.target.checked }))
+              }
             />
           </div>
         </CardContent>
@@ -549,7 +587,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>
-                {showCreateForm ? "Create Timetable Blocks" : "Create New Blocks"}
+                {showCreateForm
+                  ? "Create Timetable Blocks"
+                  : "Create New Blocks"}
               </CardTitle>
             </div>
             {!showCreateForm && (
@@ -602,7 +642,10 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                       id="create-year"
                       value={createForm.schoolYearId}
                       onChange={(e) =>
-                        setCreateForm((f) => ({ ...f, schoolYearId: e.target.value }))
+                        setCreateForm((f) => ({
+                          ...f,
+                          schoolYearId: e.target.value,
+                        }))
                       }
                       required
                     >
@@ -621,7 +664,12 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                     <Select
                       id="create-teacher"
                       value={createForm.teacherId}
-                      onChange={(e) => setCreateForm((f) => ({ ...f, teacherId: e.target.value }))}
+                      onChange={(e) =>
+                        setCreateForm((f) => ({
+                          ...f,
+                          teacherId: e.target.value,
+                        }))
+                      }
                       required
                     >
                       <option value="">Select teacher</option>
@@ -638,7 +686,12 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                       id="create-start"
                       type="time"
                       value={createForm.startTime}
-                      onChange={(e) => setCreateForm((f) => ({ ...f, startTime: e.target.value }))}
+                      onChange={(e) =>
+                        setCreateForm((f) => ({
+                          ...f,
+                          startTime: e.target.value,
+                        }))
+                      }
                       required
                     />
                   </Field>
@@ -648,7 +701,12 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                       id="create-end"
                       type="time"
                       value={createForm.endTime}
-                      onChange={(e) => setCreateForm((f) => ({ ...f, endTime: e.target.value }))}
+                      onChange={(e) =>
+                        setCreateForm((f) => ({
+                          ...f,
+                          endTime: e.target.value,
+                        }))
+                      }
                       required
                     />
                   </Field>
@@ -659,7 +717,12 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                       type="text"
                       placeholder="e.g., Room 101"
                       value={createForm.roomLabel}
-                      onChange={(e) => setCreateForm((f) => ({ ...f, roomLabel: e.target.value }))}
+                      onChange={(e) =>
+                        setCreateForm((f) => ({
+                          ...f,
+                          roomLabel: e.target.value,
+                        }))
+                      }
                     />
                   </Field>
                 </div>
@@ -690,7 +753,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                           type="radio"
                           name="dayMode"
                           value="ALL_WEEKDAYS"
-                          checked={createForm.daySelectionMode === "ALL_WEEKDAYS"}
+                          checked={
+                            createForm.daySelectionMode === "ALL_WEEKDAYS"
+                          }
                           onChange={(e) =>
                             setCreateForm((f) => ({
                               ...f,
@@ -774,7 +839,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                     rows={2}
                     placeholder="Any additional notes"
                     value={createForm.notes}
-                    onChange={(e) => setCreateForm((f) => ({ ...f, notes: e.target.value }))}
+                    onChange={(e) =>
+                      setCreateForm((f) => ({ ...f, notes: e.target.value }))
+                    }
                   />
                 </Field>
 
@@ -784,7 +851,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                     className="space-y-2 max-h-48 overflow-y-auto rounded border border-slate-300 p-3"
                   >
                     {classes.length === 0 ? (
-                      <p className="text-sm text-slate-600">No classes available</p>
+                      <p className="text-sm text-slate-600">
+                        No classes available
+                      </p>
                     ) : (
                       classes.map((cls) => (
                         <CheckboxField
@@ -800,7 +869,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                             } else {
                               setCreateForm((f) => ({
                                 ...f,
-                                classIds: f.classIds.filter((id) => id !== cls.id),
+                                classIds: f.classIds.filter(
+                                  (id) => id !== cls.id,
+                                ),
                               }));
                             }
                           }}
@@ -865,7 +936,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                     id="edit-start"
                     type="time"
                     value={editForm.startTime || ""}
-                    onChange={(e) => setEditForm((f) => ({ ...f, startTime: e.target.value }))}
+                    onChange={(e) =>
+                      setEditForm((f) => ({ ...f, startTime: e.target.value }))
+                    }
                     required
                   />
                 </Field>
@@ -875,7 +948,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                     id="edit-end"
                     type="time"
                     value={editForm.endTime || ""}
-                    onChange={(e) => setEditForm((f) => ({ ...f, endTime: e.target.value }))}
+                    onChange={(e) =>
+                      setEditForm((f) => ({ ...f, endTime: e.target.value }))
+                    }
                     required
                   />
                 </Field>
@@ -886,7 +961,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                     type="text"
                     placeholder="e.g., Room 101"
                     value={editForm.roomLabel || ""}
-                    onChange={(e) => setEditForm((f) => ({ ...f, roomLabel: e.target.value }))}
+                    onChange={(e) =>
+                      setEditForm((f) => ({ ...f, roomLabel: e.target.value }))
+                    }
                   />
                 </Field>
               </div>
@@ -898,7 +975,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                   rows={2}
                   placeholder="Any additional notes"
                   value={editForm.notes || ""}
-                  onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, notes: e.target.value }))
+                  }
                 />
               </Field>
 
@@ -908,7 +987,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                   className="space-y-2 max-h-48 overflow-y-auto rounded border border-slate-300 p-3"
                 >
                   {classes.length === 0 ? (
-                    <p className="text-sm text-slate-600">No classes available</p>
+                    <p className="text-sm text-slate-600">
+                      No classes available
+                    </p>
                   ) : (
                     classes.map((cls) => (
                       <CheckboxField
@@ -924,7 +1005,9 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                           } else {
                             setEditForm((f) => ({
                               ...f,
-                              classIds: (f?.classIds || []).filter((id) => id !== cls.id),
+                              classIds: (f?.classIds || []).filter(
+                                (id) => id !== cls.id,
+                              ),
                             }));
                           }
                         }}
@@ -959,7 +1042,8 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
         <CardHeader>
           <CardTitle>Timetable Blocks</CardTitle>
           <CardDescription>
-            {filteredBlocks.length} block{filteredBlocks.length !== 1 ? "s" : ""}
+            {filteredBlocks.length} block
+            {filteredBlocks.length !== 1 ? "s" : ""}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -975,19 +1059,32 @@ export function TimetableManagement({ embedded = false }: { embedded?: boolean }
                   <tr className="border-b border-slate-200">
                     <th className="px-4 py-3 text-left font-semibold">Day</th>
                     <th className="px-4 py-3 text-left font-semibold">Time</th>
-                    <th className="px-4 py-3 text-left font-semibold">Teacher</th>
-                    <th className="px-4 py-3 text-left font-semibold">Classes</th>
+                    <th className="px-4 py-3 text-left font-semibold">
+                      Teacher
+                    </th>
+                    <th className="px-4 py-3 text-left font-semibold">
+                      Classes
+                    </th>
                     <th className="px-4 py-3 text-left font-semibold">Room</th>
-                    <th className="px-4 py-3 text-left font-semibold">Status</th>
+                    <th className="px-4 py-3 text-left font-semibold">
+                      Status
+                    </th>
                     {canManageTimetable && (
-                      <th className="px-4 py-3 text-left font-semibold">Actions</th>
+                      <th className="px-4 py-3 text-left font-semibold">
+                        Actions
+                      </th>
                     )}
                   </tr>
                 </thead>
                 <tbody>
                   {filteredBlocks.map((block) => (
-                    <tr key={block.id} className="border-b border-slate-200 hover:bg-slate-50">
-                      <td className="px-4 py-3 font-medium">{getDayOfWeekLabel(block.dayOfWeek)}</td>
+                    <tr
+                      key={block.id}
+                      className="border-b border-slate-200 hover:bg-slate-50"
+                    >
+                      <td className="px-4 py-3 font-medium">
+                        {getDayOfWeekLabel(block.dayOfWeek)}
+                      </td>
                       <td className="px-4 py-3">
                         {block.startTime} - {block.endTime}
                       </td>

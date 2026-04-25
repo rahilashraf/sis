@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
-import { AttendanceStatus, StudentGender, UserRole } from '@prisma/client';
+import { StudentGender, UserRole } from '@prisma/client';
 import request from 'supertest';
 import { AttendanceService } from '../attendance/attendance.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -17,6 +17,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GradebookService } from '../gradebook/gradebook.service';
 import { StudentsController } from './students.controller';
 import { StudentsService } from './students.service';
+import { AuditService } from '../audit/audit.service';
+import { ReRegistrationService } from '../re-registration/re-registration.service';
 
 @Injectable()
 class TestJwtAuthGuard implements CanActivate {
@@ -55,6 +57,7 @@ class TestRolesGuard implements CanActivate {
 
 describe('StudentsController (HTTP)', () => {
   let app: INestApplication;
+  let attendance: { getStudentSummary: jest.Mock };
   let gradebook: { getStudentGrades: jest.Mock; getStudentSummary: jest.Mock };
   let prisma: {
     user: {
@@ -63,10 +66,14 @@ describe('StudentsController (HTTP)', () => {
       update: jest.Mock;
     };
     studentParentLink: { findMany: jest.Mock; findUnique: jest.Mock };
-    attendanceRecord: { findMany: jest.Mock };
+    teacherClassAssignment: { findFirst: jest.Mock };
   };
 
   beforeEach(async () => {
+    attendance = {
+      getStudentSummary: jest.fn(),
+    };
+
     gradebook = {
       getStudentGrades: jest.fn(),
       getStudentSummary: jest.fn(),
@@ -79,13 +86,16 @@ describe('StudentsController (HTTP)', () => {
         update: jest.fn(),
       },
       studentParentLink: { findMany: jest.fn(), findUnique: jest.fn() },
-      attendanceRecord: { findMany: jest.fn() },
+      teacherClassAssignment: { findFirst: jest.fn() },
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [StudentsController],
       providers: [
-        AttendanceService,
+        {
+          provide: AttendanceService,
+          useValue: attendance,
+        },
         StudentsService,
         {
           provide: GradebookService,
@@ -95,6 +105,17 @@ describe('StudentsController (HTTP)', () => {
         {
           provide: PrismaService,
           useValue: prisma,
+        },
+        {
+          provide: AuditService,
+          useValue: { log: jest.fn() },
+        },
+        {
+          provide: ReRegistrationService,
+          useValue: {
+            isReRegistrationOpenForSchool: jest.fn(),
+            recordSubmission: jest.fn(),
+          },
         },
       ],
     })
@@ -120,10 +141,17 @@ describe('StudentsController (HTTP)', () => {
   });
 
   it('returns student self attendance summary', async () => {
-    prisma.attendanceRecord.findMany.mockResolvedValue([
-      { status: AttendanceStatus.PRESENT },
-      { status: AttendanceStatus.EXCUSED },
-    ]);
+    attendance.getStudentSummary.mockResolvedValue({
+      studentId: 'student-1',
+      startDate: '2026-04-01',
+      endDate: '2026-04-02',
+      totalDays: 2,
+      presentCount: 1,
+      absentCount: 0,
+      lateCount: 0,
+      excusedCount: 1,
+      attendancePercentage: 50,
+    });
 
     await request(app.getHttpServer())
       .get('/students/me/attendance/summary')
@@ -158,7 +186,7 @@ describe('StudentsController (HTTP)', () => {
       })
       .expect(403);
 
-    expect(prisma.attendanceRecord.findMany).not.toHaveBeenCalled();
+    expect(attendance.getStudentSummary).not.toHaveBeenCalled();
   });
 
   it('returns linked parents for a student to owner access', async () => {
@@ -236,6 +264,58 @@ describe('StudentsController (HTTP)', () => {
         healthCardNumber: '******7890',
         memberships: [],
       });
+  });
+
+  it('returns a student profile for an assigned teacher', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'student-1',
+      role: UserRole.STUDENT,
+      memberships: [{ schoolId: 'school-1' }],
+    });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue({ id: 'assignment-1' });
+    prisma.user.findUniqueOrThrow.mockResolvedValue({
+      id: 'student-1',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      role: UserRole.STUDENT,
+      allergies: 'Peanuts',
+      medicalConditions: 'Asthma',
+      healthCardNumber: '1234567890',
+      memberships: [],
+    });
+
+    await request(app.getHttpServer())
+      .get('/students/student-1')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          id: 'student-1',
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          role: UserRole.STUDENT,
+          allergies: 'Peanuts',
+          medicalConditions: 'Asthma',
+          healthCardNumber: null,
+          memberships: [],
+        });
+      });
+  });
+
+  it('returns 403 when an unassigned teacher requests a student profile', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'student-1',
+      role: UserRole.STUDENT,
+      memberships: [{ schoolId: 'school-1' }],
+    });
+    prisma.teacherClassAssignment.findFirst.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .get('/students/student-1')
+      .set('x-test-user-id', 'teacher-1')
+      .set('x-test-role', UserRole.TEACHER)
+      .expect(403);
   });
 
   it('falls back to the legacy student shape when profile columns are missing', async () => {
@@ -527,7 +607,7 @@ describe('StudentsController (HTTP)', () => {
       })
       .expect(400);
 
-    expect(prisma.attendanceRecord.findMany).not.toHaveBeenCalled();
+    expect(attendance.getStudentSummary).not.toHaveBeenCalled();
   });
 
   it('returns 400 when student self summary has an invalid endDate', async () => {
@@ -541,7 +621,7 @@ describe('StudentsController (HTTP)', () => {
       })
       .expect(400);
 
-    expect(prisma.attendanceRecord.findMany).not.toHaveBeenCalled();
+    expect(attendance.getStudentSummary).not.toHaveBeenCalled();
   });
 
   it('returns 403 when a parent requests an unlinked student profile', async () => {

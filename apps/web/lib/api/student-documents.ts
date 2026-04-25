@@ -30,7 +30,9 @@ export function listStudentDocuments(studentId: string) {
 }
 
 export function getStudentDocument(studentId: string, documentId: string) {
-  return apiFetch<StudentDocument>(`/students/${studentId}/documents/${documentId}`);
+  return apiFetch<StudentDocument>(
+    `/students/${studentId}/documents/${documentId}`,
+  );
 }
 
 export function createStudentDocument(
@@ -52,9 +54,12 @@ export function createStudentDocument(
 }
 
 export function archiveStudentDocument(studentId: string, documentId: string) {
-  return apiFetch<StudentDocument>(`/students/${studentId}/documents/${documentId}/archive`, {
-    method: "PATCH",
-  });
+  return apiFetch<StudentDocument>(
+    `/students/${studentId}/documents/${documentId}/archive`,
+    {
+      method: "PATCH",
+    },
+  );
 }
 
 export function deleteStudentDocument(studentId: string, documentId: string) {

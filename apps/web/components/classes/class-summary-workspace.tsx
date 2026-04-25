@@ -10,8 +10,15 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { getClassById, type SchoolClass } from "@/lib/api/classes";
-import { getClassGradeSummary, type ClassGradeSummary } from "@/lib/api/gradebook";
-import { formatDisplayedPercent, getDisplayText, roundDisplayedPercent } from "@/lib/utils";
+import {
+  getClassGradeSummary,
+  type ClassGradeSummary,
+} from "@/lib/api/gradebook";
+import {
+  formatDisplayedPercent,
+  getDisplayText,
+  roundDisplayedPercent,
+} from "@/lib/utils";
 
 type Mode = "teacher" | "admin";
 
@@ -27,7 +34,13 @@ function getFullName(firstName: unknown, lastName: unknown, fallback = "—") {
   return fullName || fallback;
 }
 
-export function ClassSummaryWorkspace({ mode, classId }: { mode: Mode; classId: string }) {
+export function ClassSummaryWorkspace({
+  mode,
+  classId,
+}: {
+  mode: Mode;
+  classId: string;
+}) {
   const router = useRouter();
   const [schoolClass, setSchoolClass] = useState<SchoolClass | null>(null);
   const [summary, setSummary] = useState<ClassGradeSummary | null>(null);
@@ -104,13 +117,18 @@ export function ClassSummaryWorkspace({ mode, classId }: { mode: Mode; classId: 
               <Badge variant="neutral">
                 Class avg: {formatPercent(summary.overallAveragePercent)}
               </Badge>
-              <Badge variant="neutral">Grade: {summary.overallLetterGrade ?? "—"}</Badge>
+              <Badge variant="neutral">
+                Grade: {summary.overallLetterGrade ?? "—"}
+              </Badge>
             </>
           ) : null
         }
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link className={buttonClassName({ variant: "secondary" })} href={`/${mode}/classes`}>
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href={`/${mode}/classes`}
+            >
               Back to classes
             </Link>
             <Link
@@ -203,32 +221,57 @@ export function ClassSummaryWorkspace({ mode, classId }: { mode: Mode; classId: 
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Assessments</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Avg</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">%</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Grade</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Student
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Assessments
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Avg
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        %
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Grade
+                      </th>
+                      {mode === "teacher" ? (
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Actions
+                        </th>
+                      ) : null}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {sortedStudents.map((entry) => (
-                      <tr className="align-top hover:bg-slate-50" key={entry.student.id}>
+                      <tr
+                        className="align-top hover:bg-slate-50"
+                        key={entry.student.id}
+                      >
                         <td className="px-4 py-3">
                           <button
                             className="text-left font-medium text-slate-900 hover:underline"
                             onClick={() => {
-                              router.push(`/${mode}/classes/${classId}/students/${entry.student.id}`);
+                              router.push(
+                                `/${mode}/classes/${classId}/students/${entry.student.id}`,
+                              );
                             }}
                             type="button"
                           >
-                            {getFullName(entry.student.firstName, entry.student.lastName)}
+                            {getFullName(
+                              entry.student.firstName,
+                              entry.student.lastName,
+                            )}
                           </button>
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           {entry.gradedCount}/{entry.assessmentCount}
                         </td>
                         <td className="px-4 py-3 text-slate-900">
-                          {entry.averagePercent === null ? "—" : roundDisplayedPercent(entry.averagePercent)}
+                          {entry.averagePercent === null
+                            ? "—"
+                            : roundDisplayedPercent(entry.averagePercent)}
                         </td>
                         <td className="px-4 py-3 text-slate-900">
                           {formatPercent(entry.averagePercent)}
@@ -236,11 +279,27 @@ export function ClassSummaryWorkspace({ mode, classId }: { mode: Mode; classId: 
                         <td className="px-4 py-3 text-slate-900">
                           {entry.averageLetterGrade ?? "—"}
                         </td>
+                        {mode === "teacher" ? (
+                          <td className="px-4 py-3">
+                            <Link
+                              className={buttonClassName({
+                                size: "sm",
+                                variant: "secondary",
+                              })}
+                              href={`/teacher/classes/${encodeURIComponent(classId)}/students/${encodeURIComponent(entry.student.id)}/profile`}
+                            >
+                              Student Profile
+                            </Link>
+                          </td>
+                        ) : null}
                       </tr>
                     ))}
                     {sortedStudents.length === 0 ? (
                       <tr>
-                        <td className="px-4 py-10" colSpan={5}>
+                        <td
+                          className="px-4 py-10"
+                          colSpan={mode === "teacher" ? 6 : 5}
+                        >
                           <EmptyState
                             compact
                             title="No students enrolled"

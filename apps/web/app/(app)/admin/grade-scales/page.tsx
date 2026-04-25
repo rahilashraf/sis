@@ -3,4 +3,3 @@ import { GradeScalesManagement } from "@/components/admin/grade-scales-managemen
 export default function AdminGradeScalesPage() {
   return <GradeScalesManagement />;
 }
-

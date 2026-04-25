@@ -47,7 +47,12 @@ export type ReRegistrationTrackingResponse = {
     classes: Array<{ id: string; name: string }>;
     gradeLevels: Array<{ id: string; name: string }>;
     reasons: Array<
-      "MOVING" | "TRANSFERRING_SCHOOLS" | "HOMESCHOOLING" | "GRADUATING" | "FINANCIAL" | "OTHER"
+      | "MOVING"
+      | "TRANSFERRING_SCHOOLS"
+      | "HOMESCHOOLING"
+      | "GRADUATING"
+      | "FINANCIAL"
+      | "OTHER"
     >;
   };
   filtersApplied: {
@@ -105,9 +110,17 @@ export type ReRegistrationStudentReminderResult = {
   throttleMinutes?: number;
 };
 
-export function getReRegistrationWindowStatus(options: { schoolId: string; schoolYearId: string }) {
-  const query = new URLSearchParams({ schoolId: options.schoolId, schoolYearId: options.schoolYearId });
-  return apiFetch<ReRegistrationWindowStatus>(`/re-registration/window?${query.toString()}`);
+export function getReRegistrationWindowStatus(options: {
+  schoolId: string;
+  schoolYearId: string;
+}) {
+  const query = new URLSearchParams({
+    schoolId: options.schoolId,
+    schoolYearId: options.schoolYearId,
+  });
+  return apiFetch<ReRegistrationWindowStatus>(
+    `/re-registration/window?${query.toString()}`,
+  );
 }
 
 export type ReRegistrationWindowStatusForStudent = {
@@ -156,7 +169,9 @@ export function createReRegistrationWindow(input: {
 
 export function updateReRegistrationWindow(
   id: string,
-  input: Partial<Pick<ReRegistrationWindow, "opensAt" | "closesAt" | "isActive">>,
+  input: Partial<
+    Pick<ReRegistrationWindow, "opensAt" | "closesAt" | "isActive">
+  >,
 ) {
   return apiFetch<ReRegistrationWindow>(`/re-registration/window/${id}`, {
     method: "PATCH",
@@ -164,12 +179,17 @@ export function updateReRegistrationWindow(
   });
 }
 
-export function listReRegistrationWindows(options: { schoolId: string; schoolYearId: string }) {
+export function listReRegistrationWindows(options: {
+  schoolId: string;
+  schoolYearId: string;
+}) {
   const query = new URLSearchParams({
     schoolId: options.schoolId,
     schoolYearId: options.schoolYearId,
   });
-  return apiFetch<ReRegistrationWindow[]>(`/re-registration/windows?${query.toString()}`);
+  return apiFetch<ReRegistrationWindow[]>(
+    `/re-registration/windows?${query.toString()}`,
+  );
 }
 
 export function getReRegistrationWindowTracking(

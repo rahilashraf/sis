@@ -8,4 +8,3 @@ export default function ParentStudentAcademicsPage() {
 
   return <ParentStudentAcademics studentId={params.id} />;
 }
-

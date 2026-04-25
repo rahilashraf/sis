@@ -17,7 +17,12 @@ import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth/auth-context";
-import { listSchools, listSchoolYears, type SchoolYear, type School } from "@/lib/api/schools";
+import {
+  listSchools,
+  listSchoolYears,
+  type SchoolYear,
+  type School,
+} from "@/lib/api/schools";
 import {
   activateReportingPeriod,
   archiveReportingPeriod,
@@ -77,8 +82,11 @@ export function ReportingPeriodsManagement() {
   const [selectedSchoolId, setSelectedSchoolId] = useState("");
   const [selectedSchoolYearId, setSelectedSchoolYearId] = useState("");
   const [periods, setPeriods] = useState<ReportingPeriod[]>([]);
-  const [createForm, setCreateForm] = useState<PeriodFormState>(buildPeriodForm());
-  const [editingPeriod, setEditingPeriod] = useState<ReportingPeriod | null>(null);
+  const [createForm, setCreateForm] =
+    useState<PeriodFormState>(buildPeriodForm());
+  const [editingPeriod, setEditingPeriod] = useState<ReportingPeriod | null>(
+    null,
+  );
   const [editForm, setEditForm] = useState<PeriodFormState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -109,7 +117,11 @@ export function ReportingPeriodsManagement() {
         setSchools(response);
         setSelectedSchoolId((current) => current || response[0]?.id || "");
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load schools.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load schools.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -133,11 +145,17 @@ export function ReportingPeriodsManagement() {
       setError(null);
 
       try {
-        const response = await listSchoolYears(selectedSchoolId, { includeInactive: true });
+        const response = await listSchoolYears(selectedSchoolId, {
+          includeInactive: true,
+        });
         setSchoolYears(response);
         setSelectedSchoolYearId((current) => current || response[0]?.id || "");
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load school years.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load school years.",
+        );
         setSchoolYears([]);
         setSelectedSchoolYearId("");
       }
@@ -167,7 +185,11 @@ export function ReportingPeriodsManagement() {
         });
         setPeriods(response);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load reporting periods.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load reporting periods.",
+        );
         setPeriods([]);
       }
     }
@@ -223,7 +245,11 @@ export function ReportingPeriodsManagement() {
       setCreateForm(buildPeriodForm());
       setSuccessMessage("Reporting period created.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to create reporting period.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to create reporting period.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -250,12 +276,17 @@ export function ReportingPeriodsManagement() {
       });
 
       const next = await refreshPeriods();
-      const updated = next.find((period) => period.id === editingPeriod.id) ?? null;
+      const updated =
+        next.find((period) => period.id === editingPeriod.id) ?? null;
       setEditingPeriod(updated);
       setEditForm(updated ? buildEditForm(updated) : null);
       setSuccessMessage("Reporting period updated.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update reporting period.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update reporting period.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -274,9 +305,17 @@ export function ReportingPeriodsManagement() {
       }
 
       await refreshPeriods();
-      setSuccessMessage(period.isActive ? "Reporting period archived." : "Reporting period activated.");
+      setSuccessMessage(
+        period.isActive
+          ? "Reporting period archived."
+          : "Reporting period activated.",
+      );
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update reporting period.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update reporting period.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -295,9 +334,17 @@ export function ReportingPeriodsManagement() {
       }
 
       await refreshPeriods();
-      setSuccessMessage(period.isLocked ? "Reporting period unlocked." : "Reporting period locked.");
+      setSuccessMessage(
+        period.isLocked
+          ? "Reporting period unlocked."
+          : "Reporting period locked.",
+      );
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update reporting period.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update reporting period.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -344,7 +391,9 @@ export function ReportingPeriodsManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Context</CardTitle>
-          <CardDescription>Select a school year to manage its periods.</CardDescription>
+          <CardDescription>
+            Select a school year to manage its periods.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <Field htmlFor="reporting-school" label="School">
@@ -384,7 +433,9 @@ export function ReportingPeriodsManagement() {
         <Card>
           <CardHeader>
             <CardTitle>Create Period</CardTitle>
-            <CardDescription>Add a reporting period for the selected school year.</CardDescription>
+            <CardDescription>
+              Add a reporting period for the selected school year.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {!selectedSchoolId || !selectedSchoolYearId ? (
@@ -394,12 +445,18 @@ export function ReportingPeriodsManagement() {
                 description="Select a school and school year before creating a reporting period."
               />
             ) : (
-              <form className="grid gap-4 md:grid-cols-2" onSubmit={handleCreate}>
+              <form
+                className="grid gap-4 md:grid-cols-2"
+                onSubmit={handleCreate}
+              >
                 <Field htmlFor="create-period-name" label="Name">
                   <Input
                     id="create-period-name"
                     onChange={(event) =>
-                      setCreateForm((current) => ({ ...current, name: event.target.value }))
+                      setCreateForm((current) => ({
+                        ...current,
+                        name: event.target.value,
+                      }))
                     }
                     placeholder="Term 1"
                     value={createForm.name}
@@ -409,7 +466,10 @@ export function ReportingPeriodsManagement() {
                   <Input
                     id="create-period-key"
                     onChange={(event) =>
-                      setCreateForm((current) => ({ ...current, key: event.target.value }))
+                      setCreateForm((current) => ({
+                        ...current,
+                        key: event.target.value,
+                      }))
                     }
                     placeholder="term-1"
                     value={createForm.key}
@@ -420,7 +480,10 @@ export function ReportingPeriodsManagement() {
                     id="create-period-order"
                     inputMode="numeric"
                     onChange={(event) =>
-                      setCreateForm((current) => ({ ...current, order: event.target.value }))
+                      setCreateForm((current) => ({
+                        ...current,
+                        order: event.target.value,
+                      }))
                     }
                     value={createForm.order}
                   />
@@ -429,7 +492,10 @@ export function ReportingPeriodsManagement() {
                   <Input
                     id="create-period-start"
                     onChange={(event) =>
-                      setCreateForm((current) => ({ ...current, startsAt: event.target.value }))
+                      setCreateForm((current) => ({
+                        ...current,
+                        startsAt: event.target.value,
+                      }))
                     }
                     type="date"
                     value={createForm.startsAt}
@@ -439,7 +505,10 @@ export function ReportingPeriodsManagement() {
                   <Input
                     id="create-period-end"
                     onChange={(event) =>
-                      setCreateForm((current) => ({ ...current, endsAt: event.target.value }))
+                      setCreateForm((current) => ({
+                        ...current,
+                        endsAt: event.target.value,
+                      }))
                     }
                     type="date"
                     value={createForm.endsAt}
@@ -458,7 +527,9 @@ export function ReportingPeriodsManagement() {
         <Card>
           <CardHeader>
             <CardTitle>Periods</CardTitle>
-            <CardDescription>Lock/activate periods to control edits.</CardDescription>
+            <CardDescription>
+              Lock/activate periods to control edits.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {periods.length === 0 ? (
@@ -473,30 +544,52 @@ export function ReportingPeriodsManagement() {
                   <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                     <thead className="bg-slate-50/80">
                       <tr>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Period</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Dates</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Period
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Dates
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white">
                       {periods.map((period) => (
-                        <tr className="align-top hover:bg-slate-50" key={period.id}>
+                        <tr
+                          className="align-top hover:bg-slate-50"
+                          key={period.id}
+                        >
                           <td className="px-4 py-4">
                             <p className="font-medium text-slate-900">
                               {period.order}. {period.name}
                             </p>
-                            <p className="mt-1 text-xs text-slate-500">{period.key}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {period.key}
+                            </p>
                           </td>
                           <td className="px-4 py-4 text-slate-600">
-                            {formatDateLabel(period.startsAt)} – {formatDateLabel(period.endsAt)}
+                            {formatDateLabel(period.startsAt)} –{" "}
+                            {formatDateLabel(period.endsAt)}
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex flex-wrap gap-2">
-                              <Badge variant={period.isActive ? "success" : "neutral"}>
+                              <Badge
+                                variant={
+                                  period.isActive ? "success" : "neutral"
+                                }
+                              >
                                 {period.isActive ? "Active" : "Archived"}
                               </Badge>
-                              <Badge variant={period.isLocked ? "neutral" : "success"}>
+                              <Badge
+                                variant={
+                                  period.isLocked ? "neutral" : "success"
+                                }
+                              >
                                 {period.isLocked ? "Locked" : "Unlocked"}
                               </Badge>
                             </div>
@@ -550,7 +643,9 @@ export function ReportingPeriodsManagement() {
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <CardTitle>Edit Period</CardTitle>
-              <CardDescription>Locked periods cannot be edited until unlocked.</CardDescription>
+              <CardDescription>
+                Locked periods cannot be edited until unlocked.
+              </CardDescription>
             </div>
             <Button
               onClick={() => {
@@ -564,13 +659,18 @@ export function ReportingPeriodsManagement() {
             </Button>
           </CardHeader>
           <CardContent>
-            <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSaveEdit}>
+            <form
+              className="grid gap-4 md:grid-cols-2"
+              onSubmit={handleSaveEdit}
+            >
               <Field htmlFor="edit-period-name" label="Name">
                 <Input
                   id="edit-period-name"
                   onChange={(event) =>
                     setEditForm((current) =>
-                      current ? { ...current, name: event.target.value } : current,
+                      current
+                        ? { ...current, name: event.target.value }
+                        : current,
                     )
                   }
                   value={editForm.name}
@@ -581,7 +681,9 @@ export function ReportingPeriodsManagement() {
                   id="edit-period-key"
                   onChange={(event) =>
                     setEditForm((current) =>
-                      current ? { ...current, key: event.target.value } : current,
+                      current
+                        ? { ...current, key: event.target.value }
+                        : current,
                     )
                   }
                   value={editForm.key}
@@ -593,7 +695,9 @@ export function ReportingPeriodsManagement() {
                   inputMode="numeric"
                   onChange={(event) =>
                     setEditForm((current) =>
-                      current ? { ...current, order: event.target.value } : current,
+                      current
+                        ? { ...current, order: event.target.value }
+                        : current,
                     )
                   }
                   value={editForm.order}
@@ -604,7 +708,9 @@ export function ReportingPeriodsManagement() {
                   id="edit-period-start"
                   onChange={(event) =>
                     setEditForm((current) =>
-                      current ? { ...current, startsAt: event.target.value } : current,
+                      current
+                        ? { ...current, startsAt: event.target.value }
+                        : current,
                     )
                   }
                   type="date"
@@ -616,7 +722,9 @@ export function ReportingPeriodsManagement() {
                   id="edit-period-end"
                   onChange={(event) =>
                     setEditForm((current) =>
-                      current ? { ...current, endsAt: event.target.value } : current,
+                      current
+                        ? { ...current, endsAt: event.target.value }
+                        : current,
                     )
                   }
                   type="date"

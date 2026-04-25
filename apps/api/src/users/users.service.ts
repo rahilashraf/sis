@@ -293,6 +293,7 @@ export class UsersService {
         schoolId: true,
         username: true,
         email: true,
+        phone: true,
         firstName: true,
         lastName: true,
         role: true,
@@ -307,6 +308,7 @@ export class UsersService {
     const updateData: {
       username?: string;
       email?: string | null;
+      phone?: string | null;
       firstName?: string;
       lastName?: string;
       role?: AppUserRole;
@@ -320,6 +322,10 @@ export class UsersService {
 
     if (data.email !== undefined) {
       updateData.email = data.email;
+    }
+
+    if (data.phone !== undefined) {
+      updateData.phone = data.phone;
     }
 
     if (data.firstName !== undefined) {
@@ -378,6 +384,7 @@ export class UsersService {
           after: {
             username: updated.username,
             email: updated.email,
+            phone: updated.phone,
             firstName: updated.firstName,
             lastName: updated.lastName,
             role: updated.role,

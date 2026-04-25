@@ -19,4 +19,8 @@ export class CreateClassDto {
   @IsOptional()
   @IsBoolean()
   isHomeroom?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  takesAttendance?: boolean;
 }

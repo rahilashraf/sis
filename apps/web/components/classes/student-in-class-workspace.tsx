@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonClassName } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -27,7 +33,11 @@ import {
   type AssessmentResultStatusLabel,
   type UpsertAssessmentGradeInput,
 } from "@/lib/api/assessments";
-import { formatDateLabel, formatDisplayedPercent, getDisplayText } from "@/lib/utils";
+import {
+  formatDateLabel,
+  formatDisplayedPercent,
+  getDisplayText,
+} from "@/lib/utils";
 
 type Mode = "teacher" | "admin";
 
@@ -49,7 +59,9 @@ export function StudentInClassWorkspace({
   studentId: string;
 }) {
   const [schoolClass, setSchoolClass] = useState<SchoolClass | null>(null);
-  const [classSummary, setClassSummary] = useState<ClassGradeSummary | null>(null);
+  const [classSummary, setClassSummary] = useState<ClassGradeSummary | null>(
+    null,
+  );
   const [summary, setSummary] = useState<StudentInClassSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -57,10 +69,18 @@ export function StudentInClassWorkspace({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const [scoreByAssessmentId, setScoreByAssessmentId] = useState<Record<string, string>>({});
-  const [commentByAssessmentId, setCommentByAssessmentId] = useState<Record<string, string>>({});
-  const [statusKeyByAssessmentId, setStatusKeyByAssessmentId] = useState<Record<string, string>>({});
-  const [statusLabels, setStatusLabels] = useState<AssessmentResultStatusLabel[]>([]);
+  const [scoreByAssessmentId, setScoreByAssessmentId] = useState<
+    Record<string, string>
+  >({});
+  const [commentByAssessmentId, setCommentByAssessmentId] = useState<
+    Record<string, string>
+  >({});
+  const [statusKeyByAssessmentId, setStatusKeyByAssessmentId] = useState<
+    Record<string, string>
+  >({});
+  const [statusLabels, setStatusLabels] = useState<
+    AssessmentResultStatusLabel[]
+  >([]);
   const [statusLabelError, setStatusLabelError] = useState<string | null>(null);
 
   const [overridePercent, setOverridePercent] = useState("");
@@ -75,11 +95,12 @@ export function StudentInClassWorkspace({
       setSaveError(null);
       setSuccessMessage(null);
 
-      const [classResult, classSummaryResult, summaryResult] = await Promise.allSettled([
-        getClassById(classId),
-        getClassGradeSummary(classId),
-        getStudentInClassSummary(classId, studentId),
-      ]);
+      const [classResult, classSummaryResult, summaryResult] =
+        await Promise.allSettled([
+          getClassById(classId),
+          getClassGradeSummary(classId),
+          getStudentInClassSummary(classId, studentId),
+        ]);
 
       if (classResult.status === "fulfilled") {
         setSchoolClass(classResult.value);
@@ -126,12 +147,17 @@ export function StudentInClassWorkspace({
       setStatusLabelError(null);
 
       try {
-        const response = await listAssessmentResultStatusLabels({ schoolId, includeInactive: false });
+        const response = await listAssessmentResultStatusLabels({
+          schoolId,
+          includeInactive: false,
+        });
         setStatusLabels(response);
       } catch (loadError) {
         setStatusLabels([]);
         setStatusLabelError(
-          loadError instanceof Error ? loadError.message : "Unable to load status labels.",
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load status labels.",
         );
       }
     }
@@ -142,7 +168,8 @@ export function StudentInClassWorkspace({
   useEffect(() => {
     const existing = summary?.override ?? null;
     setOverridePercent(
-      existing?.overridePercent === null || existing?.overridePercent === undefined
+      existing?.overridePercent === null ||
+        existing?.overridePercent === undefined
         ? ""
         : String(existing.overridePercent),
     );
@@ -155,12 +182,18 @@ export function StudentInClassWorkspace({
       return "Student";
     }
 
-    const entry = classSummary.students.find((row) => row.student.id === studentId);
+    const entry = classSummary.students.find(
+      (row) => row.student.id === studentId,
+    );
     if (!entry) {
       return "Student";
     }
 
-    return getFullName(entry.student.firstName, entry.student.lastName, "Student");
+    return getFullName(
+      entry.student.firstName,
+      entry.student.lastName,
+      "Student",
+    );
   }, [classSummary, studentId]);
 
   async function handleSave() {
@@ -184,93 +217,143 @@ export function StudentInClassWorkspace({
       );
 
       const updates = flattened
-        .map(({ assessment, isLocked, existingRawScore, existingComment, existingStatusKey }) => {
-          if (isLocked) {
-            return null;
-          }
-
-          const scoreTouched = Object.prototype.hasOwnProperty.call(scoreByAssessmentId, assessment.id);
-          const commentTouched = Object.prototype.hasOwnProperty.call(commentByAssessmentId, assessment.id);
-          const statusTouched = Object.prototype.hasOwnProperty.call(statusKeyByAssessmentId, assessment.id);
-
-          if (!scoreTouched && !commentTouched && !statusTouched) {
-            return null;
-          }
-
-          const scoreRaw = scoreTouched ? (scoreByAssessmentId[assessment.id] ?? "").trim() : "";
-          const commentRaw = commentTouched ? (commentByAssessmentId[assessment.id] ?? "").trim() : "";
-          const statusRaw = statusTouched ? (statusKeyByAssessmentId[assessment.id] ?? "").trim() : "";
-
-          const nextScore: number | null | undefined = scoreTouched
-            ? scoreRaw.length === 0
-              ? null
-              : Number(scoreRaw)
-            : undefined;
-
-          if (scoreTouched && nextScore !== null && nextScore !== undefined) {
-            if (!Number.isFinite(nextScore) || nextScore < 0) {
-              throw new Error(`Invalid score provided for ${assessment.title}.`);
+        .map(
+          ({
+            assessment,
+            isLocked,
+            existingRawScore,
+            existingComment,
+            existingStatusKey,
+          }) => {
+            if (isLocked) {
+              return null;
             }
 
-            if (nextScore > assessment.maxScore) {
-              throw new Error(`Score for ${assessment.title} cannot exceed ${assessment.maxScore}.`);
+            const scoreTouched = Object.prototype.hasOwnProperty.call(
+              scoreByAssessmentId,
+              assessment.id,
+            );
+            const commentTouched = Object.prototype.hasOwnProperty.call(
+              commentByAssessmentId,
+              assessment.id,
+            );
+            const statusTouched = Object.prototype.hasOwnProperty.call(
+              statusKeyByAssessmentId,
+              assessment.id,
+            );
+
+            if (!scoreTouched && !commentTouched && !statusTouched) {
+              return null;
             }
-          }
 
-          const nextComment: string | null | undefined = commentTouched
-            ? commentRaw.length === 0
-              ? null
-              : commentRaw
-            : undefined;
+            const scoreRaw = scoreTouched
+              ? (scoreByAssessmentId[assessment.id] ?? "").trim()
+              : "";
+            const commentRaw = commentTouched
+              ? (commentByAssessmentId[assessment.id] ?? "").trim()
+              : "";
+            const statusRaw = statusTouched
+              ? (statusKeyByAssessmentId[assessment.id] ?? "").trim()
+              : "";
 
-          const nextStatusKey: string | null | undefined = statusTouched
-            ? statusRaw.length === 0
-              ? null
-              : statusRaw.toUpperCase()
-            : undefined;
+            const nextScore: number | null | undefined = scoreTouched
+              ? scoreRaw.length === 0
+                ? null
+                : Number(scoreRaw)
+              : undefined;
 
-          const normalizedExistingComment =
-            (existingComment ?? "").trim().length === 0 ? null : (existingComment ?? "").trim();
+            if (scoreTouched && nextScore !== null && nextScore !== undefined) {
+              if (!Number.isFinite(nextScore) || nextScore < 0) {
+                throw new Error(
+                  `Invalid score provided for ${assessment.title}.`,
+                );
+              }
 
-          const scoreChanged = scoreTouched && (existingRawScore ?? null) !== (nextScore ?? null);
-          const commentChanged = commentTouched && normalizedExistingComment !== (nextComment ?? null);
-          const statusChanged = statusTouched && (existingStatusKey ?? null) !== (nextStatusKey ?? null);
+              if (nextScore > assessment.maxScore) {
+                throw new Error(
+                  `Score for ${assessment.title} cannot exceed ${assessment.maxScore}.`,
+                );
+              }
+            }
 
-          if (!scoreChanged && !commentChanged && !statusChanged) {
-            return null;
-          }
+            const nextComment: string | null | undefined = commentTouched
+              ? commentRaw.length === 0
+                ? null
+                : commentRaw
+              : undefined;
 
-          const effectiveStatusKey =
-            statusTouched
+            const nextStatusKey: string | null | undefined = statusTouched
+              ? statusRaw.length === 0
+                ? null
+                : statusRaw.toUpperCase()
+              : undefined;
+
+            const normalizedExistingComment =
+              (existingComment ?? "").trim().length === 0
+                ? null
+                : (existingComment ?? "").trim();
+
+            const scoreChanged =
+              scoreTouched &&
+              (existingRawScore ?? null) !== (nextScore ?? null);
+            const commentChanged =
+              commentTouched &&
+              normalizedExistingComment !== (nextComment ?? null);
+            const statusChanged =
+              statusTouched &&
+              (existingStatusKey ?? null) !== (nextStatusKey ?? null);
+
+            if (!scoreChanged && !commentChanged && !statusChanged) {
+              return null;
+            }
+
+            const effectiveStatusKey = statusTouched
               ? nextStatusKey
               : scoreTouched && nextScore !== null && nextScore !== undefined
                 ? null
                 : (existingStatusKey ?? null);
 
-          const effectiveComment = commentTouched ? nextComment : normalizedExistingComment;
-          const effectiveScore =
-            scoreTouched ? nextScore ?? null : existingRawScore ?? null;
+            const effectiveComment = commentTouched
+              ? nextComment
+              : normalizedExistingComment;
+            const effectiveScore = scoreTouched
+              ? (nextScore ?? null)
+              : (existingRawScore ?? null);
 
-          if (effectiveScore === null && effectiveStatusKey === null && effectiveComment === null) {
+            if (
+              effectiveScore === null &&
+              effectiveStatusKey === null &&
+              effectiveComment === null
+            ) {
+              return {
+                assessmentId: assessment.id,
+                grade: {
+                  studentId,
+                  clear: true,
+                } satisfies UpsertAssessmentGradeInput,
+              };
+            }
+
             return {
               assessmentId: assessment.id,
-              grade: { studentId, clear: true } satisfies UpsertAssessmentGradeInput,
+              grade: {
+                studentId,
+                score: effectiveScore,
+                statusLabelKey: effectiveStatusKey,
+                comment: effectiveComment,
+              } satisfies UpsertAssessmentGradeInput,
             };
-          }
+          },
+        )
+        .filter(Boolean) as Array<{
+        assessmentId: string;
+        grade: UpsertAssessmentGradeInput;
+      }>;
 
-          return {
-            assessmentId: assessment.id,
-            grade: {
-              studentId,
-              score: effectiveScore,
-              statusLabelKey: effectiveStatusKey,
-              comment: effectiveComment,
-            } satisfies UpsertAssessmentGradeInput,
-          };
-        })
-        .filter(Boolean) as Array<{ assessmentId: string; grade: UpsertAssessmentGradeInput }>;
-
-      const payloadByAssessmentId = new Map<string, UpsertAssessmentGradeInput[]>();
+      const payloadByAssessmentId = new Map<
+        string,
+        UpsertAssessmentGradeInput[]
+      >();
 
       for (const update of updates) {
         const bucket = payloadByAssessmentId.get(update.assessmentId) ?? [];
@@ -284,18 +367,23 @@ export function StudentInClassWorkspace({
       }
 
       const settled = await Promise.allSettled(
-        Array.from(payloadByAssessmentId.entries()).map(([assessmentId, grades]) =>
-          upsertAssessmentGrades(assessmentId, grades),
+        Array.from(payloadByAssessmentId.entries()).map(
+          ([assessmentId, grades]) =>
+            upsertAssessmentGrades(assessmentId, grades),
         ),
       );
 
-      const failures = settled.filter((result) => result.status === "rejected") as PromiseRejectedResult[];
+      const failures = settled.filter(
+        (result) => result.status === "rejected",
+      ) as PromiseRejectedResult[];
 
       if (failures.length > 0) {
         setSaveError(
           failures
             .map((failure) =>
-              failure.reason instanceof Error ? failure.reason.message : "Unable to save grades.",
+              failure.reason instanceof Error
+                ? failure.reason.message
+                : "Unable to save grades.",
             )
             .join(" "),
         );
@@ -309,7 +397,11 @@ export function StudentInClassWorkspace({
       setStatusKeyByAssessmentId({});
       setSuccessMessage("Student grades saved.");
     } catch (saveError) {
-      setSaveError(saveError instanceof Error ? saveError.message : "Unable to save grades.");
+      setSaveError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save grades.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -329,8 +421,14 @@ export function StudentInClassWorkspace({
       const parsedPercent =
         rawPercent.length === 0 ? undefined : Number(rawPercent);
       if (parsedPercent !== undefined) {
-        if (!Number.isFinite(parsedPercent) || parsedPercent < 0 || parsedPercent > 100) {
-          throw new Error("Override percent must be a number between 0 and 100.");
+        if (
+          !Number.isFinite(parsedPercent) ||
+          parsedPercent < 0 ||
+          parsedPercent > 100
+        ) {
+          throw new Error(
+            "Override percent must be a number between 0 and 100.",
+          );
         }
       }
 
@@ -350,7 +448,11 @@ export function StudentInClassWorkspace({
       setSummary(refreshed);
       setSuccessMessage("Grade override saved.");
     } catch (saveError) {
-      setOverrideError(saveError instanceof Error ? saveError.message : "Unable to save override.");
+      setOverrideError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save override.",
+      );
     } finally {
       setIsSavingOverride(false);
     }
@@ -367,7 +469,11 @@ export function StudentInClassWorkspace({
       setSummary(refreshed);
       setSuccessMessage("Grade override cleared.");
     } catch (clearError) {
-      setOverrideError(clearError instanceof Error ? clearError.message : "Unable to clear override.");
+      setOverrideError(
+        clearError instanceof Error
+          ? clearError.message
+          : "Unable to clear override.",
+      );
     } finally {
       setIsSavingOverride(false);
     }
@@ -377,22 +483,42 @@ export function StudentInClassWorkspace({
     <div className="space-y-6">
       <PageHeader
         title={studentName}
-        description={schoolClass ? `${schoolClass.name} • Student academic record` : "Student academic record"}
+        description={
+          schoolClass
+            ? `${schoolClass.name} • Student academic record`
+            : "Student academic record"
+        }
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
               className={buttonClassName({ variant: "secondary" })}
-              href={mode === "admin" ? `/admin/classes/${classId}/summary` : `/teacher/classes/${classId}`}
+              href={
+                mode === "admin"
+                  ? `/admin/classes/${classId}/summary`
+                  : `/teacher/classes/${classId}`
+              }
             >
               Back to class
             </Link>
+            {mode === "teacher" ? (
+              <Link
+                className={buttonClassName({ variant: "secondary" })}
+                href={`/teacher/classes/${encodeURIComponent(classId)}/students/${encodeURIComponent(studentId)}/profile`}
+              >
+                Student Profile
+              </Link>
+            ) : null}
             <Link
               className={buttonClassName({ variant: "secondary" })}
               href={`/${mode}/gradebook?classId=${encodeURIComponent(classId)}`}
             >
               Gradebook
             </Link>
-            <Button disabled={isSaving || !summary} onClick={() => void handleSave()} type="button">
+            <Button
+              disabled={isSaving || !summary}
+              onClick={() => void handleSave()}
+              type="button"
+            >
               {isSaving ? "Saving..." : "Save changes"}
             </Button>
           </div>
@@ -403,9 +529,15 @@ export function StudentInClassWorkspace({
               <Badge variant="neutral">
                 Avg: {formatDisplayedPercent(summary.averagePercent)}
               </Badge>
-              <Badge variant="neutral">Grade: {summary.averageLetterGrade ?? "—"}</Badge>
-              {summary.usesWeights ? <Badge variant="neutral">Weighted</Badge> : null}
-              {summary.override ? <Badge variant="warning">Override</Badge> : null}
+              <Badge variant="neutral">
+                Grade: {summary.averageLetterGrade ?? "—"}
+              </Badge>
+              {summary.usesWeights ? (
+                <Badge variant="neutral">Weighted</Badge>
+              ) : null}
+              {summary.override ? (
+                <Badge variant="warning">Override</Badge>
+              ) : null}
             </>
           ) : null
         }
@@ -413,7 +545,9 @@ export function StudentInClassWorkspace({
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {saveError ? <Notice tone="danger">{saveError}</Notice> : null}
-      {statusLabelError ? <Notice tone="danger">{statusLabelError}</Notice> : null}
+      {statusLabelError ? (
+        <Notice tone="danger">{statusLabelError}</Notice>
+      ) : null}
       {overrideError ? <Notice tone="danger">{overrideError}</Notice> : null}
       {successMessage ? <Notice tone="success">{successMessage}</Notice> : null}
 
@@ -437,7 +571,8 @@ export function StudentInClassWorkspace({
           <CardHeader>
             <CardTitle>Final grade override</CardTitle>
             <CardDescription>
-              Override the final class percentage. Letter grade is derived automatically from the school scale.
+              Override the final class percentage. Letter grade is derived
+              automatically from the school scale.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -445,8 +580,8 @@ export function StudentInClassWorkspace({
               <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
                 <p className="font-semibold text-slate-900">Calculated</p>
                 <p className="mt-1 text-slate-600">
-                  {formatDisplayedPercent(summary.calculatedAveragePercent)}{" "}
-                  • {summary.calculatedAverageLetterGrade ?? "—"}
+                  {formatDisplayedPercent(summary.calculatedAveragePercent)} •{" "}
+                  {summary.calculatedAverageLetterGrade ?? "—"}
                 </p>
               </div>
               <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
@@ -513,13 +648,17 @@ export function StudentInClassWorkspace({
           <CardHeader>
             <CardTitle>Assessments</CardTitle>
             <CardDescription>
-              Scores are grouped by reporting period. Locked periods are read-only.
+              Scores are grouped by reporting period. Locked periods are
+              read-only.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
               {summary.groups.map((group) => (
-                <div className="space-y-3" key={group.reportingPeriod?.id ?? "unassigned"}>
+                <div
+                  className="space-y-3"
+                  key={group.reportingPeriod?.id ?? "unassigned"}
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-slate-900">
                       {group.reportingPeriod
@@ -536,33 +675,62 @@ export function StudentInClassWorkspace({
                       <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                         <thead className="bg-slate-50/80">
                           <tr>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Assessment</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Type</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Due</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Wt</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Parents</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Code</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">%</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Score</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Edit</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Comment</th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Assessment
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Type
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Due
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Wt
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Parents
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Code
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              %
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Score
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Edit
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Comment
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 bg-white">
                           {group.assessments.map((assessment) => {
-                            const isLocked = assessment.reportingPeriod?.isLocked ?? false;
+                            const isLocked =
+                              assessment.reportingPeriod?.isLocked ?? false;
                             const scoreValue =
                               scoreByAssessmentId[assessment.id] ??
-                              (assessment.rawScore === null || assessment.rawScore === undefined ? "" : `${assessment.rawScore}`);
+                              (assessment.rawScore === null ||
+                              assessment.rawScore === undefined
+                                ? ""
+                                : `${assessment.rawScore}`);
                             const statusValue =
                               statusKeyByAssessmentId[assessment.id] ??
                               assessment.statusLabel?.key ??
                               "";
 
                             return (
-                              <tr className="align-top hover:bg-slate-50" key={assessment.id}>
+                              <tr
+                                className="align-top hover:bg-slate-50"
+                                key={assessment.id}
+                              >
                                 <td className="px-4 py-3">
-                                  <p className="font-medium text-slate-900">{assessment.title}</p>
+                                  <p className="font-medium text-slate-900">
+                                    {assessment.title}
+                                  </p>
                                   <p className="mt-1 text-xs text-slate-500">
                                     Max {assessment.maxScore}
                                   </p>
@@ -571,19 +739,35 @@ export function StudentInClassWorkspace({
                                   {assessment.assessmentType.name}
                                 </td>
                                 <td className="px-4 py-3 text-slate-600">
-                                  {assessment.dueAt ? formatDateLabel(assessment.dueAt) : "—"}
+                                  {assessment.dueAt
+                                    ? formatDateLabel(assessment.dueAt)
+                                    : "—"}
                                 </td>
-                                <td className="px-4 py-3 text-slate-600">{assessment.weight}</td>
+                                <td className="px-4 py-3 text-slate-600">
+                                  {assessment.weight}
+                                </td>
                                 <td className="px-4 py-3">
-                                  <Badge variant={assessment.isPublishedToParents ? "success" : "neutral"}>
-                                    {assessment.isPublishedToParents ? "Visible" : "Hidden"}
+                                  <Badge
+                                    variant={
+                                      assessment.isPublishedToParents
+                                        ? "success"
+                                        : "neutral"
+                                    }
+                                  >
+                                    {assessment.isPublishedToParents
+                                      ? "Visible"
+                                      : "Hidden"}
                                   </Badge>
                                 </td>
                                 <td className="px-4 py-3">
                                   <Select
                                     aria-label={`Status code for ${assessment.title}`}
                                     className="min-w-40"
-                                    disabled={isLocked || isSaving || statusLabels.length === 0}
+                                    disabled={
+                                      isLocked ||
+                                      isSaving ||
+                                      statusLabels.length === 0
+                                    }
                                     onChange={(event) =>
                                       setStatusKeyByAssessmentId((current) => ({
                                         ...current,
@@ -601,10 +785,14 @@ export function StudentInClassWorkspace({
                                   </Select>
                                 </td>
                                 <td className="px-4 py-3 text-slate-900">
-                                  {assessment.percent === null ? "—" : `${assessment.percent}%`}
+                                  {assessment.percent === null
+                                    ? "—"
+                                    : `${assessment.percent}%`}
                                 </td>
                                 <td className="px-4 py-3 text-slate-900">
-                                  {assessment.score === null ? "—" : `${assessment.score} / ${assessment.maxScore}`}
+                                  {assessment.score === null
+                                    ? "—"
+                                    : `${assessment.score} / ${assessment.maxScore}`}
                                 </td>
                                 <td className="px-4 py-3">
                                   <Input
@@ -619,7 +807,11 @@ export function StudentInClassWorkspace({
                                         [assessment.id]: event.target.value,
                                       }))
                                     }
-                                    placeholder={isLocked ? "Locked" : `0 - ${assessment.maxScore}`}
+                                    placeholder={
+                                      isLocked
+                                        ? "Locked"
+                                        : `0 - ${assessment.maxScore}`
+                                    }
                                     value={scoreValue}
                                   />
                                 </td>
@@ -633,9 +825,15 @@ export function StudentInClassWorkspace({
                                         [assessment.id]: event.target.value,
                                       }))
                                     }
-                                    placeholder={isLocked ? "Locked" : "Optional comment"}
+                                    placeholder={
+                                      isLocked ? "Locked" : "Optional comment"
+                                    }
                                     rows={1}
-                                    value={commentByAssessmentId[assessment.id] ?? assessment.comment ?? ""}
+                                    value={
+                                      commentByAssessmentId[assessment.id] ??
+                                      assessment.comment ??
+                                      ""
+                                    }
                                   />
                                 </td>
                               </tr>

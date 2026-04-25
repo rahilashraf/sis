@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/lib/auth/auth-context";
-import { getPaymentReceipt, getParentPaymentReceipt, type PaymentReceipt } from "@/lib/api/billing";
+import {
+  getPaymentReceipt,
+  getParentPaymentReceipt,
+  type PaymentReceipt,
+} from "@/lib/api/billing";
 import { formatDateTimeLabel } from "@/lib/utils";
 
 function formatCurrency(value: string | number) {
@@ -38,7 +42,10 @@ function formatMethod(method: string): string {
   return labels[method] ?? method;
 }
 
-export function PaymentReceiptView({ paymentId, isParent = false }: PaymentReceiptProps) {
+export function PaymentReceiptView({
+  paymentId,
+  isParent = false,
+}: PaymentReceiptProps) {
   const { session } = useAuth();
   const [receipt, setReceipt] = useState<PaymentReceipt | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,7 +69,9 @@ export function PaymentReceiptView({ paymentId, isParent = false }: PaymentRecei
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Unable to load receipt");
+          setError(
+            err instanceof Error ? err.message : "Unable to load receipt",
+          );
           setIsLoading(false);
         }
       });
@@ -84,7 +93,10 @@ export function PaymentReceiptView({ paymentId, isParent = false }: PaymentRecei
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Payment Receipt" description="Receipt not found or access denied" />
+        <PageHeader
+          title="Payment Receipt"
+          description="Receipt not found or access denied"
+        />
         <Notice tone="danger">{error}</Notice>
       </div>
     );
@@ -145,11 +157,15 @@ export function PaymentReceiptView({ paymentId, isParent = false }: PaymentRecei
                 {receipt.school?.name || "School"}
               </p>
               {receipt.school?.shortName && (
-                <p className="text-xs text-slate-500">{receipt.school.shortName}</p>
+                <p className="text-xs text-slate-500">
+                  {receipt.school.shortName}
+                </p>
               )}
             </div>
             <div className="text-right">
-              <p className="text-sm font-semibold text-slate-700">Payment Date</p>
+              <p className="text-sm font-semibold text-slate-700">
+                Payment Date
+              </p>
               <p className="mt-1 text-sm font-medium text-slate-900">
                 {formatDateTimeLabel(receipt.paymentDate, {
                   month: "short",
@@ -174,7 +190,9 @@ export function PaymentReceiptView({ paymentId, isParent = false }: PaymentRecei
 
         {/* Student Information */}
         <div className="my-6 rounded-lg bg-slate-50 p-4">
-          <p className="text-xs font-semibold uppercase text-slate-600">Received From</p>
+          <p className="text-xs font-semibold uppercase text-slate-600">
+            Received From
+          </p>
           <p className="mt-2 text-base font-semibold text-slate-900">
             {receipt.student.firstName} {receipt.student.lastName}
           </p>
@@ -185,13 +203,17 @@ export function PaymentReceiptView({ paymentId, isParent = false }: PaymentRecei
         <div className="my-6 space-y-3">
           <div className="flex justify-between border-b border-slate-100 pb-2">
             <span className="text-sm text-slate-600">Payment Method</span>
-            <span className="text-sm font-medium text-slate-900">{formatMethod(receipt.method)}</span>
+            <span className="text-sm font-medium text-slate-900">
+              {formatMethod(receipt.method)}
+            </span>
           </div>
 
           {receipt.referenceNumber && (
             <div className="flex justify-between border-b border-slate-100 pb-2">
               <span className="text-sm text-slate-600">Reference Number</span>
-              <span className="text-sm font-medium text-slate-900">{receipt.referenceNumber}</span>
+              <span className="text-sm font-medium text-slate-900">
+                {receipt.referenceNumber}
+              </span>
             </div>
           )}
 
@@ -215,12 +237,16 @@ export function PaymentReceiptView({ paymentId, isParent = false }: PaymentRecei
         {/* Allocations */}
         {receipt.allocations.length > 0 && (
           <div className="my-6">
-            <p className="mb-3 text-sm font-semibold text-slate-900">Allocation of Payment</p>
+            <p className="mb-3 text-sm font-semibold text-slate-900">
+              Allocation of Payment
+            </p>
             <table className="w-full text-sm">
               <tbody>
                 {receipt.allocations.map((allocation) => (
                   <tr key={allocation.id} className="border-b border-slate-100">
-                    <td className="py-2 pr-3 text-slate-700">{allocation.charge.title}</td>
+                    <td className="py-2 pr-3 text-slate-700">
+                      {allocation.charge.title}
+                    </td>
                     <td className="py-2 text-right font-medium text-slate-900">
                       {formatCurrency(allocation.amount)}
                     </td>
@@ -234,8 +260,12 @@ export function PaymentReceiptView({ paymentId, isParent = false }: PaymentRecei
         {/* Total */}
         <div className="border-t-2 border-slate-900 pt-4">
           <div className="flex justify-between">
-            <span className="text-lg font-semibold text-slate-900">Total Paid</span>
-            <span className="text-lg font-bold text-slate-900">{formatCurrency(receipt.amount)}</span>
+            <span className="text-lg font-semibold text-slate-900">
+              Total Paid
+            </span>
+            <span className="text-lg font-bold text-slate-900">
+              {formatCurrency(receipt.amount)}
+            </span>
           </div>
         </div>
 

@@ -23,7 +23,10 @@ export function roundDisplayedPercent(value: number | null | undefined) {
   return Math.round(value);
 }
 
-export function formatDisplayedPercent(value: number | null | undefined, fallback = "—") {
+export function formatDisplayedPercent(
+  value: number | null | undefined,
+  fallback = "—",
+) {
   const rounded = roundDisplayedPercent(value);
   return rounded === null ? fallback : `${rounded}%`;
 }

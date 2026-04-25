@@ -192,6 +192,12 @@ enum LibraryLoanStatus {
   OVERDUE
 }
 
+enum LibraryHoldStatus {
+  ACTIVE
+  CANCELLED
+  FULFILLED
+}
+
 enum LibraryFineReason {
   LATE
   LOST
@@ -232,6 +238,7 @@ model User {
   gradeLevelId String?
   username     String   @unique
   email        String?  @unique
+  phone        String?
   passwordHash String
   firstName    String
   lastName     String
@@ -312,6 +319,9 @@ model User {
   libraryLoansAsStudent    LibraryLoan[] @relation("LibraryLoanStudent")
   libraryLoansCheckedOut   LibraryLoan[] @relation("LibraryLoanCheckedOutBy")
   libraryLoansReceived     LibraryLoan[] @relation("LibraryLoanReceivedBy")
+  libraryHoldsAsStudent    LibraryHold[] @relation("LibraryHoldStudent")
+  createdLibraryHolds      LibraryHold[] @relation("LibraryHoldCreatedBy")
+  resolvedLibraryHolds     LibraryHold[] @relation("LibraryHoldResolvedBy")
   libraryFinesAsStudent    LibraryFine[] @relation("LibraryFineStudent")
   waivedLibraryFines       LibraryFine[] @relation("LibraryFineWaivedBy")
   uniformOrdersAsParent    UniformOrder[] @relation("UniformOrderParent")
@@ -358,6 +368,7 @@ model School {
   notifications          Notification[]
   libraryItems           LibraryItem[]
   libraryLoans           LibraryLoan[]
+  libraryHolds           LibraryHold[]
   libraryFineSettings    LibraryFineSettings?
   libraryFines           LibraryFine[]
   uniformItems           UniformItem[]
@@ -682,6 +693,7 @@ model Class {
   name       String
   subject    String?
   isHomeroom Boolean @default(false)
+  takesAttendance Boolean @default(true)
   isActive   Boolean @default(true)
   gradebookWeightingMode GradebookWeightingMode @default(UNWEIGHTED)
 
@@ -1147,6 +1159,7 @@ model LibraryItem {
 
   school School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   loans  LibraryLoan[]
+  holds  LibraryHold[]
   fines  LibraryFine[] @relation("LibraryFineItem")
 
   @@unique([schoolId, barcode])
@@ -1178,6 +1191,30 @@ model LibraryLoan {
   @@index([schoolId, status, dueDate])
   @@index([studentId, status, dueDate])
   @@index([itemId, status])
+}
+
+model LibraryHold {
+  id               String            @id @default(cuid())
+  schoolId         String
+  itemId           String
+  studentId        String
+  createdByUserId  String
+  status           LibraryHoldStatus @default(ACTIVE)
+  notes            String?
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  school     School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  item       LibraryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  student    User        @relation("LibraryHoldStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  createdBy  User        @relation("LibraryHoldCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  resolvedBy User?       @relation("LibraryHoldResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, status, createdAt])
+  @@index([studentId, status, createdAt])
+  @@index([itemId, status, createdAt])
 }
 
 model LibraryFineSettings {

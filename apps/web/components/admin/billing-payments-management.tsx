@@ -67,7 +67,9 @@ function getStudentLabel(student: ManagedUser) {
 function userBelongsToSchool(user: ManagedUser, schoolId: string) {
   if (!schoolId) return true;
   if (user.schoolId === schoolId) return true;
-  return user.memberships.some((membership) => membership.schoolId === schoolId);
+  return user.memberships.some(
+    (membership) => membership.schoolId === schoolId,
+  );
 }
 
 export function BillingPaymentsManagement() {
@@ -87,7 +89,9 @@ export function BillingPaymentsManagement() {
   const [error, setError] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
 
-  const [voidTarget, setVoidTarget] = useState<AccountSummaryPayment | null>(null);
+  const [voidTarget, setVoidTarget] = useState<AccountSummaryPayment | null>(
+    null,
+  );
   const [isVoiding, setIsVoiding] = useState(false);
   const [voidError, setVoidError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -117,18 +121,25 @@ export function BillingPaymentsManagement() {
         setSchools(schoolList);
         setStudents(userList);
 
-        const defaultSchoolId = getDefaultSchoolContextId(session?.user) ?? schoolList[0]?.id ?? "";
+        const defaultSchoolId =
+          getDefaultSchoolContextId(session?.user) ?? schoolList[0]?.id ?? "";
         const resolvedSchoolId =
           schoolList.find((school) => school.id === defaultSchoolId)?.id ??
           schoolList[0]?.id ??
           "";
 
-        const defaultStudent = userList.find((student) => userBelongsToSchool(student, resolvedSchoolId));
+        const defaultStudent = userList.find((student) =>
+          userBelongsToSchool(student, resolvedSchoolId),
+        );
 
         setSchoolId(resolvedSchoolId);
         setStudentId(defaultStudent?.id ?? "");
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load payments view.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load payments view.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -161,7 +172,11 @@ export function BillingPaymentsManagement() {
         const summary = await getStudentAccountSummary(studentId, { schoolId });
         setPayments(summary.recentPayments);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load payment records.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load payment records.",
+        );
       } finally {
         setIsLoadingPayments(false);
       }
@@ -194,7 +209,11 @@ export function BillingPaymentsManagement() {
       setVoidTarget(null);
       setRefreshNonce((value) => value + 1);
     } catch (submitError) {
-      setVoidError(submitError instanceof Error ? submitError.message : "Unable to void payment.");
+      setVoidError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Unable to void payment.",
+      );
     } finally {
       setIsVoiding(false);
     }
@@ -228,15 +247,30 @@ export function BillingPaymentsManagement() {
           <div className="flex items-center gap-2">
             {canManage ? (
               <>
-                <Link className={buttonClassName({ size: "sm", variant: "secondary" })} href="/admin/billing/payments/new">
+                <Link
+                  className={buttonClassName({
+                    size: "sm",
+                    variant: "secondary",
+                  })}
+                  href="/admin/billing/payments/new"
+                >
                   Record payment
                 </Link>
-                <Link className={buttonClassName({ size: "sm", variant: "secondary" })} href="/admin/billing/payments/batch">
+                <Link
+                  className={buttonClassName({
+                    size: "sm",
+                    variant: "secondary",
+                  })}
+                  href="/admin/billing/payments/batch"
+                >
                   Batch payments
                 </Link>
               </>
             ) : null}
-            <Link className={buttonClassName({ size: "sm", variant: "secondary" })} href="/admin/billing/charges">
+            <Link
+              className={buttonClassName({ size: "sm", variant: "secondary" })}
+              href="/admin/billing/charges"
+            >
               Charges
             </Link>
           </div>
@@ -304,40 +338,76 @@ export function BillingPaymentsManagement() {
         </CardHeader>
         <CardContent className="p-0">
           {isLoadingPayments ? (
-            <div className="px-6 py-5 text-sm text-slate-500">Loading payment records...</div>
+            <div className="px-6 py-5 text-sm text-slate-500">
+              Loading payment records...
+            </div>
           ) : payments.length === 0 ? (
-            <div className="px-6 py-5 text-sm text-slate-500">No payment records found.</div>
+            <div className="px-6 py-5 text-sm text-slate-500">
+              No payment records found.
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Receipt</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Student</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">Amount</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Method</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Payment date</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Receipt
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Student
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Amount
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Method
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Payment date
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Status
+                    </th>
                     {canManage ? (
-                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">Actions</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
+                        Actions
+                      </th>
                     ) : null}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {payments.map((payment) => {
-                    const student = filteredStudents.find((entry) => entry.id === payment.studentId);
-                    const studentDisplay =
-                      student ? `${getStudentLabel(student)} (${student.username})` : payment.studentId;
+                    const student = filteredStudents.find(
+                      (entry) => entry.id === payment.studentId,
+                    );
+                    const studentDisplay = student
+                      ? `${getStudentLabel(student)} (${student.username})`
+                      : payment.studentId;
 
                     return (
-                      <tr key={payment.id} className={payment.isVoided ? "bg-slate-50 opacity-70" : "hover:bg-slate-50"}>
-                        <td className="px-4 py-3 text-sm font-mono text-slate-900">{payment.receiptNumber}</td>
-                        <td className="px-4 py-3 text-sm text-slate-700">{studentDisplay}</td>
+                      <tr
+                        key={payment.id}
+                        className={
+                          payment.isVoided
+                            ? "bg-slate-50 opacity-70"
+                            : "hover:bg-slate-50"
+                        }
+                      >
+                        <td className="px-4 py-3 text-sm font-mono text-slate-900">
+                          {payment.receiptNumber}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-700">
+                          {studentDisplay}
+                        </td>
                         <td className="px-4 py-3 text-right text-sm font-medium tabular-nums text-slate-900">
                           {formatCurrency(payment.amount)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-slate-700">{getMethodLabel(payment.method)}</td>
-                        <td className="px-4 py-3 text-sm text-slate-700">{formatDateLabel(payment.paymentDate)}</td>
+                        <td className="px-4 py-3 text-sm text-slate-700">
+                          {getMethodLabel(payment.method)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-700">
+                          {formatDateLabel(payment.paymentDate)}
+                        </td>
                         <td className="px-4 py-3 text-sm">
                           {payment.isVoided ? (
                             <Badge variant="danger">Voided</Badge>
@@ -383,7 +453,11 @@ export function BillingPaymentsManagement() {
         }}
         onConfirm={handleConfirmVoid}
         pendingLabel="Voiding..."
-        title={voidTarget ? `Void receipt ${voidTarget.receiptNumber}?` : "Void payment?"}
+        title={
+          voidTarget
+            ? `Void receipt ${voidTarget.receiptNumber}?`
+            : "Void payment?"
+        }
       />
     </div>
   );

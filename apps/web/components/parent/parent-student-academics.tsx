@@ -25,8 +25,12 @@ export function ParentStudentAcademics({ studentId }: { studentId: string }) {
   const [student, setStudent] = useState<StudentProfile | null>(null);
   const [classes, setClasses] = useState<OverviewClass[]>([]);
   const [selectedClassId, setSelectedClassId] = useState("");
-  const [overview, setOverview] = useState<StudentAcademicOverview | null>(null);
-  const [classDetail, setClassDetail] = useState<StudentInClassSummary | null>(null);
+  const [overview, setOverview] = useState<StudentAcademicOverview | null>(
+    null,
+  );
+  const [classDetail, setClassDetail] = useState<StudentInClassSummary | null>(
+    null,
+  );
   const [isLoadingGrades, setIsLoadingGrades] = useState(false);
   const [gradeError, setGradeError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,7 +45,11 @@ export function ParentStudentAcademics({ studentId }: { studentId: string }) {
         const response = await getStudentById(studentId);
         setStudent(response);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load student.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load student.",
+        );
         setStudent(null);
       } finally {
         setIsLoading(false);
@@ -69,7 +77,11 @@ export function ParentStudentAcademics({ studentId }: { studentId: string }) {
         setClasses(nextClasses);
         setSelectedClassId((current) => current || nextClasses[0]?.id || "");
       } catch (loadError) {
-        setGradeError(loadError instanceof Error ? loadError.message : "Unable to load academics.");
+        setGradeError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load academics.",
+        );
         setOverview(null);
         setClasses([]);
         setSelectedClassId("");
@@ -90,10 +102,17 @@ export function ParentStudentAcademics({ studentId }: { studentId: string }) {
       setGradeError(null);
 
       try {
-        const response = await getStudentInClassSummary(selectedClassId, studentId);
+        const response = await getStudentInClassSummary(
+          selectedClassId,
+          studentId,
+        );
         setClassDetail(response);
       } catch (loadError) {
-        setGradeError(loadError instanceof Error ? loadError.message : "Unable to load course grades.");
+        setGradeError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load course grades.",
+        );
         setClassDetail(null);
       } finally {
         setIsLoadingGrades(false);
@@ -108,7 +127,10 @@ export function ParentStudentAcademics({ studentId }: { studentId: string }) {
       <PageHeader
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link className={buttonClassName({ variant: "secondary" })} href="/parent">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/parent"
+            >
               Back to my students
             </Link>
             <Link
@@ -162,7 +184,9 @@ export function ParentStudentAcademics({ studentId }: { studentId: string }) {
                   onChange={(event) => setSelectedClassId(event.target.value)}
                   value={selectedClassId}
                 >
-                  {classes.length === 0 ? <option value="">No classes</option> : null}
+                  {classes.length === 0 ? (
+                    <option value="">No classes</option>
+                  ) : null}
                   {classes.map((schoolClass) => (
                     <option key={schoolClass.id} value={schoolClass.id}>
                       {schoolClass.name}
@@ -171,7 +195,8 @@ export function ParentStudentAcademics({ studentId }: { studentId: string }) {
                 </Select>
               </Field>
               <div className="self-end text-sm text-slate-600">
-                Overall averages may include assessments that are hidden from the published breakdown.
+                Overall averages may include assessments that are hidden from
+                the published breakdown.
               </div>
             </CardContent>
           </Card>
@@ -187,7 +212,9 @@ export function ParentStudentAcademics({ studentId }: { studentId: string }) {
                 >
                   <Card className="h-full transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-base">{entry.class.name}</CardTitle>
+                      <CardTitle className="text-base">
+                        {entry.class.name}
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-1">
                       <p className="text-sm font-medium text-slate-900">
@@ -204,7 +231,9 @@ export function ParentStudentAcademics({ studentId }: { studentId: string }) {
           ) : null}
 
           {isLoadingGrades ? (
-            <p className="text-sm text-slate-500">Loading published assessments...</p>
+            <p className="text-sm text-slate-500">
+              Loading published assessments...
+            </p>
           ) : !classDetail ? (
             <EmptyState
               title="No course detail available"
@@ -218,60 +247,101 @@ export function ParentStudentAcademics({ studentId }: { studentId: string }) {
               <CardContent className="space-y-3">
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="neutral">
-                    {classDetail.gradedCount}/{classDetail.assessmentCount} graded
+                    {classDetail.gradedCount}/{classDetail.assessmentCount}{" "}
+                    graded
                   </Badge>
                   <Badge variant="neutral">
-                    Average: {formatDisplayedPercent(classDetail.averagePercent)}
+                    Average:{" "}
+                    {formatDisplayedPercent(classDetail.averagePercent)}
                   </Badge>
-                  <Badge variant="neutral">Grade: {classDetail.averageLetterGrade ?? "—"}</Badge>
+                  <Badge variant="neutral">
+                    Grade: {classDetail.averageLetterGrade ?? "—"}
+                  </Badge>
                 </div>
 
                 <div className="overflow-hidden rounded-xl border border-slate-200">
                   <div className="overflow-x-auto">
                     <div className="space-y-4 p-4">
                       {classDetail.groups.map((group) => (
-                        <div className="space-y-2" key={group.reportingPeriod?.id ?? "unassigned"}>
+                        <div
+                          className="space-y-2"
+                          key={group.reportingPeriod?.id ?? "unassigned"}
+                        >
                           <div className="flex items-center justify-between">
                             <p className="text-sm font-semibold text-slate-900">
                               {group.reportingPeriod
                                 ? `${group.reportingPeriod.order}. ${group.reportingPeriod.name}`
                                 : "Unassigned"}
                             </p>
-                            {group.reportingPeriod?.isLocked ? <Badge variant="neutral">Locked</Badge> : null}
+                            {group.reportingPeriod?.isLocked ? (
+                              <Badge variant="neutral">Locked</Badge>
+                            ) : null}
                           </div>
                           <div className="overflow-hidden rounded-xl border border-slate-200">
                             <div className="overflow-x-auto">
                               <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                                 <thead className="bg-slate-50/80">
                                   <tr>
-                                    <th className="px-4 py-3 font-semibold text-slate-700">Assessment</th>
-                                    <th className="px-4 py-3 font-semibold text-slate-700">Type</th>
-                                    <th className="px-4 py-3 font-semibold text-slate-700">Due</th>
-                                    <th className="px-4 py-3 font-semibold text-slate-700">Weight</th>
-                                    <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                                    <th className="px-4 py-3 font-semibold text-slate-700">Percent</th>
-                                    <th className="px-4 py-3 font-semibold text-slate-700">Score</th>
+                                    <th className="px-4 py-3 font-semibold text-slate-700">
+                                      Assessment
+                                    </th>
+                                    <th className="px-4 py-3 font-semibold text-slate-700">
+                                      Type
+                                    </th>
+                                    <th className="px-4 py-3 font-semibold text-slate-700">
+                                      Due
+                                    </th>
+                                    <th className="px-4 py-3 font-semibold text-slate-700">
+                                      Weight
+                                    </th>
+                                    <th className="px-4 py-3 font-semibold text-slate-700">
+                                      Status
+                                    </th>
+                                    <th className="px-4 py-3 font-semibold text-slate-700">
+                                      Percent
+                                    </th>
+                                    <th className="px-4 py-3 font-semibold text-slate-700">
+                                      Score
+                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-200 bg-white">
                                   {group.assessments.map((assessment) => (
-                                    <tr className="align-top hover:bg-slate-50" key={assessment.id}>
+                                    <tr
+                                      className="align-top hover:bg-slate-50"
+                                      key={assessment.id}
+                                    >
                                       <td className="px-4 py-4">
-                                        <p className="font-medium text-slate-900">{assessment.title}</p>
+                                        <p className="font-medium text-slate-900">
+                                          {assessment.title}
+                                        </p>
                                         {assessment.comment ? (
-                                          <p className="mt-1 text-xs text-slate-500">{assessment.comment}</p>
+                                          <p className="mt-1 text-xs text-slate-500">
+                                            {assessment.comment}
+                                          </p>
                                         ) : null}
                                       </td>
-                                      <td className="px-4 py-4 text-slate-600">{assessment.assessmentType.name}</td>
                                       <td className="px-4 py-4 text-slate-600">
-                                        {assessment.dueAt ? formatDateLabel(assessment.dueAt) : "—"}
+                                        {assessment.assessmentType.name}
                                       </td>
-                                      <td className="px-4 py-4 text-slate-600">{assessment.weight}</td>
+                                      <td className="px-4 py-4 text-slate-600">
+                                        {assessment.dueAt
+                                          ? formatDateLabel(assessment.dueAt)
+                                          : "—"}
+                                      </td>
+                                      <td className="px-4 py-4 text-slate-600">
+                                        {assessment.weight === null ||
+                                        assessment.weight === undefined
+                                          ? "—"
+                                          : `${assessment.weight}%`}
+                                      </td>
                                       <td className="px-4 py-4 text-slate-900">
                                         {assessment.statusLabel?.key ?? "—"}
                                       </td>
                                       <td className="px-4 py-4 text-slate-900">
-                                        {formatDisplayedPercent(assessment.percent)}
+                                        {formatDisplayedPercent(
+                                          assessment.percent,
+                                        )}
                                       </td>
                                       <td className="px-4 py-4 text-slate-900">
                                         {assessment.score === null

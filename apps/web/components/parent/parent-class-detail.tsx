@@ -10,7 +10,10 @@ import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { getClassById, type SchoolClass } from "@/lib/api/classes";
 import { getStudentById, type StudentProfile } from "@/lib/api/students";
-import { getStudentInClassSummary, type StudentInClassSummary } from "@/lib/api/gradebook";
+import {
+  getStudentInClassSummary,
+  type StudentInClassSummary,
+} from "@/lib/api/gradebook";
 import { formatDateLabel, formatDisplayedPercent } from "@/lib/utils";
 
 export function ParentClassDetail({
@@ -31,11 +34,12 @@ export function ParentClassDetail({
       setIsLoading(true);
       setError(null);
 
-      const [studentResult, classResult, summaryResult] = await Promise.allSettled([
-        getStudentById(studentId),
-        getClassById(classId),
-        getStudentInClassSummary(classId, studentId),
-      ]);
+      const [studentResult, classResult, summaryResult] =
+        await Promise.allSettled([
+          getStudentById(studentId),
+          getClassById(classId),
+          getStudentInClassSummary(classId, studentId),
+        ]);
 
       if (studentResult.status === "fulfilled") {
         setStudent(studentResult.value);
@@ -70,7 +74,11 @@ export function ParentClassDetail({
     <div className="space-y-6">
       <PageHeader
         title={schoolClass ? schoolClass.name : "Course Detail"}
-        description={student ? `${student.firstName} ${student.lastName}` : "Parent-visible course detail"}
+        description={
+          student
+            ? `${student.firstName} ${student.lastName}`
+            : "Parent-visible course detail"
+        }
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
@@ -96,7 +104,9 @@ export function ParentClassDetail({
               <Badge variant="neutral">
                 Average: {formatDisplayedPercent(summary.averagePercent)}
               </Badge>
-              <Badge variant="neutral">Grade: {summary.averageLetterGrade ?? "—"}</Badge>
+              <Badge variant="neutral">
+                Grade: {summary.averageLetterGrade ?? "—"}
+              </Badge>
             </>
           ) : null
         }
@@ -127,7 +137,10 @@ export function ParentClassDetail({
           <CardContent>
             <div className="space-y-4">
               {summary.groups.map((group) => (
-                <div className="space-y-2" key={group.reportingPeriod?.id ?? "unassigned"}>
+                <div
+                  className="space-y-2"
+                  key={group.reportingPeriod?.id ?? "unassigned"}
+                >
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-slate-900">
                       {group.reportingPeriod
@@ -143,35 +156,63 @@ export function ParentClassDetail({
                       <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                         <thead className="bg-slate-50/80">
                           <tr>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Assessment</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Type</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Due</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Weight</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Percent</th>
-                            <th className="px-4 py-3 font-semibold text-slate-700">Score</th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Assessment
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Type
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Due
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Weight
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Percent
+                            </th>
+                            <th className="px-4 py-3 font-semibold text-slate-700">
+                              Score
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 bg-white">
                           {group.assessments.map((assessment) => (
-                            <tr className="align-top hover:bg-slate-50" key={assessment.id}>
+                            <tr
+                              className="align-top hover:bg-slate-50"
+                              key={assessment.id}
+                            >
                               <td className="px-4 py-4">
-                                <p className="font-medium text-slate-900">{assessment.title}</p>
+                                <p className="font-medium text-slate-900">
+                                  {assessment.title}
+                                </p>
                                 {assessment.comment ? (
-                                  <p className="mt-1 text-xs text-slate-500">{assessment.comment}</p>
+                                  <p className="mt-1 text-xs text-slate-500">
+                                    {assessment.comment}
+                                  </p>
                                 ) : null}
                               </td>
                               <td className="px-4 py-4 text-slate-600">
                                 {assessment.assessmentType.name}
                               </td>
                               <td className="px-4 py-4 text-slate-600">
-                                {assessment.dueAt ? formatDateLabel(assessment.dueAt) : "—"}
+                                {assessment.dueAt
+                                  ? formatDateLabel(assessment.dueAt)
+                                  : "—"}
                               </td>
-                              <td className="px-4 py-4 text-slate-600">{assessment.weight}</td>
+                              <td className="px-4 py-4 text-slate-600">
+                                {assessment.weight === null ||
+                                assessment.weight === undefined
+                                  ? "—"
+                                  : `${assessment.weight}%`}
+                              </td>
                               <td className="px-4 py-4 text-slate-900">
                                 {formatDisplayedPercent(assessment.percent)}
                               </td>
                               <td className="px-4 py-4 text-slate-900">
-                                {assessment.score === null ? "—" : `${assessment.score} / ${assessment.maxScore}`}
+                                {assessment.score === null
+                                  ? "—"
+                                  : `${assessment.score} / ${assessment.maxScore}`}
                               </td>
                             </tr>
                           ))}

@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { buttonClassName } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CheckboxField, Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -61,7 +67,11 @@ export function InterviewEventsManagement() {
       const title = event.title.toLowerCase();
       const description = (event.description ?? "").toLowerCase();
       const schoolName = event.school.name.toLowerCase();
-      return title.includes(query) || description.includes(query) || schoolName.includes(query);
+      return (
+        title.includes(query) ||
+        description.includes(query) ||
+        schoolName.includes(query)
+      );
     });
   }, [eventQuery, events]);
 
@@ -79,7 +89,9 @@ export function InterviewEventsManagement() {
         setSchools(schoolResponse);
 
         const defaultSchoolId =
-          getDefaultSchoolContextId(session?.user) ?? schoolResponse[0]?.id ?? "";
+          getDefaultSchoolContextId(session?.user) ??
+          schoolResponse[0]?.id ??
+          "";
         const resolvedSchoolId =
           schoolResponse.find((school) => school.id === defaultSchoolId)?.id ??
           schoolResponse[0]?.id ??
@@ -87,7 +99,11 @@ export function InterviewEventsManagement() {
 
         setSchoolId(resolvedSchoolId);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load schools.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load schools.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -152,11 +168,18 @@ export function InterviewEventsManagement() {
         title="Interview Events"
         description="Create and manage parent-teacher interview events."
         actions={
-          <Link className={buttonClassName({ variant: "primary" })} href="/admin/interviews/new">
+          <Link
+            className={buttonClassName({ variant: "primary" })}
+            href="/admin/interviews/new"
+          >
             New event
           </Link>
         }
-        meta={<Badge variant="neutral">{selectedSchool?.name ?? "All schools"}</Badge>}
+        meta={
+          <Badge variant="neutral">
+            {selectedSchool?.name ?? "All schools"}
+          </Badge>
+        }
       />
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
@@ -173,7 +196,9 @@ export function InterviewEventsManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Filters</CardTitle>
-          <CardDescription>Filter by school and publication state.</CardDescription>
+          <CardDescription>
+            Filter by school and publication state.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
           <Field htmlFor="interview-events-school" label="School">
@@ -213,7 +238,9 @@ export function InterviewEventsManagement() {
         <CardHeader>
           <CardTitle>Events</CardTitle>
           <CardDescription>
-            {isRefreshing ? "Refreshing..." : `${filteredEvents.length} event${filteredEvents.length === 1 ? "" : "s"}`}
+            {isRefreshing
+              ? "Refreshing..."
+              : `${filteredEvents.length} event${filteredEvents.length === 1 ? "" : "s"}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -230,7 +257,11 @@ export function InterviewEventsManagement() {
           {filteredEvents.length === 0 ? (
             <EmptyState
               compact
-              title={events.length === 0 ? "No interview events" : "No matching events"}
+              title={
+                events.length === 0
+                  ? "No interview events"
+                  : "No matching events"
+              }
               description={
                 events.length === 0
                   ? "No events match the current filter options."
@@ -243,12 +274,24 @@ export function InterviewEventsManagement() {
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Event</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Booking Window</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Date Range</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Slots</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">State</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Action</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Event
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Booking Window
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Date Range
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Slots
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        State
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
@@ -256,29 +299,53 @@ export function InterviewEventsManagement() {
                       const state = formatEventState(event);
 
                       return (
-                        <tr className="align-top hover:bg-slate-50" key={event.id}>
+                        <tr
+                          className="align-top hover:bg-slate-50"
+                          key={event.id}
+                        >
                           <td className="px-4 py-3">
-                            <p className="font-medium text-slate-900">{event.title}</p>
-                            <p className="mt-1 text-xs text-slate-500">{event.school.name}</p>
+                            <p className="font-medium text-slate-900">
+                              {event.title}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {event.school.name}
+                            </p>
                             {event.description ? (
-                              <p className="mt-1 text-xs text-slate-500">{event.description}</p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {event.description}
+                              </p>
                             ) : null}
                           </td>
                           <td className="px-4 py-3 text-slate-600">
-                            <p>{event.bookingOpensAt ? formatDateTimeLabel(event.bookingOpensAt) : "No open date"}</p>
-                            <p className="mt-1">{event.bookingClosesAt ? formatDateTimeLabel(event.bookingClosesAt) : "No close date"}</p>
+                            <p>
+                              {event.bookingOpensAt
+                                ? formatDateTimeLabel(event.bookingOpensAt)
+                                : "No open date"}
+                            </p>
+                            <p className="mt-1">
+                              {event.bookingClosesAt
+                                ? formatDateTimeLabel(event.bookingClosesAt)
+                                : "No close date"}
+                            </p>
                           </td>
                           <td className="px-4 py-3 text-slate-600">
                             <p>{formatDateTimeLabel(event.startsAt)}</p>
-                            <p className="mt-1">{formatDateTimeLabel(event.endsAt)}</p>
+                            <p className="mt-1">
+                              {formatDateTimeLabel(event.endsAt)}
+                            </p>
                           </td>
-                          <td className="px-4 py-3 text-slate-600">{event._count.slots}</td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {event._count.slots}
+                          </td>
                           <td className="px-4 py-3">
                             <Badge variant={state.variant}>{state.label}</Badge>
                           </td>
                           <td className="px-4 py-3">
                             <Link
-                              className={buttonClassName({ size: "sm", variant: "secondary" })}
+                              className={buttonClassName({
+                                size: "sm",
+                                variant: "secondary",
+                              })}
                               href={`/admin/interviews/${encodeURIComponent(event.id)}`}
                             >
                               Manage

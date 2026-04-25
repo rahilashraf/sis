@@ -10,6 +10,7 @@ import {
   ChargeStatus,
   LibraryFineReason,
   LibraryFineStatus,
+  LibraryHoldStatus,
   LibraryLateFineFrequency,
   LibraryItemStatus,
   LibraryLoanStatus,
@@ -27,8 +28,10 @@ import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/schoo
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CheckoutLibraryLoanDto } from './dto/checkout-library-loan.dto';
+import { CreateLibraryHoldDto } from './dto/create-library-hold.dto';
 import { CreateLibraryItemDto } from './dto/create-library-item.dto';
 import { ListLibraryItemsQueryDto } from './dto/list-library-items-query.dto';
+import { ListLibraryHoldsQueryDto } from './dto/list-library-holds-query.dto';
 import { ListLibraryLoansQueryDto } from './dto/list-library-loans-query.dto';
 import { ListLibraryOverdueQueryDto } from './dto/list-library-overdue-query.dto';
 import { GetLibraryFineSettingsQueryDto } from './dto/get-library-fine-settings-query.dto';
@@ -39,6 +42,7 @@ import { WaiveLibraryFineDto } from './dto/waive-library-fine.dto';
 import { AssessLibraryOverdueFinesDto } from './dto/assess-library-overdue-fines.dto';
 import { AssessUnclaimedHoldFineDto } from './dto/assess-unclaimed-hold-fine.dto';
 import { ReturnLibraryLoanDto } from './dto/return-library-loan.dto';
+import { UpdateLibraryHoldDto } from './dto/update-library-hold.dto';
 import { UpdateLibraryItemDto } from './dto/update-library-item.dto';
 import { MarkLibraryLoanLostDto } from './dto/mark-library-loan-lost.dto';
 
@@ -132,6 +136,65 @@ const libraryLoanSelect = Prisma.validator<Prisma.LibraryLoanSelect>()({
 });
 
 type LoanRecord = Prisma.LibraryLoanGetPayload<{ select: typeof libraryLoanSelect }>;
+
+const libraryHoldSelect = Prisma.validator<Prisma.LibraryHoldSelect>()({
+  id: true,
+  schoolId: true,
+  itemId: true,
+  studentId: true,
+  createdByUserId: true,
+  status: true,
+  notes: true,
+  resolvedAt: true,
+  resolvedByUserId: true,
+  createdAt: true,
+  updatedAt: true,
+  school: {
+    select: {
+      id: true,
+      name: true,
+      shortName: true,
+    },
+  },
+  item: {
+    select: {
+      id: true,
+      title: true,
+      author: true,
+      isbn: true,
+      barcode: true,
+      category: true,
+      status: true,
+      availableCopies: true,
+      totalCopies: true,
+    },
+  },
+  student: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      username: true,
+      email: true,
+    },
+  },
+  createdBy: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      username: true,
+    },
+  },
+  resolvedBy: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      username: true,
+    },
+  },
+});
 
 const libraryFineSettingsSelect =
   Prisma.validator<Prisma.LibraryFineSettingsSelect>()({
@@ -390,6 +453,60 @@ export class LibraryService {
       ...fine,
       status: effectiveStatus,
     };
+  }
+
+  private mapHoldRecord(
+    hold: Prisma.LibraryHoldGetPayload<{ select: typeof libraryHoldSelect }>,
+  ) {
+    return hold;
+  }
+
+  private getActorSchoolIds(actor: AuthenticatedUser) {
+    return getAccessibleSchoolIdsWithLegacyFallback({
+      memberships: actor.memberships,
+      legacySchoolId: actor.schoolId ?? null,
+    });
+  }
+
+  private async ensureParentLinkedStudentOrThrow(
+    actor: AuthenticatedUser,
+    studentId: string,
+  ) {
+    if (actor.role !== UserRole.PARENT) {
+      throw new ForbiddenException('Only parents can access this endpoint');
+    }
+
+    const link = await this.prisma.studentParentLink.findUnique({
+      where: {
+        parentId_studentId: {
+          parentId: actor.id,
+          studentId,
+        },
+      },
+      select: {
+        student: {
+          select: {
+            id: true,
+            role: true,
+            schoolId: true,
+            memberships: {
+              where: {
+                isActive: true,
+              },
+              select: {
+                schoolId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!link || link.student.role !== UserRole.STUDENT) {
+      throw new ForbiddenException('You are not linked to this student');
+    }
+
+    return link.student;
   }
 
   private async getFineSettingsOrCreate(schoolId: string) {
@@ -949,6 +1066,171 @@ export class LibraryService {
     });
   }
 
+  async listStudentCatalog(actor: AuthenticatedUser) {
+    if (actor.role !== UserRole.STUDENT) {
+      throw new ForbiddenException('Only students can access this endpoint');
+    }
+
+    const schoolIds = this.getActorSchoolIds(actor);
+    if (schoolIds.length === 0) {
+      throw new ForbiddenException('You do not have school access');
+    }
+
+    return this.prisma.libraryItem.findMany({
+      where: {
+        schoolId: { in: schoolIds },
+        status: {
+          in: [LibraryItemStatus.AVAILABLE, LibraryItemStatus.CHECKED_OUT],
+        },
+      },
+      orderBy: [{ title: 'asc' }, { createdAt: 'desc' }],
+      select: libraryItemSelect,
+    });
+  }
+
+  async createStudentHold(actor: AuthenticatedUser, body: CreateLibraryHoldDto) {
+    if (actor.role !== UserRole.STUDENT) {
+      throw new ForbiddenException('Only students can place library holds');
+    }
+
+    const item = await this.prisma.libraryItem.findUnique({
+      where: { id: body.itemId },
+      select: {
+        id: true,
+        schoolId: true,
+        status: true,
+        availableCopies: true,
+      },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Library item not found');
+    }
+
+    const schoolIds = this.getActorSchoolIds(actor);
+    if (!schoolIds.includes(item.schoolId)) {
+      throw new ForbiddenException('You do not have access to this school');
+    }
+
+    if (item.status === LibraryItemStatus.ARCHIVED || item.status === LibraryItemStatus.LOST) {
+      throw new BadRequestException('This item is not eligible for holds');
+    }
+
+    if (item.availableCopies > 0) {
+      throw new ConflictException('This item is currently available and does not require a hold');
+    }
+
+    const existing = await this.prisma.libraryHold.findFirst({
+      where: {
+        schoolId: item.schoolId,
+        itemId: item.id,
+        studentId: actor.id,
+        status: LibraryHoldStatus.ACTIVE,
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      throw new ConflictException('You already have an active hold for this item');
+    }
+
+    const created = await this.prisma.libraryHold.create({
+      data: {
+        schoolId: item.schoolId,
+        itemId: item.id,
+        studentId: actor.id,
+        createdByUserId: actor.id,
+        status: LibraryHoldStatus.ACTIVE,
+        notes: body.notes ?? null,
+      },
+      select: libraryHoldSelect,
+    });
+
+    return this.mapHoldRecord(created);
+  }
+
+  async listMyStudentHolds(actor: AuthenticatedUser) {
+    if (actor.role !== UserRole.STUDENT) {
+      throw new ForbiddenException('Only students can access this endpoint');
+    }
+
+    const schoolIds = this.getActorSchoolIds(actor);
+    if (schoolIds.length === 0) {
+      throw new ForbiddenException('You do not have school access');
+    }
+
+    const rows = await this.prisma.libraryHold.findMany({
+      where: {
+        studentId: actor.id,
+        schoolId: {
+          in: schoolIds,
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      select: libraryHoldSelect,
+    });
+
+    return rows.map((row) => this.mapHoldRecord(row));
+  }
+
+  async listHolds(actor: AuthenticatedUser, query: ListLibraryHoldsQueryDto) {
+    this.ensureCanManage(actor);
+
+    const scopeSchoolIds = this.buildScopeSchoolIds(actor, query.schoolId);
+    const rows = await this.prisma.libraryHold.findMany({
+      where: {
+        ...(scopeSchoolIds ? { schoolId: { in: scopeSchoolIds } } : {}),
+        ...(query.studentId ? { studentId: query.studentId } : {}),
+        ...(query.itemId ? { itemId: query.itemId } : {}),
+        ...(query.status ? { status: query.status } : {}),
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      select: libraryHoldSelect,
+    });
+
+    return rows.map((row) => this.mapHoldRecord(row));
+  }
+
+  async updateHold(actor: AuthenticatedUser, holdId: string, body: UpdateLibraryHoldDto) {
+    this.ensureCanManage(actor);
+
+    const hold = await this.prisma.libraryHold.findUnique({
+      where: { id: holdId },
+      select: {
+        id: true,
+        schoolId: true,
+        status: true,
+      },
+    });
+
+    if (!hold) {
+      throw new NotFoundException('Library hold not found');
+    }
+
+    this.ensureCanAccessSchool(actor, hold.schoolId);
+
+    if (hold.status !== LibraryHoldStatus.ACTIVE) {
+      throw new ConflictException('Only active holds can be updated');
+    }
+
+    if (body.status === LibraryHoldStatus.ACTIVE) {
+      throw new BadRequestException('Holds can only be updated to CANCELLED or FULFILLED');
+    }
+
+    const updated = await this.prisma.libraryHold.update({
+      where: { id: hold.id },
+      data: {
+        status: body.status,
+        notes: body.notes ?? undefined,
+        resolvedAt: new Date(),
+        resolvedByUserId: actor.id,
+      },
+      select: libraryHoldSelect,
+    });
+
+    return this.mapHoldRecord(updated);
+  }
+
   async listItems(actor: AuthenticatedUser, query: ListLibraryItemsQueryDto) {
     this.ensureCanManage(actor);
 
@@ -1056,23 +1338,55 @@ export class LibraryService {
 
     this.ensureCanAccessSchool(actor, existing.schoolId);
 
+    const activeLoans = await this.prisma.libraryLoan.findMany({
+      where: {
+        itemId: existing.id,
+        returnedAt: null,
+        status: {
+          in: [LibraryLoanStatus.ACTIVE, LibraryLoanStatus.OVERDUE],
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const activeLoanCount = activeLoans.length;
+
     const nextTotalCopies = body.totalCopies ?? existing.totalCopies;
-    const currentCheckedOut = Math.max(0, existing.totalCopies - existing.availableCopies);
+
+    if (nextTotalCopies < activeLoanCount) {
+      throw new BadRequestException(
+        `totalCopies cannot be less than active checkouts (${activeLoanCount})`,
+      );
+    }
+
+    const maxAvailableCopies = Math.max(0, nextTotalCopies - activeLoanCount);
 
     let nextAvailableCopies = body.availableCopies;
 
     if (nextAvailableCopies === undefined) {
-      nextAvailableCopies = Math.max(0, nextTotalCopies - currentCheckedOut);
+      nextAvailableCopies = maxAvailableCopies;
     }
 
     if (nextAvailableCopies > nextTotalCopies) {
-      throw new BadRequestException('availableCopies cannot exceed totalCopies');
+      throw new BadRequestException(
+        'availableCopies cannot exceed totalCopies',
+      );
     }
 
-    const status = this.normalizeItemStatus({
-      status: body.status ?? existing.status,
-      availableCopies: nextAvailableCopies,
-    });
+    if (nextAvailableCopies > maxAvailableCopies) {
+      throw new BadRequestException(
+        `availableCopies cannot exceed non-checked-out copies (${maxAvailableCopies})`,
+      );
+    }
+
+    const status =
+      body.status ??
+      this.normalizeItemStatus({
+        status: existing.status,
+        availableCopies: nextAvailableCopies,
+      });
 
     return this.prisma.libraryItem.update({
       where: { id: existing.id },
@@ -1698,30 +2012,7 @@ export class LibraryService {
   }
 
   async listParentStudentLoans(actor: AuthenticatedUser, studentId: string) {
-    if (actor.role !== UserRole.PARENT) {
-      throw new ForbiddenException('Only parents can access this endpoint');
-    }
-
-    const link = await this.prisma.studentParentLink.findUnique({
-      where: {
-        parentId_studentId: {
-          parentId: actor.id,
-          studentId,
-        },
-      },
-      select: {
-        student: {
-          select: {
-            id: true,
-            role: true,
-          },
-        },
-      },
-    });
-
-    if (!link || link.student.role !== UserRole.STUDENT) {
-      throw new ForbiddenException('You are not linked to this student');
-    }
+    await this.ensureParentLinkedStudentOrThrow(actor, studentId);
 
     const todayStart = this.startOfToday();
 
@@ -1752,6 +2043,112 @@ export class LibraryService {
           daysOverdue,
         };
       }),
+    };
+  }
+
+  async listParentStudentCatalog(actor: AuthenticatedUser, studentId: string) {
+    const student = await this.ensureParentLinkedStudentOrThrow(actor, studentId);
+    const studentSchoolIds = getAccessibleSchoolIdsWithLegacyFallback({
+      memberships: student.memberships,
+      legacySchoolId: student.schoolId ?? null,
+    });
+
+    if (studentSchoolIds.length === 0) {
+      return [];
+    }
+
+    return this.prisma.libraryItem.findMany({
+      where: {
+        schoolId: { in: studentSchoolIds },
+        status: {
+          in: [LibraryItemStatus.AVAILABLE, LibraryItemStatus.CHECKED_OUT],
+        },
+      },
+      orderBy: [{ title: 'asc' }, { createdAt: 'desc' }],
+      select: libraryItemSelect,
+    });
+  }
+
+  async createParentStudentHold(
+    actor: AuthenticatedUser,
+    studentId: string,
+    body: CreateLibraryHoldDto,
+  ) {
+    const student = await this.ensureParentLinkedStudentOrThrow(actor, studentId);
+    const studentSchoolIds = getAccessibleSchoolIdsWithLegacyFallback({
+      memberships: student.memberships,
+      legacySchoolId: student.schoolId ?? null,
+    });
+
+    const item = await this.prisma.libraryItem.findUnique({
+      where: { id: body.itemId },
+      select: {
+        id: true,
+        schoolId: true,
+        status: true,
+        availableCopies: true,
+      },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Library item not found');
+    }
+
+    if (!studentSchoolIds.includes(item.schoolId)) {
+      throw new ForbiddenException("Selected item is not in this student's school");
+    }
+
+    if (item.status === LibraryItemStatus.ARCHIVED || item.status === LibraryItemStatus.LOST) {
+      throw new BadRequestException('This item is not eligible for holds');
+    }
+
+    if (item.availableCopies > 0) {
+      throw new ConflictException('This item is currently available and does not require a hold');
+    }
+
+    const existing = await this.prisma.libraryHold.findFirst({
+      where: {
+        schoolId: item.schoolId,
+        itemId: item.id,
+        studentId: student.id,
+        status: LibraryHoldStatus.ACTIVE,
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      throw new ConflictException('This student already has an active hold for this item');
+    }
+
+    const created = await this.prisma.libraryHold.create({
+      data: {
+        schoolId: item.schoolId,
+        itemId: item.id,
+        studentId: student.id,
+        createdByUserId: actor.id,
+        status: LibraryHoldStatus.ACTIVE,
+        notes: body.notes ?? null,
+      },
+      select: libraryHoldSelect,
+    });
+
+    return this.mapHoldRecord(created);
+  }
+
+  async listParentStudentHolds(actor: AuthenticatedUser, studentId: string) {
+    await this.ensureParentLinkedStudentOrThrow(actor, studentId);
+
+    const rows = await this.prisma.libraryHold.findMany({
+      where: {
+        studentId,
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      select: libraryHoldSelect,
+    });
+
+    return {
+      studentId,
+      holds: rows.map((row) => this.mapHoldRecord(row)),
     };
   }
 }

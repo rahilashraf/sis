@@ -57,7 +57,9 @@ export function StudentStatementView({
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Unable to load statement");
+          setError(
+            err instanceof Error ? err.message : "Unable to load statement",
+          );
           setIsLoading(false);
         }
       });
@@ -70,7 +72,10 @@ export function StudentStatementView({
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Account Statement" description="Loading statement..." />
+        <PageHeader
+          title="Account Statement"
+          description="Loading statement..."
+        />
         <div className="text-center text-sm text-slate-500">Loading...</div>
       </div>
     );
@@ -79,7 +84,10 @@ export function StudentStatementView({
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Account Statement" description="Statement not found or access denied" />
+        <PageHeader
+          title="Account Statement"
+          description="Statement not found or access denied"
+        />
         <Notice tone="danger">{error}</Notice>
       </div>
     );
@@ -88,7 +96,10 @@ export function StudentStatementView({
   if (!statement) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Account Statement" description="Statement not found" />
+        <PageHeader
+          title="Account Statement"
+          description="Statement not found"
+        />
       </div>
     );
   }
@@ -127,7 +138,9 @@ export function StudentStatementView({
         {/* Header */}
         <div className="border-b border-slate-200 pb-6 print:pb-4">
           <div className="mb-4">
-            <h1 className="text-2xl font-bold text-slate-900">ACCOUNT STATEMENT</h1>
+            <h1 className="text-2xl font-bold text-slate-900">
+              ACCOUNT STATEMENT
+            </h1>
             <p className="mt-1 text-sm text-slate-500">
               Generated{" "}
               {formatDateTimeLabel(statement.generatedAt, {
@@ -152,7 +165,9 @@ export function StudentStatementView({
               <p className="mt-1 text-sm font-medium text-slate-900">
                 {statement.student.firstName} {statement.student.lastName}
               </p>
-              <p className="text-xs text-slate-500">{statement.student.username}</p>
+              <p className="text-xs text-slate-500">
+                {statement.student.username}
+              </p>
             </div>
           </div>
         </div>
@@ -160,19 +175,25 @@ export function StudentStatementView({
         {/* Summary */}
         <div className="grid grid-cols-3 gap-4">
           <div className="rounded-lg bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase text-slate-600">Current Balance</p>
+            <p className="text-xs font-semibold uppercase text-slate-600">
+              Current Balance
+            </p>
             <p className="mt-2 text-2xl font-bold text-slate-900">
               {formatCurrency(statement.currentBalance)}
             </p>
           </div>
           <div className="rounded-lg bg-red-50 p-4">
-            <p className="text-xs font-semibold uppercase text-slate-600">Overdue Balance</p>
+            <p className="text-xs font-semibold uppercase text-slate-600">
+              Overdue Balance
+            </p>
             <p className="mt-2 text-2xl font-bold text-red-600">
               {formatCurrency(statement.overdueBalance)}
             </p>
           </div>
           <div className="rounded-lg bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase text-slate-600">Total Charges</p>
+            <p className="text-xs font-semibold uppercase text-slate-600">
+              Total Charges
+            </p>
             <p className="mt-2 text-2xl font-bold text-slate-900">
               {statement.allCharges.length}
             </p>
@@ -182,7 +203,9 @@ export function StudentStatementView({
         {/* Charges Section */}
         {statement.allCharges.length > 0 && (
           <div>
-            <h2 className="mb-4 text-lg font-semibold text-slate-900">Charges</h2>
+            <h2 className="mb-4 text-lg font-semibold text-slate-900">
+              Charges
+            </h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -199,7 +222,9 @@ export function StudentStatementView({
                     <th className="px-4 py-3 text-right font-semibold text-slate-700">
                       Paid
                     </th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">Due</th>
+                    <th className="px-4 py-3 text-right font-semibold text-slate-700">
+                      Due
+                    </th>
                     <th className="px-4 py-3 text-center font-semibold text-slate-700">
                       Status
                     </th>
@@ -214,12 +239,17 @@ export function StudentStatementView({
                       <td className="px-4 py-3 text-slate-900">
                         <div className="flex flex-wrap items-center gap-2">
                           <span>{charge.title}</span>
-                          {charge.libraryFine ? <Badge variant="primary">Library fine</Badge> : null}
+                          {charge.libraryFine ? (
+                            <Badge variant="primary">Library fine</Badge>
+                          ) : null}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         {charge.dueDate
-                          ? formatDateTimeLabel(charge.dueDate, { month: "short", day: "numeric" })
+                          ? formatDateTimeLabel(charge.dueDate, {
+                              month: "short",
+                              day: "numeric",
+                            })
                           : "—"}
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-slate-900">
@@ -257,7 +287,9 @@ export function StudentStatementView({
         {/* Payments Section */}
         {statement.allPayments.length > 0 && (
           <div>
-            <h2 className="mb-4 text-lg font-semibold text-slate-900">Recent Payments</h2>
+            <h2 className="mb-4 text-lg font-semibold text-slate-900">
+              Recent Payments
+            </h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -265,11 +297,15 @@ export function StudentStatementView({
                     <th className="px-4 py-3 text-left font-semibold text-slate-700">
                       Payment Date
                     </th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Method</th>
+                    <th className="px-4 py-3 text-left font-semibold text-slate-700">
+                      Method
+                    </th>
                     <th className="px-4 py-3 text-left font-semibold text-slate-700">
                       Reference
                     </th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">Amount</th>
+                    <th className="px-4 py-3 text-right font-semibold text-slate-700">
+                      Amount
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -285,7 +321,9 @@ export function StudentStatementView({
                           year: "numeric",
                         })}
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{payment.method}</td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {payment.method}
+                      </td>
                       <td className="px-4 py-3 text-sm text-slate-500">
                         {payment.referenceNumber || "—"}
                       </td>
@@ -302,7 +340,10 @@ export function StudentStatementView({
 
         {/* Footer */}
         <div className="border-t border-slate-200 pt-6 text-center text-xs text-slate-500 print:border-t-0 print:pt-4">
-          <p>This is an official account statement. Please contact the school for any questions.</p>
+          <p>
+            This is an official account statement. Please contact the school for
+            any questions.
+          </p>
         </div>
       </div>
     </div>

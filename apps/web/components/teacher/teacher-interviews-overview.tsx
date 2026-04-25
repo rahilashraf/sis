@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { buttonClassName } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -48,7 +54,11 @@ export function TeacherInterviewsOverview({ eventId }: { eventId?: string }) {
       setSlots(response);
     } catch (loadError) {
       setSlots([]);
-      setError(loadError instanceof Error ? loadError.message : "Unable to load interview slots.");
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load interview slots.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -143,7 +153,10 @@ export function TeacherInterviewsOverview({ eventId }: { eventId?: string }) {
         description="Review your interview schedule and booked parent/student details."
         actions={
           eventId ? (
-            <Link className={buttonClassName({ variant: "secondary" })} href="/teacher/interviews">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/teacher/interviews"
+            >
               View all events
             </Link>
           ) : null
@@ -172,7 +185,9 @@ export function TeacherInterviewsOverview({ eventId }: { eventId?: string }) {
             <Field htmlFor="teacher-interview-event" label="Interview event">
               <Select
                 id="teacher-interview-event"
-                onChange={(changeEvent) => setSelectedEventId(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setSelectedEventId(changeEvent.target.value)
+                }
                 value={selectedEventId}
               >
                 <option value="">All events</option>
@@ -202,21 +217,27 @@ export function TeacherInterviewsOverview({ eventId }: { eventId?: string }) {
             <CardTitle className="text-base">Booked</CardTitle>
             <CardDescription>Confirmed parent appointments</CardDescription>
           </CardHeader>
-          <CardContent className="text-sm font-semibold text-slate-900">{counts.booked}</CardContent>
+          <CardContent className="text-sm font-semibold text-slate-900">
+            {counts.booked}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Available</CardTitle>
             <CardDescription>Open slots for booking</CardDescription>
           </CardHeader>
-          <CardContent className="text-sm font-semibold text-slate-900">{counts.available}</CardContent>
+          <CardContent className="text-sm font-semibold text-slate-900">
+            {counts.available}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Cancelled</CardTitle>
             <CardDescription>Cancelled slots</CardDescription>
           </CardHeader>
-          <CardContent className="text-sm font-semibold text-slate-900">{counts.cancelled}</CardContent>
+          <CardContent className="text-sm font-semibold text-slate-900">
+            {counts.cancelled}
+          </CardContent>
         </Card>
       </div>
 
@@ -224,7 +245,9 @@ export function TeacherInterviewsOverview({ eventId }: { eventId?: string }) {
         <CardHeader>
           <CardTitle>{selectedEventTitle ?? "Interview Slots"}</CardTitle>
           <CardDescription>
-            {isLoading ? "Loading..." : "Your schedule with booking status and participant details."}
+            {isLoading
+              ? "Loading..."
+              : "Your schedule with booking status and participant details."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -232,7 +255,9 @@ export function TeacherInterviewsOverview({ eventId }: { eventId?: string }) {
             <Field htmlFor="teacher-interview-slot-query" label="Search slots">
               <Input
                 id="teacher-interview-slot-query"
-                onChange={(changeEvent) => setSlotQuery(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setSlotQuery(changeEvent.target.value)
+                }
                 placeholder="Search by class, student, parent, or event"
                 value={slotQuery}
               />
@@ -243,7 +268,11 @@ export function TeacherInterviewsOverview({ eventId }: { eventId?: string }) {
           ) : filteredSlots.length === 0 ? (
             <EmptyState
               compact
-              title={eventScopedSlots.length === 0 ? "No interview slots" : "No matching slots"}
+              title={
+                eventScopedSlots.length === 0
+                  ? "No interview slots"
+                  : "No matching slots"
+              }
               description={
                 eventScopedSlots.length === 0
                   ? "No interview slots are currently assigned to you."
@@ -256,23 +285,43 @@ export function TeacherInterviewsOverview({ eventId }: { eventId?: string }) {
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Event</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Class</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Time</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Parent</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Event
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Class
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Time
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Student
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Parent
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Status
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {filteredSlots.map((slot) => (
                       <tr className="align-top hover:bg-slate-50" key={slot.id}>
-                        <td className="px-4 py-3 text-slate-900">{slot.interviewEvent.title}</td>
-                        <td className="px-4 py-3 text-slate-600">{slot.class?.name ?? "—"}</td>
+                        <td className="px-4 py-3 text-slate-900">
+                          {slot.interviewEvent.title}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {slot.class?.name ?? "—"}
+                        </td>
                         <td className="px-4 py-3 text-slate-600">
                           <p>{formatDateTimeLabel(slot.startTime)}</p>
-                          <p className="mt-1">{formatDateTimeLabel(slot.endTime)}</p>
-                          {slot.location ? <p className="mt-1 text-xs">{slot.location}</p> : null}
+                          <p className="mt-1">
+                            {formatDateTimeLabel(slot.endTime)}
+                          </p>
+                          {slot.location ? (
+                            <p className="mt-1 text-xs">{slot.location}</p>
+                          ) : null}
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           {slot.bookedStudent
@@ -283,10 +332,13 @@ export function TeacherInterviewsOverview({ eventId }: { eventId?: string }) {
                           {slot.bookedParent ? (
                             <div>
                               <p>
-                                {slot.bookedParent.firstName} {slot.bookedParent.lastName}
+                                {slot.bookedParent.firstName}{" "}
+                                {slot.bookedParent.lastName}
                               </p>
                               {slot.bookedParent.email ? (
-                                <p className="mt-1 text-xs">{slot.bookedParent.email}</p>
+                                <p className="mt-1 text-xs">
+                                  {slot.bookedParent.email}
+                                </p>
                               ) : null}
                             </div>
                           ) : (

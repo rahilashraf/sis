@@ -5,7 +5,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { useAuth } from "@/lib/auth/auth-context";
-import { getDefaultRouteForRole, isPathAllowedForRole } from "@/lib/auth/role-routing";
+import {
+  getDefaultRouteForRole,
+  isPathAllowedForRole,
+} from "@/lib/auth/role-routing";
 
 export default function AuthenticatedLayout({
   children,
@@ -50,7 +53,10 @@ export default function AuthenticatedLayout({
       <main className="flex min-h-screen items-center justify-center px-6">
         <div className="space-y-2 text-center">
           <p className="text-sm text-slate-500">Checking session...</p>
-          <Link className="text-sm font-medium text-slate-700 underline" href="/login">
+          <Link
+            className="text-sm font-medium text-slate-700 underline"
+            href="/login"
+          >
             Continue to login
           </Link>
         </div>
@@ -63,7 +69,10 @@ export default function AuthenticatedLayout({
       <main className="flex min-h-screen items-center justify-center px-6">
         <div className="space-y-2 text-center">
           <p className="text-sm text-slate-500">Redirecting to sign in…</p>
-          <Link className="text-sm font-medium text-slate-700 underline" href="/login">
+          <Link
+            className="text-sm font-medium text-slate-700 underline"
+            href="/login"
+          >
             Go to login
           </Link>
         </div>

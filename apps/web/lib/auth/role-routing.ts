@@ -35,9 +35,23 @@ const interviewNavigationChildren: NavigationItem["children"] = [
 
 function buildAdminBaseItems(): NavigationItem[] {
   return [
-    { href: "/admin/users", label: "Users" },
+    {
+      href: "/admin/users",
+      label: "Users",
+      children: [
+        { href: "/admin/users", label: "Directory" },
+        { href: "/admin/users/student-profiles", label: "Student Profiles" },
+      ],
+    },
     { href: "/admin/attendance", label: "Attendance" },
-    { href: "/admin/classes", label: "Classes" },
+    {
+      href: "/admin/classes",
+      label: "Classes",
+      children: [
+        { href: "/admin/classes", label: "Directory" },
+        { href: "/admin/classes/bulk-enrollment", label: "Bulk Enrollment" },
+      ],
+    },
     { href: "/admin/gradebook", label: "Gradebook" },
     { href: "/admin/timetable", label: "Timetable" },
     {
@@ -68,7 +82,9 @@ function buildAdminBaseItems(): NavigationItem[] {
     {
       href: "/admin/behavior",
       label: "Incident Reports",
-      children: [{ href: "/admin/behavior-categories", label: "Incident Categories" }],
+      children: [
+        { href: "/admin/behavior-categories", label: "Incident Categories" },
+      ],
     },
     {
       href: "/admin/schools",
@@ -120,7 +136,9 @@ function buildAdminItems(options: {
       if (item.href === "/admin/behavior") {
         return {
           ...item,
-          children: options.includeIncidentCategories ? item.children : undefined,
+          children: options.includeIncidentCategories
+            ? item.children
+            : undefined,
         };
       }
 
@@ -141,7 +159,7 @@ export function getDefaultRouteForRole(role: UserRole) {
   }
 
   if (role === "TEACHER") {
-    return "/teacher";
+    return "/teacher/dashboard";
   }
 
   if (role === "SUPPLY_TEACHER") {
@@ -262,6 +280,7 @@ export function getNavigationItems(role: UserRole) {
   if (role === "STUDENT") {
     items.push(
       { href: "/student/timetable", label: "Timetable" },
+      { href: "/student/library", label: "Library" },
       { href: "/notifications", label: "Notifications" },
     );
   }

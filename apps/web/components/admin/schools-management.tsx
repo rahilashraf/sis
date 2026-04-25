@@ -65,7 +65,12 @@ type EditSchoolYearFormState = {
 };
 
 type ActionTarget =
-  | { action: "activate" | "archive" | "delete"; id: string; kind: "school"; label: string }
+  | {
+      action: "activate" | "archive" | "delete";
+      id: string;
+      kind: "school";
+      label: string;
+    }
   | {
       action: "activate" | "archive" | "delete";
       id: string;
@@ -99,7 +104,9 @@ function buildSchoolYearForm(schoolYear: SchoolYear): EditSchoolYearFormState {
   };
 }
 
-function buildCreateSchoolYearForm(schoolId: string): CreateSchoolYearFormState {
+function buildCreateSchoolYearForm(
+  schoolId: string,
+): CreateSchoolYearFormState {
   return {
     schoolId,
     name: "",
@@ -119,7 +126,10 @@ function validateSchoolName(name: string) {
 }
 
 function validateSchoolYearForm(
-  form: Pick<CreateSchoolYearFormState, "endDate" | "name" | "schoolId" | "startDate">,
+  form: Pick<
+    CreateSchoolYearFormState,
+    "endDate" | "name" | "schoolId" | "startDate"
+  >,
 ) {
   if (!form.schoolId) {
     throw new Error("Select a school before creating a school year.");
@@ -166,14 +176,18 @@ function getActionTitle(actionTarget: ActionTarget | null) {
       return "Remove school";
     }
 
-    return actionTarget.action === "archive" ? "Archive school" : "Unarchive school";
+    return actionTarget.action === "archive"
+      ? "Archive school"
+      : "Unarchive school";
   }
 
   if (actionTarget.action === "delete") {
     return "Remove school year";
   }
 
-  return actionTarget.action === "archive" ? "Archive school year" : "Unarchive school year";
+  return actionTarget.action === "archive"
+    ? "Archive school year"
+    : "Unarchive school year";
 }
 
 function getActionDescription(actionTarget: ActionTarget | null) {
@@ -206,7 +220,9 @@ function getActionConfirmLabel(actionTarget: ActionTarget | null) {
   }
 
   if (actionTarget.action === "delete") {
-    return actionTarget.kind === "school" ? "Remove school" : "Remove school year";
+    return actionTarget.kind === "school"
+      ? "Remove school"
+      : "Remove school year";
   }
 
   return actionTarget.action === "archive"
@@ -247,16 +263,20 @@ export function SchoolsManagement() {
   const [selectedSchoolId, setSelectedSchoolId] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [isCreateSchoolOpen, setIsCreateSchoolOpen] = useState(false);
-  const [createSchoolForm, setCreateSchoolForm] = useState<CreateSchoolFormState>(
-    buildCreateSchoolForm(),
-  );
+  const [createSchoolForm, setCreateSchoolForm] =
+    useState<CreateSchoolFormState>(buildCreateSchoolForm());
   const [editingSchool, setEditingSchool] = useState<School | null>(null);
-  const [schoolForm, setSchoolForm] = useState<EditSchoolFormState | null>(null);
+  const [schoolForm, setSchoolForm] = useState<EditSchoolFormState | null>(
+    null,
+  );
   const [isCreateSchoolYearOpen, setIsCreateSchoolYearOpen] = useState(false);
   const [createSchoolYearForm, setCreateSchoolYearForm] =
     useState<CreateSchoolYearFormState>(buildCreateSchoolYearForm(""));
-  const [editingSchoolYear, setEditingSchoolYear] = useState<SchoolYear | null>(null);
-  const [schoolYearForm, setSchoolYearForm] = useState<EditSchoolYearFormState | null>(null);
+  const [editingSchoolYear, setEditingSchoolYear] = useState<SchoolYear | null>(
+    null,
+  );
+  const [schoolYearForm, setSchoolYearForm] =
+    useState<EditSchoolYearFormState | null>(null);
   const [actionTarget, setActionTarget] = useState<ActionTarget | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingYears, setIsLoadingYears] = useState(false);
@@ -276,7 +296,8 @@ export function SchoolsManagement() {
     ? schoolManageRoles.has(session.user.role)
     : false;
   const canCreateSchools = canManageSchools;
-  const selectedSchool = schools.find((school) => school.id === selectedSchoolId) ?? null;
+  const selectedSchool =
+    schools.find((school) => school.id === selectedSchoolId) ?? null;
 
   const activeSchoolsCount = useMemo(
     () => schools.filter((school) => school.isActive).length,
@@ -289,16 +310,20 @@ export function SchoolsManagement() {
       setError(null);
 
       try {
-        const schoolResponse = await listSchools({ includeInactive: showArchived });
+        const schoolResponse = await listSchools({
+          includeInactive: showArchived,
+        });
         setSchools(schoolResponse);
         setSelectedSchoolId((current) =>
           schoolResponse.some((school) => school.id === current)
             ? current
-            : schoolResponse[0]?.id ?? "",
+            : (schoolResponse[0]?.id ?? ""),
         );
       } catch (loadError) {
         setError(
-          loadError instanceof Error ? loadError.message : "Unable to load schools.",
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load schools.",
         );
       } finally {
         setIsLoading(false);
@@ -349,7 +374,7 @@ export function SchoolsManagement() {
     setSelectedSchoolId((current) =>
       schoolResponse.some((school) => school.id === current)
         ? current
-        : schoolResponse[0]?.id ?? "",
+        : (schoolResponse[0]?.id ?? ""),
     );
     return schoolResponse;
   }
@@ -372,7 +397,9 @@ export function SchoolsManagement() {
       return;
     }
 
-    const updatedSchool = updatedSchools.find((school) => school.id === editingSchool.id);
+    const updatedSchool = updatedSchools.find(
+      (school) => school.id === editingSchool.id,
+    );
 
     if (!updatedSchool) {
       setEditingSchool(null);
@@ -445,7 +472,11 @@ export function SchoolsManagement() {
       await refreshSchoolYears(createdSchool.id);
       setSuccessMessage("School created successfully.");
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "Unable to create school.");
+      setError(
+        createError instanceof Error
+          ? createError.message
+          : "Unable to create school.",
+      );
     } finally {
       setIsCreatingSchool(false);
     }
@@ -475,7 +506,11 @@ export function SchoolsManagement() {
 
       setSuccessMessage("School updated successfully.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update school.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update school.",
+      );
     } finally {
       setIsSavingSchool(false);
     }
@@ -502,9 +537,13 @@ export function SchoolsManagement() {
         endDate: createSchoolYearForm.endDate,
       });
 
-      const updatedSchoolYears = await refreshSchoolYears(createSchoolYearForm.schoolId);
+      const updatedSchoolYears = await refreshSchoolYears(
+        createSchoolYearForm.schoolId,
+      );
       syncEditingSchoolYearState(updatedSchoolYears);
-      setCreateSchoolYearForm(buildCreateSchoolYearForm(createSchoolYearForm.schoolId));
+      setCreateSchoolYearForm(
+        buildCreateSchoolYearForm(createSchoolYearForm.schoolId),
+      );
       setIsCreateSchoolYearOpen(false);
       setSuccessMessage("School year created successfully.");
     } catch (createError) {
@@ -549,7 +588,9 @@ export function SchoolsManagement() {
       setSuccessMessage("School year updated successfully.");
     } catch (saveError) {
       setError(
-        saveError instanceof Error ? saveError.message : "Unable to update school year.",
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update school year.",
       );
     } finally {
       setIsSavingSchoolYear(false);
@@ -576,7 +617,8 @@ export function SchoolsManagement() {
           const result = await deleteSchool(actionTarget.id);
           const updatedSchools = await refreshSchools();
           const nextSchoolId =
-            updatedSchools.find((school) => school.id === selectedSchoolId)?.id ??
+            updatedSchools.find((school) => school.id === selectedSchoolId)
+              ?.id ??
             updatedSchools[0]?.id ??
             "";
 
@@ -668,7 +710,9 @@ export function SchoolsManagement() {
         meta={
           <>
             <Badge variant="neutral">
-              {showArchived ? `${schools.length} visible schools` : `${schools.length} active schools`}
+              {showArchived
+                ? `${schools.length} visible schools`
+                : `${schools.length} active schools`}
             </Badge>
             <Badge variant="neutral">{activeSchoolsCount} active</Badge>
           </>
@@ -679,8 +723,8 @@ export function SchoolsManagement() {
       {successMessage ? <Notice tone="success">{successMessage}</Notice> : null}
       {!canManageSchools ? (
         <Notice tone="info">
-          Your role is read-only on this page. Contact an owner or super admin to make
-          school, school year, or grade-level changes.
+          Your role is read-only on this page. Contact an owner or super admin
+          to make school, school year, or grade-level changes.
         </Notice>
       ) : null}
 
@@ -690,7 +734,9 @@ export function SchoolsManagement() {
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <CardTitle>Edit School</CardTitle>
-                <CardDescription>Updating {editingSchool.name}.</CardDescription>
+                <CardDescription>
+                  Updating {editingSchool.name}.
+                </CardDescription>
               </div>
               <Button
                 onClick={() => {
@@ -704,7 +750,10 @@ export function SchoolsManagement() {
               </Button>
             </CardHeader>
             <CardContent>
-              <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSaveSchool}>
+              <form
+                className="grid gap-4 md:grid-cols-2"
+                onSubmit={handleSaveSchool}
+              >
                 <Field htmlFor="edit-school-name" label="School name">
                   <Input
                     id="edit-school-name"
@@ -754,7 +803,8 @@ export function SchoolsManagement() {
             <CardHeader>
               <CardTitle>Edit School</CardTitle>
               <CardDescription>
-                Select a school from the directory to rename it or update its short name.
+                Select a school from the directory to rename it or update its
+                short name.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -772,7 +822,9 @@ export function SchoolsManagement() {
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <CardTitle>Edit School Year</CardTitle>
-                <CardDescription>Updating {editingSchoolYear.name}.</CardDescription>
+                <CardDescription>
+                  Updating {editingSchoolYear.name}.
+                </CardDescription>
               </div>
               <Button
                 onClick={() => {
@@ -786,7 +838,10 @@ export function SchoolsManagement() {
               </Button>
             </CardHeader>
             <CardContent>
-              <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSaveSchoolYear}>
+              <form
+                className="grid gap-4 md:grid-cols-2"
+                onSubmit={handleSaveSchoolYear}
+              >
                 <Field htmlFor="edit-school-year-name" label="School year name">
                   <Input
                     id="edit-school-year-name"
@@ -858,7 +913,8 @@ export function SchoolsManagement() {
             <CardHeader>
               <CardTitle>Edit School Year</CardTitle>
               <CardDescription>
-                Select a school year from the table to update its name or date range.
+                Select a school year from the table to update its name or date
+                range.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -877,8 +933,8 @@ export function SchoolsManagement() {
           <div>
             <CardTitle>School Directory</CardTitle>
             <CardDescription>
-              Active schools are shown by default. Removed schools are archived safely when
-              related records still exist.
+              Active schools are shown by default. Removed schools are archived
+              safely when related records still exist.
             </CardDescription>
           </div>
 
@@ -906,7 +962,10 @@ export function SchoolsManagement() {
             ) : null}
 
             <div className="w-full max-w-sm">
-              <Field htmlFor="school-years-filter-school" label="School year context">
+              <Field
+                htmlFor="school-years-filter-school"
+                label="School year context"
+              >
                 <Select
                   id="school-years-filter-school"
                   onChange={(event) => setSelectedSchoolId(event.target.value)}
@@ -925,7 +984,10 @@ export function SchoolsManagement() {
         </CardHeader>
         <CardContent>
           {isCreateSchoolOpen ? (
-            <form className="mb-6 grid gap-4 rounded-xl border border-slate-200 p-4 md:grid-cols-2" onSubmit={handleCreateSchool}>
+            <form
+              className="mb-6 grid gap-4 rounded-xl border border-slate-200 p-4 md:grid-cols-2"
+              onSubmit={handleCreateSchool}
+            >
               <Field htmlFor="create-school-name" label="School name">
                 <Input
                   id="create-school-name"
@@ -967,21 +1029,33 @@ export function SchoolsManagement() {
               <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                 <thead className="bg-slate-50/80">
                   <tr>
-                    <th className="px-4 py-3 font-semibold text-slate-700">School</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Short name</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      School
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Short name
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {schools.map((school) => (
                     <tr className="align-top hover:bg-slate-50" key={school.id}>
-                      <td className="px-4 py-4 font-medium text-slate-900">{school.name}</td>
+                      <td className="px-4 py-4 font-medium text-slate-900">
+                        {school.name}
+                      </td>
                       <td className="px-4 py-4 text-slate-600">
                         {school.shortName ?? "Not set"}
                       </td>
                       <td className="px-4 py-4">
-                        <Badge variant={school.isActive ? "success" : "neutral"}>
+                        <Badge
+                          variant={school.isActive ? "success" : "neutral"}
+                        >
                           {school.isActive ? "Active" : "Archived"}
                         </Badge>
                       </td>
@@ -1002,7 +1076,9 @@ export function SchoolsManagement() {
                                 setActionTarget({
                                   id: school.id,
                                   kind: "school",
-                                  action: school.isActive ? "archive" : "activate",
+                                  action: school.isActive
+                                    ? "archive"
+                                    : "activate",
                                   label: school.name,
                                 });
                                 setActionError(null);
@@ -1034,7 +1110,9 @@ export function SchoolsManagement() {
                             </Button>
                           </div>
                         ) : (
-                          <span className="text-xs text-slate-500">Read-only</span>
+                          <span className="text-xs text-slate-500">
+                            Read-only
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -1062,20 +1140,24 @@ export function SchoolsManagement() {
           <div>
             <CardTitle>School Years</CardTitle>
             <CardDescription>
-              Active school years are shown by default. Removed school years are archived
-              safely when linked academic records still exist.
+              Active school years are shown by default. Removed school years are
+              archived safely when linked academic records still exist.
             </CardDescription>
           </div>
           <div className="flex flex-col gap-3 sm:items-end">
             <Badge variant="neutral">
-              {isLoadingYears ? "Loading school years..." : `${schoolYears.length} records`}
+              {isLoadingYears
+                ? "Loading school years..."
+                : `${schoolYears.length} records`}
             </Badge>
             {canManageSchools ? (
               <Button
                 disabled={!selectedSchoolId}
                 onClick={() => {
                   setIsCreateSchoolYearOpen((current) => !current);
-                  setCreateSchoolYearForm(buildCreateSchoolYearForm(selectedSchoolId));
+                  setCreateSchoolYearForm(
+                    buildCreateSchoolYearForm(selectedSchoolId),
+                  );
                   setError(null);
                   setSuccessMessage(null);
                 }}
@@ -1150,7 +1232,10 @@ export function SchoolsManagement() {
               </Field>
 
               <div className="md:col-span-2 flex justify-end">
-                <Button disabled={isCreatingSchoolYear || !selectedSchoolId} type="submit">
+                <Button
+                  disabled={isCreatingSchoolYear || !selectedSchoolId}
+                  type="submit"
+                >
                   {isCreatingSchoolYear ? "Creating..." : "Create school year"}
                 </Button>
               </div>
@@ -1163,15 +1248,26 @@ export function SchoolsManagement() {
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Name</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Dates</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Name
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Dates
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {schoolYears.map((schoolYear) => (
-                      <tr className="align-top hover:bg-slate-50" key={schoolYear.id}>
+                      <tr
+                        className="align-top hover:bg-slate-50"
+                        key={schoolYear.id}
+                      >
                         <td className="px-4 py-4 font-medium text-slate-900">
                           {schoolYear.name}
                         </td>
@@ -1179,7 +1275,11 @@ export function SchoolsManagement() {
                           {formatSchoolYearDateRange(schoolYear)}
                         </td>
                         <td className="px-4 py-4">
-                          <Badge variant={schoolYear.isActive ? "success" : "neutral"}>
+                          <Badge
+                            variant={
+                              schoolYear.isActive ? "success" : "neutral"
+                            }
+                          >
                             {schoolYear.isActive ? "Active" : "Archived"}
                           </Badge>
                         </td>
@@ -1188,7 +1288,9 @@ export function SchoolsManagement() {
                             <div className="flex flex-wrap gap-2">
                               <Button
                                 disabled={isSavingSchoolYear || isRunningAction}
-                                onClick={() => handleStartEditSchoolYear(schoolYear)}
+                                onClick={() =>
+                                  handleStartEditSchoolYear(schoolYear)
+                                }
                                 type="button"
                                 variant="secondary"
                               >
@@ -1200,7 +1302,9 @@ export function SchoolsManagement() {
                                   setActionTarget({
                                     id: schoolYear.id,
                                     kind: "schoolYear",
-                                    action: schoolYear.isActive ? "archive" : "activate",
+                                    action: schoolYear.isActive
+                                      ? "archive"
+                                      : "activate",
                                     label: schoolYear.name,
                                   });
                                   setActionError(null);
@@ -1208,7 +1312,9 @@ export function SchoolsManagement() {
                                   setSuccessMessage(null);
                                 }}
                                 type="button"
-                                variant={schoolYear.isActive ? "danger" : "primary"}
+                                variant={
+                                  schoolYear.isActive ? "danger" : "primary"
+                                }
                               >
                                 {schoolYear.isActive ? "Archive" : "Unarchive"}
                               </Button>
@@ -1232,7 +1338,9 @@ export function SchoolsManagement() {
                               </Button>
                             </div>
                           ) : (
-                            <span className="text-xs text-slate-500">Read-only</span>
+                            <span className="text-xs text-slate-500">
+                              Read-only
+                            </span>
                           )}
                         </td>
                       </tr>
@@ -1275,7 +1383,11 @@ export function SchoolsManagement() {
         errorMessage={actionError}
         isOpen={actionTarget !== null}
         isPending={isRunningAction}
-        key={actionTarget ? `${actionTarget.kind}:${actionTarget.action}:${actionTarget.id}` : "closed"}
+        key={
+          actionTarget
+            ? `${actionTarget.kind}:${actionTarget.action}:${actionTarget.id}`
+            : "closed"
+        }
         onCancel={() => {
           if (!isRunningAction) {
             setActionTarget(null);

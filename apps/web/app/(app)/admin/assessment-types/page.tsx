@@ -3,4 +3,3 @@ import { AssessmentTypesManagement } from "@/components/admin/assessment-types-m
 export default function AdminAssessmentTypesPage() {
   return <AssessmentTypesManagement />;
 }
-

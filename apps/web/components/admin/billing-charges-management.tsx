@@ -69,7 +69,8 @@ function getStatusLabel(status: BillingChargeStatus) {
 }
 
 function getStudentLabel(charge: BillingCharge) {
-  const fullName = `${charge.student.firstName} ${charge.student.lastName}`.trim();
+  const fullName =
+    `${charge.student.firstName} ${charge.student.lastName}`.trim();
 
   if (fullName) {
     return fullName;
@@ -102,7 +103,9 @@ export function BillingChargesManagement() {
   const searchParams = useSearchParams();
   const { session } = useAuth();
   const role = session?.user.role;
-  const canManage = role ? ["OWNER", "SUPER_ADMIN", "ADMIN"].includes(role) : false;
+  const canManage = role
+    ? ["OWNER", "SUPER_ADMIN", "ADMIN"].includes(role)
+    : false;
 
   const [schools, setSchools] = useState<School[]>([]);
   const [categories, setCategories] = useState<BillingCategory[]>([]);
@@ -163,7 +166,10 @@ export function BillingChargesManagement() {
         });
         setCategories(categoryResponse);
 
-        if (categoryId && !categoryResponse.some((entry) => entry.id === categoryId)) {
+        if (
+          categoryId &&
+          !categoryResponse.some((entry) => entry.id === categoryId)
+        ) {
           setCategoryId("");
         }
       } catch {
@@ -195,7 +201,11 @@ export function BillingChargesManagement() {
         setCharges(response);
       } catch (loadError) {
         setCharges([]);
-        setError(loadError instanceof Error ? loadError.message : "Unable to load charges.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load charges.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -275,23 +285,35 @@ export function BillingChargesManagement() {
         }
         meta={
           <>
-            <Badge variant="neutral">{selectedSchool?.name ?? "All schools"}</Badge>
+            <Badge variant="neutral">
+              {selectedSchool?.name ?? "All schools"}
+            </Badge>
             <Badge variant="neutral">{charges.length} charges</Badge>
           </>
         }
       />
 
-      {created ? <Notice tone="success">Charge created successfully.</Notice> : null}
-      {edited ? <Notice tone="success">Charge updated successfully.</Notice> : null}
-      {voided ? <Notice tone="success">Charge voided successfully.</Notice> : null}
-      {paymentRecorded ? <Notice tone="success">Payment recorded successfully.</Notice> : null}
+      {created ? (
+        <Notice tone="success">Charge created successfully.</Notice>
+      ) : null}
+      {edited ? (
+        <Notice tone="success">Charge updated successfully.</Notice>
+      ) : null}
+      {voided ? (
+        <Notice tone="success">Charge voided successfully.</Notice>
+      ) : null}
+      {paymentRecorded ? (
+        <Notice tone="success">Payment recorded successfully.</Notice>
+      ) : null}
       {successMessage ? <Notice tone="success">{successMessage}</Notice> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
 
       <Card>
         <CardHeader>
           <CardTitle>Filters</CardTitle>
-          <CardDescription>Use filters to narrow charge records.</CardDescription>
+          <CardDescription>
+            Use filters to narrow charge records.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field htmlFor="billing-charges-school" label="School">
@@ -341,7 +363,9 @@ export function BillingChargesManagement() {
           <Field htmlFor="billing-charges-status" label="Status">
             <Select
               id="billing-charges-status"
-              onChange={(event) => setStatus(event.target.value as "" | BillingChargeStatus)}
+              onChange={(event) =>
+                setStatus(event.target.value as "" | BillingChargeStatus)
+              }
               value={status}
             >
               <option value="">All statuses</option>
@@ -375,49 +399,97 @@ export function BillingChargesManagement() {
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Category</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Title</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Amount</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Paid</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Balance</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Due date</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Issued date</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Student
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Category
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Title
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Amount
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Paid
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Balance
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Due date
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Issued date
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {charges.map((charge) => (
-                      <tr className="align-top hover:bg-slate-50" key={charge.id}>
+                      <tr
+                        className="align-top hover:bg-slate-50"
+                        key={charge.id}
+                      >
                         <td className="px-4 py-4">
-                          <p className="font-medium text-slate-900">{getStudentLabel(charge)}</p>
-                          <p className="mt-1 text-xs text-slate-500">{charge.studentId}</p>
+                          <p className="font-medium text-slate-900">
+                            {getStudentLabel(charge)}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {charge.studentId}
+                          </p>
                         </td>
-                        <td className="px-4 py-4 text-slate-700">{charge.category.name}</td>
+                        <td className="px-4 py-4 text-slate-700">
+                          {charge.category.name}
+                        </td>
                         <td className="px-4 py-4 text-slate-700">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-medium text-slate-900">{charge.title}</p>
-                            {charge.libraryFine ? <Badge variant="primary">Library fine</Badge> : null}
+                            <p className="font-medium text-slate-900">
+                              {charge.title}
+                            </p>
+                            {charge.libraryFine ? (
+                              <Badge variant="primary">Library fine</Badge>
+                            ) : null}
                           </div>
                           {charge.schoolYear ? (
-                            <p className="mt-1 text-xs text-slate-500">{charge.schoolYear.name}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {charge.schoolYear.name}
+                            </p>
                           ) : null}
                         </td>
-                        <td className="px-4 py-4 text-slate-700">{formatCurrency(charge.amount)}</td>
-                        <td className="px-4 py-4 text-slate-700">{formatCurrency(charge.amountPaid)}</td>
-                        <td className="px-4 py-4 text-slate-700">{formatCurrency(charge.amountDue)}</td>
+                        <td className="px-4 py-4 text-slate-700">
+                          {formatCurrency(charge.amount)}
+                        </td>
+                        <td className="px-4 py-4 text-slate-700">
+                          {formatCurrency(charge.amountPaid)}
+                        </td>
+                        <td className="px-4 py-4 text-slate-700">
+                          {formatCurrency(charge.amountDue)}
+                        </td>
                         <td className="px-4 py-4">
                           <Badge variant={getStatusVariant(charge.status)}>
                             {getStatusLabel(charge.status)}
                           </Badge>
                         </td>
-                        <td className="px-4 py-4 text-slate-700">{formatDateLabel(charge.dueDate)}</td>
-                        <td className="px-4 py-4 text-slate-700">{formatDateLabel(charge.issuedAt)}</td>
+                        <td className="px-4 py-4 text-slate-700">
+                          {formatDateLabel(charge.dueDate)}
+                        </td>
+                        <td className="px-4 py-4 text-slate-700">
+                          {formatDateLabel(charge.issuedAt)}
+                        </td>
                         <td className="px-4 py-4">
                           <div className="flex flex-wrap gap-2">
                             <Link
-                              className={buttonClassName({ size: "sm", variant: "secondary" })}
+                              className={buttonClassName({
+                                size: "sm",
+                                variant: "secondary",
+                              })}
                               href={`/admin/billing/students/${encodeURIComponent(charge.studentId)}`}
                             >
                               Account
@@ -425,13 +497,18 @@ export function BillingChargesManagement() {
                             {canManage ? (
                               <>
                                 <Link
-                                  className={buttonClassName({ size: "sm", variant: "ghost" })}
+                                  className={buttonClassName({
+                                    size: "sm",
+                                    variant: "ghost",
+                                  })}
                                   href={`/admin/billing/charges/${encodeURIComponent(charge.id)}/edit`}
                                 >
                                   Edit
                                 </Link>
                                 <Button
-                                  disabled={charge.status === "VOID" || isVoiding}
+                                  disabled={
+                                    charge.status === "VOID" || isVoiding
+                                  }
                                   size="sm"
                                   type="button"
                                   variant="danger"
@@ -443,7 +520,10 @@ export function BillingChargesManagement() {
                                   Void
                                 </Button>
                                 <Link
-                                  className={buttonClassName({ size: "sm", variant: "ghost" })}
+                                  className={buttonClassName({
+                                    size: "sm",
+                                    variant: "ghost",
+                                  })}
                                   href={`/admin/billing/payments/new?studentId=${encodeURIComponent(charge.studentId)}`}
                                 >
                                   Record payment

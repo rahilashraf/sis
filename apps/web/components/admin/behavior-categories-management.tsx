@@ -64,8 +64,11 @@ export function BehaviorCategoriesManagement() {
   const role = session?.user.role;
   const [schools, setSchools] = useState<School[]>([]);
   const [categories, setCategories] = useState<BehaviorCategoryOption[]>([]);
-  const [createForm, setCreateForm] = useState<CategoryFormState>(buildCreateForm());
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [createForm, setCreateForm] =
+    useState<CategoryFormState>(buildCreateForm());
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
+    null,
+  );
   const [editForm, setEditForm] = useState<CategoryFormState | null>(null);
   const [includeInactive, setIncludeInactive] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -105,7 +108,11 @@ export function BehaviorCategoriesManagement() {
             : buildCreateForm(schoolResponse[0]?.id ?? "GLOBAL"),
         );
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load incident categories.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load incident categories.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -141,7 +148,11 @@ export function BehaviorCategoriesManagement() {
       setCreateForm(buildCreateForm(createForm.schoolId));
       setSuccessMessage("Incident category created.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to create category.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to create category.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -175,7 +186,11 @@ export function BehaviorCategoriesManagement() {
       setEditForm(updated ? buildEditForm(updated) : null);
       setSuccessMessage("Incident category updated.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update category.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update category.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -193,9 +208,15 @@ export function BehaviorCategoriesManagement() {
         await activateBehaviorCategory(category.id);
       }
       await refreshCategories();
-      setSuccessMessage(category.isActive ? "Category deactivated." : "Category activated.");
+      setSuccessMessage(
+        category.isActive ? "Category deactivated." : "Category activated.",
+      );
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update category status.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update category status.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -214,7 +235,9 @@ export function BehaviorCategoriesManagement() {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-sm text-slate-500">Loading incident categories...</p>
+          <p className="text-sm text-slate-500">
+            Loading incident categories...
+          </p>
         </CardContent>
       </Card>
     );
@@ -244,24 +267,36 @@ export function BehaviorCategoriesManagement() {
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-4" onSubmit={handleCreate}>
-            <Field htmlFor="create-behavior-category-name" label="Incident category name">
+            <Field
+              htmlFor="create-behavior-category-name"
+              label="Incident category name"
+            >
               <Input
                 id="create-behavior-category-name"
                 value={createForm.name}
                 onChange={(event) =>
-                  setCreateForm((current) => ({ ...current, name: event.target.value }))
+                  setCreateForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
                 }
                 placeholder="Disruption"
               />
             </Field>
 
-            <Field htmlFor="create-behavior-category-sort-order" label="Sort order">
+            <Field
+              htmlFor="create-behavior-category-sort-order"
+              label="Sort order"
+            >
               <Input
                 id="create-behavior-category-sort-order"
                 inputMode="numeric"
                 value={createForm.sortOrder}
                 onChange={(event) =>
-                  setCreateForm((current) => ({ ...current, sortOrder: event.target.value }))
+                  setCreateForm((current) => ({
+                    ...current,
+                    sortOrder: event.target.value,
+                  }))
                 }
               />
             </Field>
@@ -271,7 +306,10 @@ export function BehaviorCategoriesManagement() {
                 id="create-behavior-category-school"
                 value={createForm.schoolId}
                 onChange={(event) =>
-                  setCreateForm((current) => ({ ...current, schoolId: event.target.value }))
+                  setCreateForm((current) => ({
+                    ...current,
+                    schoolId: event.target.value,
+                  }))
                 }
               >
                 <option value="GLOBAL">Global</option>
@@ -296,7 +334,8 @@ export function BehaviorCategoriesManagement() {
         <CardHeader>
           <CardTitle>Incident Category List</CardTitle>
           <CardDescription>
-            Inactive categories stay on historical incident reports but are hidden from normal selection.
+            Inactive categories stay on historical incident reports but are
+            hidden from normal selection.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -304,7 +343,9 @@ export function BehaviorCategoriesManagement() {
             <Select
               id="behavior-categories-visibility"
               value={includeInactive ? "all" : "active"}
-              onChange={(event) => setIncludeInactive(event.target.value === "all")}
+              onChange={(event) =>
+                setIncludeInactive(event.target.value === "all")
+              }
             >
               <option value="all">Show active and inactive</option>
               <option value="active">Show active only</option>
@@ -320,7 +361,8 @@ export function BehaviorCategoriesManagement() {
           ) : (
             <div className="space-y-3">
               {visibleCategories.map((category) => {
-                const isEditing = editingCategoryId === category.id && editForm !== null;
+                const isEditing =
+                  editingCategoryId === category.id && editForm !== null;
 
                 return (
                   <div
@@ -328,20 +370,31 @@ export function BehaviorCategoriesManagement() {
                     key={category.id}
                   >
                     {isEditing ? (
-                      <form className="grid gap-3 md:grid-cols-4" onSubmit={handleSaveEdit}>
-                        <Field htmlFor={`edit-category-name-${category.id}`} label="Name">
+                      <form
+                        className="grid gap-3 md:grid-cols-4"
+                        onSubmit={handleSaveEdit}
+                      >
+                        <Field
+                          htmlFor={`edit-category-name-${category.id}`}
+                          label="Name"
+                        >
                           <Input
                             id={`edit-category-name-${category.id}`}
                             value={editForm.name}
                             onChange={(event) =>
                               setEditForm((current) =>
-                                current ? { ...current, name: event.target.value } : current,
+                                current
+                                  ? { ...current, name: event.target.value }
+                                  : current,
                               )
                             }
                           />
                         </Field>
 
-                        <Field htmlFor={`edit-category-order-${category.id}`} label="Sort order">
+                        <Field
+                          htmlFor={`edit-category-order-${category.id}`}
+                          label="Sort order"
+                        >
                           <Input
                             id={`edit-category-order-${category.id}`}
                             inputMode="numeric"
@@ -349,14 +402,20 @@ export function BehaviorCategoriesManagement() {
                             onChange={(event) =>
                               setEditForm((current) =>
                                 current
-                                  ? { ...current, sortOrder: event.target.value }
+                                  ? {
+                                      ...current,
+                                      sortOrder: event.target.value,
+                                    }
                                   : current,
                               )
                             }
                           />
                         </Field>
 
-                        <Field htmlFor={`edit-category-school-${category.id}`} label="Scope">
+                        <Field
+                          htmlFor={`edit-category-school-${category.id}`}
+                          label="Scope"
+                        >
                           <Select
                             id={`edit-category-school-${category.id}`}
                             value={editForm.schoolId}
@@ -378,7 +437,11 @@ export function BehaviorCategoriesManagement() {
                         </Field>
 
                         <div className="flex items-end justify-end gap-2">
-                          <Button disabled={isSaving} type="submit" variant="secondary">
+                          <Button
+                            disabled={isSaving}
+                            type="submit"
+                            variant="secondary"
+                          >
                             {isSaving ? "Saving..." : "Save"}
                           </Button>
                           <Button
@@ -397,16 +460,21 @@ export function BehaviorCategoriesManagement() {
                     ) : (
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-slate-900">{category.name}</p>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {category.name}
+                          </p>
                           <p className="mt-1 text-xs text-slate-500">
                             {category.schoolId
-                              ? schoolsById.get(category.schoolId)?.name ?? category.schoolId
+                              ? (schoolsById.get(category.schoolId)?.name ??
+                                category.schoolId)
                               : "Global"}{" "}
                             · Sort {category.sortOrder}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge variant={category.isActive ? "success" : "neutral"}>
+                          <Badge
+                            variant={category.isActive ? "success" : "neutral"}
+                          >
                             {category.isActive ? "Active" : "Inactive"}
                           </Badge>
                           <Button

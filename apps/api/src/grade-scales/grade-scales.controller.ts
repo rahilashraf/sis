@@ -10,6 +10,7 @@ import { CreateGradeScaleRuleDto } from './dto/create-grade-scale-rule.dto';
 import { GetGradeScalesQueryDto } from './dto/get-grade-scales-query.dto';
 import { UpdateGradeScaleDto } from './dto/update-grade-scale.dto';
 import { UpdateGradeScaleRuleDto } from './dto/update-grade-scale-rule.dto';
+import { ApplyGradeScaleMultiSchoolDto } from './dto/apply-grade-scale-multi-school.dto';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -70,6 +71,15 @@ export class GradeScalesController {
     return this.gradeScalesService.setActive(req.user, id, true);
   }
 
+  @Post('grade-scales/multi-school')
+  @Roles('OWNER', 'SUPER_ADMIN')
+  applyAcrossSchools(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: ApplyGradeScaleMultiSchoolDto,
+  ) {
+    return this.gradeScalesService.applyAcrossSchools(req.user, body);
+  }
+
   @Post('grade-scales/:id/rules')
   @Roles('OWNER', 'SUPER_ADMIN')
   addRule(
@@ -90,4 +100,3 @@ export class GradeScalesController {
     return this.gradeScalesService.updateRule(req.user, id, body);
   }
 }
-

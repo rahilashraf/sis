@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
@@ -33,7 +39,9 @@ export function ParentChangePasswordForm() {
     }
 
     if (newPassword.length < MIN_PASSWORD_LENGTH) {
-      setError(`New password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+      setError(
+        `New password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+      );
       return;
     }
 
@@ -91,10 +99,15 @@ export function ParentChangePasswordForm() {
             <div className="space-y-3">
               <p>{successMessage}</p>
               <p className="text-sm text-emerald-800">
-                Session invalidation is not server-tracked yet. Sign out and sign back in for best account hygiene.
+                Session invalidation is not server-tracked yet. Sign out and
+                sign back in for best account hygiene.
               </p>
               <div>
-                <Button onClick={handleSignOutNow} type="button" variant="secondary">
+                <Button
+                  onClick={handleSignOutNow}
+                  type="button"
+                  variant="secondary"
+                >
                   Sign out now
                 </Button>
               </div>
@@ -127,7 +140,10 @@ export function ParentChangePasswordForm() {
               />
             </Field>
 
-            <Field htmlFor="parent-password-confirm" label="Confirm new password">
+            <Field
+              htmlFor="parent-password-confirm"
+              label="Confirm new password"
+            >
               <Input
                 autoComplete="new-password"
                 id="parent-password-confirm"

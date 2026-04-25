@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { buttonClassName } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
@@ -13,7 +19,9 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth/auth-context";
 import { listClasses, type SchoolClass } from "@/lib/api/classes";
+import { listStudentParents, type StudentParentLink } from "@/lib/api/students";
 import {
+  bookInterviewSlotForParent,
   bulkGenerateInterviewSlots,
   createInterviewSlot,
   deleteInterviewSlot,
@@ -79,6 +87,7 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
   const [event, setEvent] = useState<InterviewEvent | null>(null);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [slots, setSlots] = useState<InterviewSlotAdmin[]>([]);
+  const [linkedParents, setLinkedParents] = useState<StudentParentLink[]>([]);
 
   const [teacherId, setTeacherId] = useState("");
   const [classId, setClassId] = useState("");
@@ -111,9 +120,21 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<InterviewSlotAdmin | null>(null);
-  const [toggleTarget, setToggleTarget] = useState<InterviewSlotAdmin | null>(null);
-  const [unbookTarget, setUnbookTarget] = useState<InterviewSlotAdmin | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<InterviewSlotAdmin | null>(
+    null,
+  );
+  const [toggleTarget, setToggleTarget] = useState<InterviewSlotAdmin | null>(
+    null,
+  );
+  const [unbookTarget, setUnbookTarget] = useState<InterviewSlotAdmin | null>(
+    null,
+  );
+  const [bookingStudentId, setBookingStudentId] = useState("");
+  const [bookingParentId, setBookingParentId] = useState("");
+  const [bookingTeacherId, setBookingTeacherId] = useState("");
+  const [bookingSlotId, setBookingSlotId] = useState("");
+  const [bookingNotes, setBookingNotes] = useState("");
+  const [isLoadingParents, setIsLoadingParents] = useState(false);
 
   const teacherOptions = useMemo(() => {
     const seen = new Set<string>();
@@ -129,7 +150,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
         seen.add(teacher.id);
         options.push({
           id: teacher.id,
-          label: `${teacher.firstName} ${teacher.lastName}`.trim() || teacher.username,
+          label:
+            `${teacher.firstName} ${teacher.lastName}`.trim() ||
+            teacher.username,
         });
       }
     }
@@ -142,12 +165,56 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
       seen.add(slot.teacher.id);
       options.push({
         id: slot.teacher.id,
-        label: `${slot.teacher.firstName} ${slot.teacher.lastName}`.trim() || slot.teacher.username,
+        label:
+          `${slot.teacher.firstName} ${slot.teacher.lastName}`.trim() ||
+          slot.teacher.username,
       });
     }
 
     return options.sort((a, b) => a.label.localeCompare(b.label));
   }, [classes, slots]);
+
+  const studentOptions = useMemo(() => {
+    const byStudentId = new Map<string, { id: string; label: string }>();
+
+    for (const schoolClass of classes) {
+      for (const enrollment of schoolClass.students ?? []) {
+        const student = enrollment.student;
+        if (byStudentId.has(student.id)) {
+          continue;
+        }
+
+        const fullName = `${student.firstName} ${student.lastName}`.trim();
+        byStudentId.set(student.id, {
+          id: student.id,
+          label:
+            fullName.length > 0
+              ? `${fullName} (${student.username})`
+              : student.username,
+        });
+      }
+    }
+
+    return Array.from(byStudentId.values()).sort((left, right) =>
+      left.label.localeCompare(right.label),
+    );
+  }, [classes]);
+
+  const availableAdminBookingSlots = useMemo(() => {
+    return slots
+      .filter(
+        (slot) =>
+          slot.status === "AVAILABLE" &&
+          slot.bookedParentId === null &&
+          slot.bookedStudentId === null &&
+          (!bookingTeacherId || slot.teacherId === bookingTeacherId),
+      )
+      .sort(
+        (left, right) =>
+          new Date(left.startTime).getTime() -
+          new Date(right.startTime).getTime(),
+      );
+  }, [bookingTeacherId, slots]);
 
   useEffect(() => {
     if (teacherOptions.length === 0) {
@@ -156,10 +223,77 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
 
     setTeacherId((current) => current || teacherOptions[0]?.id || "");
     setBulkTeacherId((current) => current || teacherOptions[0]?.id || "");
+    setBookingTeacherId((current) => current || teacherOptions[0]?.id || "");
   }, [teacherOptions]);
 
+  useEffect(() => {
+    if (studentOptions.length === 0) {
+      setBookingStudentId("");
+      return;
+    }
+
+    setBookingStudentId((current) => {
+      if (current && studentOptions.some((student) => student.id === current)) {
+        return current;
+      }
+
+      return studentOptions[0]?.id ?? "";
+    });
+  }, [studentOptions]);
+
+  useEffect(() => {
+    if (!bookingStudentId) {
+      setLinkedParents([]);
+      setBookingParentId("");
+      return;
+    }
+
+    async function loadLinkedParents() {
+      setIsLoadingParents(true);
+
+      try {
+        const response = await listStudentParents(bookingStudentId);
+        setLinkedParents(response);
+        setBookingParentId((current) => {
+          if (current && response.some((entry) => entry.parentId === current)) {
+            return current;
+          }
+
+          return response[0]?.parentId ?? "";
+        });
+      } catch (loadError) {
+        setLinkedParents([]);
+        setBookingParentId("");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load linked parents for this student.",
+        );
+      } finally {
+        setIsLoadingParents(false);
+      }
+    }
+
+    void loadLinkedParents();
+  }, [bookingStudentId]);
+
+  useEffect(() => {
+    setBookingSlotId((current) => {
+      if (
+        current &&
+        availableAdminBookingSlots.some((slot) => slot.id === current)
+      ) {
+        return current;
+      }
+
+      return availableAdminBookingSlots[0]?.id ?? "";
+    });
+  }, [availableAdminBookingSlots]);
+
   async function refreshSlots() {
-    const slotResponse = await listInterviewSlots({ interviewEventId: eventId });
+    const slotResponse = await listInterviewSlots({
+      interviewEventId: eventId,
+    });
     setSlots(slotResponse);
   }
 
@@ -178,14 +312,19 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
 
         const [slotResponse, classResponse] = await Promise.all([
           listInterviewSlots({ interviewEventId: eventId }),
-          listClasses({ includeInactive: true, schoolId: eventResponse.schoolId }),
+          listClasses({
+            includeInactive: true,
+            schoolId: eventResponse.schoolId,
+          }),
         ]);
 
         setSlots(slotResponse);
         setClasses(classResponse);
       } catch (loadError) {
         setError(
-          loadError instanceof Error ? loadError.message : "Unable to load interview slot manager.",
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load interview slot manager.",
         );
       } finally {
         setIsLoading(false);
@@ -223,7 +362,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
       await refreshSlots();
     } catch (submitError) {
       setError(
-        submitError instanceof Error ? submitError.message : "Unable to create interview slot.",
+        submitError instanceof Error
+          ? submitError.message
+          : "Unable to create interview slot.",
       );
     } finally {
       setIsSaving(false);
@@ -251,11 +392,15 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
         notes: bulkNotes.trim() || null,
       });
 
-      setSuccessMessage(`Generated ${response.createdCount} slot${response.createdCount === 1 ? "" : "s"}.`);
+      setSuccessMessage(
+        `Generated ${response.createdCount} slot${response.createdCount === 1 ? "" : "s"}.`,
+      );
       await refreshSlots();
     } catch (submitError) {
       setError(
-        submitError instanceof Error ? submitError.message : "Unable to generate slots.",
+        submitError instanceof Error
+          ? submitError.message
+          : "Unable to generate slots.",
       );
     } finally {
       setIsSaving(false);
@@ -297,7 +442,11 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
       setSuccessMessage("Interview slot updated.");
       await refreshSlots();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to update slot.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update slot.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -318,7 +467,11 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
       setToggleTarget(null);
       await refreshSlots();
     } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Unable to update slot status.");
+      setError(
+        actionError instanceof Error
+          ? actionError.message
+          : "Unable to update slot status.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -335,7 +488,11 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
       setDeleteTarget(null);
       await refreshSlots();
     } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Unable to delete slot.");
+      setError(
+        actionError instanceof Error
+          ? actionError.message
+          : "Unable to delete slot.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -352,7 +509,43 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
       setUnbookTarget(null);
       await refreshSlots();
     } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Unable to unbook slot.");
+      setError(
+        actionError instanceof Error
+          ? actionError.message
+          : "Unable to unbook slot.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleBookForParent(submitEvent: FormEvent<HTMLFormElement>) {
+    submitEvent.preventDefault();
+
+    if (!bookingSlotId || !bookingStudentId || !bookingParentId) {
+      return;
+    }
+
+    setError(null);
+    setSuccessMessage(null);
+    setIsSaving(true);
+
+    try {
+      await bookInterviewSlotForParent(bookingSlotId, {
+        studentId: bookingStudentId,
+        parentId: bookingParentId,
+        bookingNotes: bookingNotes.trim() || null,
+      });
+
+      setBookingNotes("");
+      setSuccessMessage("Interview slot booked on behalf of parent.");
+      await refreshSlots();
+    } catch (actionError) {
+      setError(
+        actionError instanceof Error
+          ? actionError.message
+          : "Unable to book for parent.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -361,7 +554,8 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
   if (!manageRoles.has(role)) {
     return (
       <Notice tone="danger">
-        Only OWNER, SUPER_ADMIN, ADMIN, and STAFF roles can manage interview slots.
+        Only OWNER, SUPER_ADMIN, ADMIN, and STAFF roles can manage interview
+        slots.
       </Notice>
     );
   }
@@ -382,8 +576,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
       {successMessage ? <Notice tone="success">{successMessage}</Notice> : null}
       {teacherOptions.length === 0 ? (
         <Notice tone="warning">
-          No teachers were found in this school&apos;s class assignments or existing slots.
-          Assign teachers to classes first or add a slot for a class-assigned teacher.
+          No teachers were found in this school&apos;s class assignments or
+          existing slots. Assign teachers to classes first or add a slot for a
+          class-assigned teacher.
         </Notice>
       ) : null}
 
@@ -391,16 +586,22 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
         <CardHeader>
           <CardTitle>Manual Slot Creation</CardTitle>
           <CardDescription>
-            Add individual teacher interview slots for {event?.title ?? "this event"}.
+            Add individual teacher interview slots for{" "}
+            {event?.title ?? "this event"}.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-4 md:grid-cols-3" onSubmit={handleCreateSlot}>
+          <form
+            className="grid gap-4 md:grid-cols-3"
+            onSubmit={handleCreateSlot}
+          >
             <Field htmlFor="slot-teacher" label="Teacher">
               <Select
                 id="slot-teacher"
                 disabled={teacherOptions.length === 0}
-                onChange={(changeEvent) => setTeacherId(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setTeacherId(changeEvent.target.value)
+                }
                 required
                 value={teacherId}
               >
@@ -431,7 +632,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
             <Field htmlFor="slot-location" label="Location">
               <Input
                 id="slot-location"
-                onChange={(changeEvent) => setLocation(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setLocation(changeEvent.target.value)
+                }
                 placeholder="Room 12"
                 value={location}
               />
@@ -440,7 +643,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
             <Field htmlFor="slot-start" label="Start">
               <Input
                 id="slot-start"
-                onChange={(changeEvent) => setStartTime(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setStartTime(changeEvent.target.value)
+                }
                 required
                 type="datetime-local"
                 value={startTime}
@@ -460,7 +665,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
             <Field htmlFor="slot-meeting-mode" label="Meeting mode">
               <Input
                 id="slot-meeting-mode"
-                onChange={(changeEvent) => setMeetingMode(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setMeetingMode(changeEvent.target.value)
+                }
                 placeholder="In-person / Online"
                 value={meetingMode}
               />
@@ -483,7 +690,11 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
                 disabled={isSaving || teacherOptions.length === 0}
                 type="submit"
               >
-                {teacherOptions.length === 0 ? "No teachers available" : isSaving ? "Saving..." : "Create slot"}
+                {teacherOptions.length === 0
+                  ? "No teachers available"
+                  : isSaving
+                    ? "Saving..."
+                    : "Create slot"}
               </button>
             </div>
           </form>
@@ -498,12 +709,17 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-4 md:grid-cols-3" onSubmit={handleBulkGenerate}>
+          <form
+            className="grid gap-4 md:grid-cols-3"
+            onSubmit={handleBulkGenerate}
+          >
             <Field htmlFor="bulk-teacher" label="Teacher">
               <Select
                 disabled={teacherOptions.length === 0}
                 id="bulk-teacher"
-                onChange={(changeEvent) => setBulkTeacherId(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setBulkTeacherId(changeEvent.target.value)
+                }
                 required
                 value={bulkTeacherId}
               >
@@ -519,7 +735,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
             <Field htmlFor="bulk-class" label="Class (optional)">
               <Select
                 id="bulk-class"
-                onChange={(changeEvent) => setBulkClassId(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setBulkClassId(changeEvent.target.value)
+                }
                 value={bulkClassId}
               >
                 <option value="">No class context</option>
@@ -535,7 +753,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
               <Input
                 id="bulk-duration"
                 min={5}
-                onChange={(changeEvent) => setSlotDurationMinutes(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setSlotDurationMinutes(changeEvent.target.value)
+                }
                 required
                 type="number"
                 value={slotDurationMinutes}
@@ -545,7 +765,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
             <Field htmlFor="bulk-window-start" label="Window start">
               <Input
                 id="bulk-window-start"
-                onChange={(changeEvent) => setWindowStart(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setWindowStart(changeEvent.target.value)
+                }
                 required
                 type="datetime-local"
                 value={windowStart}
@@ -555,7 +777,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
             <Field htmlFor="bulk-window-end" label="Window end">
               <Input
                 id="bulk-window-end"
-                onChange={(changeEvent) => setWindowEnd(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setWindowEnd(changeEvent.target.value)
+                }
                 required
                 type="datetime-local"
                 value={windowEnd}
@@ -566,7 +790,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
               <Input
                 id="bulk-break"
                 min={0}
-                onChange={(changeEvent) => setBreakMinutes(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setBreakMinutes(changeEvent.target.value)
+                }
                 required
                 type="number"
                 value={breakMinutes}
@@ -576,7 +802,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
             <Field htmlFor="bulk-location" label="Location">
               <Input
                 id="bulk-location"
-                onChange={(changeEvent) => setBulkLocation(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setBulkLocation(changeEvent.target.value)
+                }
                 value={bulkLocation}
               />
             </Field>
@@ -584,7 +812,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
             <Field htmlFor="bulk-meeting-mode" label="Meeting mode">
               <Input
                 id="bulk-meeting-mode"
-                onChange={(changeEvent) => setBulkMeetingMode(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setBulkMeetingMode(changeEvent.target.value)
+                }
                 value={bulkMeetingMode}
               />
             </Field>
@@ -593,7 +823,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
               <Field htmlFor="bulk-notes" label="Notes">
                 <Textarea
                   id="bulk-notes"
-                  onChange={(changeEvent) => setBulkNotes(changeEvent.target.value)}
+                  onChange={(changeEvent) =>
+                    setBulkNotes(changeEvent.target.value)
+                  }
                   rows={2}
                   value={bulkNotes}
                 />
@@ -601,8 +833,152 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
             </div>
 
             <div className="md:col-span-3">
-              <button className={buttonClassName({ variant: "secondary" })} disabled={isSaving || teacherOptions.length === 0} type="submit">
-                {teacherOptions.length === 0 ? "No teachers available" : isSaving ? "Generating..." : "Generate slots"}
+              <button
+                className={buttonClassName({ variant: "secondary" })}
+                disabled={isSaving || teacherOptions.length === 0}
+                type="submit"
+              >
+                {teacherOptions.length === 0
+                  ? "No teachers available"
+                  : isSaving
+                    ? "Generating..."
+                    : "Generate slots"}
+              </button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Book for Parent</CardTitle>
+          <CardDescription>
+            Create a booking on behalf of a linked parent/guardian using an
+            available slot.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="grid gap-4 md:grid-cols-2"
+            onSubmit={handleBookForParent}
+          >
+            <Field htmlFor="admin-book-student" label="Student">
+              <Select
+                id="admin-book-student"
+                disabled={studentOptions.length === 0}
+                onChange={(changeEvent) =>
+                  setBookingStudentId(changeEvent.target.value)
+                }
+                value={bookingStudentId}
+              >
+                <option value="">Select student</option>
+                {studentOptions.map((student) => (
+                  <option key={student.id} value={student.id}>
+                    {student.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            <Field htmlFor="admin-book-parent" label="Linked parent/guardian">
+              <Select
+                id="admin-book-parent"
+                disabled={isLoadingParents || linkedParents.length === 0}
+                onChange={(changeEvent) =>
+                  setBookingParentId(changeEvent.target.value)
+                }
+                value={bookingParentId}
+              >
+                <option value="">
+                  {isLoadingParents
+                    ? "Loading linked parents..."
+                    : "Select parent/guardian"}
+                </option>
+                {linkedParents.map((link) => (
+                  <option key={link.id} value={link.parentId}>
+                    {link.parent.firstName} {link.parent.lastName}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            <Field htmlFor="admin-book-teacher" label="Teacher">
+              <Select
+                id="admin-book-teacher"
+                onChange={(changeEvent) =>
+                  setBookingTeacherId(changeEvent.target.value)
+                }
+                value={bookingTeacherId}
+              >
+                <option value="">All teachers</option>
+                {teacherOptions.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            <Field htmlFor="admin-book-slot" label="Available slot">
+              <Select
+                id="admin-book-slot"
+                disabled={availableAdminBookingSlots.length === 0}
+                onChange={(changeEvent) =>
+                  setBookingSlotId(changeEvent.target.value)
+                }
+                value={bookingSlotId}
+              >
+                <option value="">Select slot</option>
+                {availableAdminBookingSlots.map((slot) => (
+                  <option key={slot.id} value={slot.id}>
+                    {formatDateTimeLabel(slot.startTime)} •{" "}
+                    {slot.teacher.firstName} {slot.teacher.lastName}
+                    {slot.class?.name ? ` • ${slot.class.name}` : ""}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            <div className="md:col-span-2">
+              <Field
+                htmlFor="admin-book-notes"
+                label="Booking notes (optional)"
+              >
+                <Textarea
+                  id="admin-book-notes"
+                  onChange={(changeEvent) =>
+                    setBookingNotes(changeEvent.target.value)
+                  }
+                  rows={2}
+                  value={bookingNotes}
+                />
+              </Field>
+            </div>
+
+            <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              {studentOptions.length === 0
+                ? "No eligible students were found from current class rosters."
+                : linkedParents.length === 0
+                  ? "Selected student has no linked parent/guardian for booking."
+                  : availableAdminBookingSlots.length === 0
+                    ? "No available slots match the current teacher filter."
+                    : "Server-side checks will verify parent-student link, slot availability, and booking constraints."}
+            </div>
+
+            <div className="md:col-span-2">
+              <button
+                className={buttonClassName({ variant: "primary" })}
+                disabled={
+                  isSaving ||
+                  !bookingSlotId ||
+                  !bookingStudentId ||
+                  !bookingParentId ||
+                  studentOptions.length === 0 ||
+                  linkedParents.length === 0
+                }
+                type="submit"
+              >
+                {isSaving ? "Booking..." : "Book for Parent"}
               </button>
             </div>
           </form>
@@ -629,12 +1005,24 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Teacher</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Class</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Time</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Booking</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Actions</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Teacher
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Class
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Time
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Booking
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
@@ -643,20 +1031,28 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
                         <td className="px-4 py-3 text-slate-900">
                           {slot.teacher.firstName} {slot.teacher.lastName}
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{slot.class?.name ?? "—"}</td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {slot.class?.name ?? "—"}
+                        </td>
                         <td className="px-4 py-3 text-slate-600">
                           <p>{formatDateTimeLabel(slot.startTime)}</p>
-                          <p className="mt-1">{formatDateTimeLabel(slot.endTime)}</p>
-                          {slot.location ? <p className="mt-1 text-xs">{slot.location}</p> : null}
+                          <p className="mt-1">
+                            {formatDateTimeLabel(slot.endTime)}
+                          </p>
+                          {slot.location ? (
+                            <p className="mt-1 text-xs">{slot.location}</p>
+                          ) : null}
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           {slot.bookedParent ? (
                             <>
                               <p>
-                                Parent: {slot.bookedParent.firstName} {slot.bookedParent.lastName}
+                                Parent: {slot.bookedParent.firstName}{" "}
+                                {slot.bookedParent.lastName}
                               </p>
                               <p className="mt-1">
-                                Student: {slot.bookedStudent?.firstName} {slot.bookedStudent?.lastName}
+                                Student: {slot.bookedStudent?.firstName}{" "}
+                                {slot.bookedStudent?.lastName}
                               </p>
                             </>
                           ) : (
@@ -672,7 +1068,10 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
                           <div className="flex flex-wrap gap-2">
                             {slot.status === "BOOKED" ? (
                               <button
-                                className={buttonClassName({ size: "sm", variant: "secondary" })}
+                                className={buttonClassName({
+                                  size: "sm",
+                                  variant: "secondary",
+                                })}
                                 onClick={() => setUnbookTarget(slot)}
                                 type="button"
                               >
@@ -681,21 +1080,32 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
                             ) : (
                               <>
                                 <button
-                                  className={buttonClassName({ size: "sm", variant: "secondary" })}
+                                  className={buttonClassName({
+                                    size: "sm",
+                                    variant: "secondary",
+                                  })}
                                   onClick={() => beginEdit(slot)}
                                   type="button"
                                 >
                                   Edit
                                 </button>
                                 <button
-                                  className={buttonClassName({ size: "sm", variant: "secondary" })}
+                                  className={buttonClassName({
+                                    size: "sm",
+                                    variant: "secondary",
+                                  })}
                                   onClick={() => setToggleTarget(slot)}
                                   type="button"
                                 >
-                                  {slot.status === "CANCELLED" ? "Activate" : "Cancel"}
+                                  {slot.status === "CANCELLED"
+                                    ? "Activate"
+                                    : "Cancel"}
                                 </button>
                                 <button
-                                  className={buttonClassName({ size: "sm", variant: "secondary" })}
+                                  className={buttonClassName({
+                                    size: "sm",
+                                    variant: "secondary",
+                                  })}
                                   onClick={() => setDeleteTarget(slot)}
                                   type="button"
                                 >
@@ -721,7 +1131,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
         confirmVariant="danger"
         isOpen={Boolean(unbookTarget)}
         isPending={isSaving}
-        onConfirm={() => (unbookTarget ? handleUnbook(unbookTarget) : Promise.resolve())}
+        onConfirm={() =>
+          unbookTarget ? handleUnbook(unbookTarget) : Promise.resolve()
+        }
         onCancel={() => {
           if (!isSaving) {
             setUnbookTarget(null);
@@ -732,7 +1144,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
       />
 
       <ConfirmDialog
-        confirmLabel={toggleTarget?.status === "CANCELLED" ? "Activate slot" : "Cancel slot"}
+        confirmLabel={
+          toggleTarget?.status === "CANCELLED" ? "Activate slot" : "Cancel slot"
+        }
         confirmVariant="secondary"
         description={
           toggleTarget?.status === "CANCELLED"
@@ -741,14 +1155,20 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
         }
         isOpen={Boolean(toggleTarget)}
         isPending={isSaving}
-        onConfirm={() => (toggleTarget ? handleToggleCancelled(toggleTarget) : Promise.resolve())}
+        onConfirm={() =>
+          toggleTarget ? handleToggleCancelled(toggleTarget) : Promise.resolve()
+        }
         onCancel={() => {
           if (!isSaving) {
             setToggleTarget(null);
           }
         }}
         pendingLabel="Processing..."
-        title={toggleTarget?.status === "CANCELLED" ? "Activate interview slot?" : "Cancel interview slot?"}
+        title={
+          toggleTarget?.status === "CANCELLED"
+            ? "Activate interview slot?"
+            : "Cancel interview slot?"
+        }
       />
 
       <ConfirmDialog
@@ -757,7 +1177,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
         confirmVariant="danger"
         isOpen={Boolean(deleteTarget)}
         isPending={isSaving}
-        onConfirm={() => (deleteTarget ? handleDelete(deleteTarget) : Promise.resolve())}
+        onConfirm={() =>
+          deleteTarget ? handleDelete(deleteTarget) : Promise.resolve()
+        }
         onCancel={() => {
           if (!isSaving) {
             setDeleteTarget(null);
@@ -771,13 +1193,17 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
         <Card>
           <CardHeader>
             <CardTitle>Edit Slot</CardTitle>
-            <CardDescription>Only unbooked slots can be edited.</CardDescription>
+            <CardDescription>
+              Only unbooked slots can be edited.
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-3">
             <Field htmlFor="edit-slot-teacher" label="Teacher">
               <Select
                 id="edit-slot-teacher"
-                onChange={(changeEvent) => setEditTeacherId(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setEditTeacherId(changeEvent.target.value)
+                }
                 value={editTeacherId}
               >
                 {teacherOptions.map((teacher) => (
@@ -791,7 +1217,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
             <Field htmlFor="edit-slot-class" label="Class (optional)">
               <Select
                 id="edit-slot-class"
-                onChange={(changeEvent) => setEditClassId(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setEditClassId(changeEvent.target.value)
+                }
                 value={editClassId}
               >
                 <option value="">No class context</option>
@@ -806,7 +1234,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
             <Field htmlFor="edit-slot-location" label="Location">
               <Input
                 id="edit-slot-location"
-                onChange={(changeEvent) => setEditLocation(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setEditLocation(changeEvent.target.value)
+                }
                 value={editLocation}
               />
             </Field>
@@ -814,7 +1244,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
             <Field htmlFor="edit-slot-start" label="Start">
               <Input
                 id="edit-slot-start"
-                onChange={(changeEvent) => setEditStartTime(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setEditStartTime(changeEvent.target.value)
+                }
                 type="datetime-local"
                 value={editStartTime}
               />
@@ -823,7 +1255,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
             <Field htmlFor="edit-slot-end" label="End">
               <Input
                 id="edit-slot-end"
-                onChange={(changeEvent) => setEditEndTime(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setEditEndTime(changeEvent.target.value)
+                }
                 type="datetime-local"
                 value={editEndTime}
               />
@@ -832,7 +1266,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
             <Field htmlFor="edit-slot-mode" label="Meeting mode">
               <Input
                 id="edit-slot-mode"
-                onChange={(changeEvent) => setEditMeetingMode(changeEvent.target.value)}
+                onChange={(changeEvent) =>
+                  setEditMeetingMode(changeEvent.target.value)
+                }
                 value={editMeetingMode}
               />
             </Field>
@@ -841,7 +1277,9 @@ export function InterviewEventSlotsManager({ eventId }: { eventId: string }) {
               <Field htmlFor="edit-slot-notes" label="Notes">
                 <Textarea
                   id="edit-slot-notes"
-                  onChange={(changeEvent) => setEditNotes(changeEvent.target.value)}
+                  onChange={(changeEvent) =>
+                    setEditNotes(changeEvent.target.value)
+                  }
                   rows={2}
                   value={editNotes}
                 />

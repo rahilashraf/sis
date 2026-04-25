@@ -18,7 +18,7 @@ export default function TeacherPage() {
       return;
     }
 
-    router.replace("/teacher/classes");
+    router.replace("/teacher/dashboard");
   }, [router, session?.user.role, status]);
 
   return null;

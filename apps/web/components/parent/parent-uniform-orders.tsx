@@ -17,7 +17,10 @@ import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth/auth-context";
-import { listMyParentStudents, type ParentStudentLink } from "@/lib/api/students";
+import {
+  listMyParentStudents,
+  type ParentStudentLink,
+} from "@/lib/api/students";
 import {
   formatUniformMoney,
   formatUniformOrderStatusLabel,
@@ -141,17 +144,25 @@ export function ParentUniformOrders() {
         description="Track order status updates and view submitted order details."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link className={buttonClassName({ variant: "secondary" })} href="/parent/uniform">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/parent/uniform"
+            >
               New order
             </Link>
-            <Link className={buttonClassName({ variant: "secondary" })} href="/parent">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/parent"
+            >
               Back to parent portal
             </Link>
           </div>
         }
         meta={
           <Badge variant="neutral">
-            {selectedStudent ? getStudentLabel(selectedStudent) : "All linked students"}
+            {selectedStudent
+              ? getStudentLabel(selectedStudent)
+              : "All linked students"}
           </Badge>
         }
       />
@@ -178,7 +189,9 @@ export function ParentUniformOrders() {
           <Card>
             <CardHeader>
               <CardTitle>Filters</CardTitle>
-              <CardDescription>Filter by child and order status.</CardDescription>
+              <CardDescription>
+                Filter by child and order status.
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <Field htmlFor="parent-uniform-orders-student" label="Student">
@@ -199,7 +212,9 @@ export function ParentUniformOrders() {
               <Field htmlFor="parent-uniform-orders-status" label="Status">
                 <Select
                   id="parent-uniform-orders-status"
-                  onChange={(event) => setStatus(event.target.value as "" | UniformOrderStatus)}
+                  onChange={(event) =>
+                    setStatus(event.target.value as "" | UniformOrderStatus)
+                  }
                   value={status}
                 >
                   <option value="">All statuses</option>
@@ -217,7 +232,9 @@ export function ParentUniformOrders() {
             <CardHeader>
               <CardTitle>Orders</CardTitle>
               <CardDescription>
-                {isRefreshing ? "Refreshing..." : `${orders.length} order${orders.length === 1 ? "" : "s"}`}
+                {isRefreshing
+                  ? "Refreshing..."
+                  : `${orders.length} order${orders.length === 1 ? "" : "s"}`}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -233,24 +250,40 @@ export function ParentUniformOrders() {
                     <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                       <thead className="bg-slate-50/80">
                         <tr>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Order</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Total</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Action</th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Order
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Student
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Status
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Total
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Action
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 bg-white">
                         {orders.map((order) => (
-                          <tr className="align-top hover:bg-slate-50" key={order.id}>
+                          <tr
+                            className="align-top hover:bg-slate-50"
+                            key={order.id}
+                          >
                             <td className="px-4 py-3">
-                              <p className="font-medium text-slate-900">#{order.id.slice(0, 8)}</p>
+                              <p className="font-medium text-slate-900">
+                                #{order.id.slice(0, 8)}
+                              </p>
                               <p className="mt-1 text-xs text-slate-500">
                                 {formatDateTimeLabel(order.createdAt)}
                               </p>
                             </td>
                             <td className="px-4 py-3 text-slate-700">
-                              {`${order.student.firstName} ${order.student.lastName}`.trim() || order.student.username}
+                              {`${order.student.firstName} ${order.student.lastName}`.trim() ||
+                                order.student.username}
                             </td>
                             <td className="px-4 py-3">
                               <Badge variant={getStatusVariant(order.status)}>
@@ -262,7 +295,10 @@ export function ParentUniformOrders() {
                             </td>
                             <td className="px-4 py-3">
                               <Link
-                                className={buttonClassName({ size: "sm", variant: "secondary" })}
+                                className={buttonClassName({
+                                  size: "sm",
+                                  variant: "secondary",
+                                })}
                                 href={`/parent/uniform/orders/${encodeURIComponent(order.id)}`}
                               >
                                 View

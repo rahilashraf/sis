@@ -37,7 +37,9 @@ function getTypeLabel(type: string): string {
   return labels[type] ?? "Notification";
 }
 
-function getTypeVariant(type: string): "neutral" | "primary" | "success" | "warning" | "danger" {
+function getTypeVariant(
+  type: string,
+): "neutral" | "primary" | "success" | "warning" | "danger" {
   if (type.startsWith("BILLING_PAYMENT_VOIDED")) return "danger";
   if (type.startsWith("BILLING")) return "primary";
   if (type.startsWith("FORM")) return "success";
@@ -51,7 +53,11 @@ type NotificationRowProps = {
   isMarkingRead: boolean;
 };
 
-function NotificationRow({ notification, onMarkRead, isMarkingRead }: NotificationRowProps) {
+function NotificationRow({
+  notification,
+  onMarkRead,
+  isMarkingRead,
+}: NotificationRowProps) {
   const router = useRouter();
   const href = resolveNotificationHref(notification);
 
@@ -67,15 +73,16 @@ function NotificationRow({ notification, onMarkRead, isMarkingRead }: Notificati
   return (
     <div
       className={`flex items-start gap-4 border-b border-slate-100 px-5 py-4 last:border-b-0 transition-colors ${
-        notification.isRead
-          ? "bg-white"
-          : "bg-blue-50/40 hover:bg-blue-50/60"
+        notification.isRead ? "bg-white" : "bg-blue-50/40 hover:bg-blue-50/60"
       } ${href || !notification.isRead ? "cursor-pointer hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1" : ""}`}
       onClick={href || !notification.isRead ? handleClick : undefined}
       role={href || !notification.isRead ? "button" : undefined}
       tabIndex={href || !notification.isRead ? 0 : undefined}
       onKeyDown={(e) => {
-        if ((e.key === "Enter" || e.key === " ") && (href || !notification.isRead)) {
+        if (
+          (e.key === "Enter" || e.key === " ") &&
+          (href || !notification.isRead)
+        ) {
           handleClick();
         }
       }}
@@ -99,9 +106,13 @@ function NotificationRow({ notification, onMarkRead, isMarkingRead }: Notificati
             <span className="text-xs font-semibold text-blue-600">New</span>
           )}
         </div>
-        <p className="mt-1 text-sm font-semibold text-slate-900">{notification.title}</p>
+        <p className="mt-1 text-sm font-semibold text-slate-900">
+          {notification.title}
+        </p>
         {notification.message !== notification.title ? (
-          <p className="mt-0.5 text-sm text-slate-600">{notification.message}</p>
+          <p className="mt-0.5 text-sm text-slate-600">
+            {notification.message}
+          </p>
         ) : null}
         <p className="mt-1.5 text-xs text-slate-400">
           {formatDateTimeLabel(notification.createdAt, {
@@ -127,7 +138,9 @@ function NotificationRow({ notification, onMarkRead, isMarkingRead }: Notificati
             variant="secondary"
             size="sm"
           >
-            <span className="hidden sm:inline">{isMarkingRead ? "..." : "Mark read"}</span>
+            <span className="hidden sm:inline">
+              {isMarkingRead ? "..." : "Mark read"}
+            </span>
             <span className="sm:hidden">{isMarkingRead ? "..." : "✓"}</span>
           </Button>
         </div>
@@ -164,7 +177,11 @@ export function NotificationsList() {
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Unable to load notifications.");
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load notifications.",
+          );
           setIsLoading(false);
         }
       });
@@ -181,7 +198,9 @@ export function NotificationsList() {
       await markNotificationAsRead(id);
       setNotifications((current) =>
         current.map((n) =>
-          n.id === id ? { ...n, isRead: true, readAt: new Date().toISOString() } : n,
+          n.id === id
+            ? { ...n, isRead: true, readAt: new Date().toISOString() }
+            : n,
         ),
       );
     } catch {
@@ -199,7 +218,11 @@ export function NotificationsList() {
     try {
       await Promise.all(unread.map((n) => markNotificationAsRead(n.id)));
       setNotifications((current) =>
-        current.map((n) => ({ ...n, isRead: true, readAt: new Date().toISOString() })),
+        current.map((n) => ({
+          ...n,
+          isRead: true,
+          readAt: new Date().toISOString(),
+        })),
       );
     } catch {
       // silently ignore
@@ -223,7 +246,9 @@ export function NotificationsList() {
               size="sm"
             >
               <span className="hidden sm:inline">
-                {isMarkingAllRead ? "Marking..." : `Mark all read (${unreadCount})`}
+                {isMarkingAllRead
+                  ? "Marking..."
+                  : `Mark all read (${unreadCount})`}
               </span>
               <span className="sm:hidden">
                 {isMarkingAllRead ? "..." : `Mark all (${unreadCount})`}
@@ -244,7 +269,8 @@ export function NotificationsList() {
         <CardHeader>
           <CardTitle>Recent notifications</CardTitle>
           <CardDescription>
-            Showing up to 50 most recent notifications. Click an item to mark it as read.
+            Showing up to 50 most recent notifications. Click an item to mark it
+            as read.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">

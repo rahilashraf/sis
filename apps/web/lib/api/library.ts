@@ -1,10 +1,15 @@
-import { apiFetch } from './client';
+import { apiFetch } from "./client";
 
-export type LibraryItemStatus = 'AVAILABLE' | 'CHECKED_OUT' | 'LOST' | 'ARCHIVED';
-export type LibraryLoanStatus = 'ACTIVE' | 'RETURNED' | 'LOST' | 'OVERDUE';
-export type LibraryFineReason = 'LATE' | 'LOST' | 'UNCLAIMED_HOLD' | 'MANUAL';
-export type LibraryFineStatus = 'OPEN' | 'WAIVED' | 'PAID' | 'VOID';
-export type LibraryLateFineFrequency = 'PER_DAY' | 'FLAT';
+export type LibraryItemStatus =
+  | "AVAILABLE"
+  | "CHECKED_OUT"
+  | "LOST"
+  | "ARCHIVED";
+export type LibraryLoanStatus = "ACTIVE" | "RETURNED" | "LOST" | "OVERDUE";
+export type LibraryHoldStatus = "ACTIVE" | "CANCELLED" | "FULFILLED";
+export type LibraryFineReason = "LATE" | "LOST" | "UNCLAIMED_HOLD" | "MANUAL";
+export type LibraryFineStatus = "OPEN" | "WAIVED" | "PAID" | "VOID";
+export type LibraryLateFineFrequency = "PER_DAY" | "FLAT";
 
 export type LibraryItem = {
   id: string;
@@ -88,6 +93,60 @@ export type ParentStudentLibraryLoansResponse = {
   >;
 };
 
+export type LibraryHold = {
+  id: string;
+  schoolId: string;
+  itemId: string;
+  studentId: string;
+  createdByUserId: string;
+  status: LibraryHoldStatus;
+  notes: string | null;
+  resolvedAt: string | null;
+  resolvedByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  school: {
+    id: string;
+    name: string;
+    shortName: string | null;
+  };
+  item: {
+    id: string;
+    title: string;
+    author: string | null;
+    isbn: string | null;
+    barcode: string | null;
+    category: string | null;
+    status: LibraryItemStatus;
+    availableCopies: number;
+    totalCopies: number;
+  };
+  student: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+    email: string | null;
+  };
+  createdBy: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+  };
+  resolvedBy: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+  } | null;
+};
+
+export type ParentStudentLibraryHoldsResponse = {
+  studentId: string;
+  holds: LibraryHold[];
+};
+
 export type CreateLibraryItemInput = {
   schoolId: string;
   title: string;
@@ -103,7 +162,14 @@ export type CreateLibraryItemInput = {
 export type UpdateLibraryItemInput = Partial<
   Pick<
     CreateLibraryItemInput,
-    'title' | 'author' | 'isbn' | 'barcode' | 'category' | 'totalCopies' | 'availableCopies' | 'status'
+    | "title"
+    | "author"
+    | "isbn"
+    | "barcode"
+    | "category"
+    | "totalCopies"
+    | "availableCopies"
+    | "status"
   >
 >;
 
@@ -113,6 +179,11 @@ export type CheckoutLibraryLoanInput = {
   studentId: string;
   dueDate: string;
   checkoutDate?: string;
+};
+
+export type CreateLibraryHoldInput = {
+  itemId: string;
+  notes?: string | null;
 };
 
 export type MarkLibraryLoanLostInput = {
@@ -271,27 +342,29 @@ export function listLibraryItems(options?: {
   const query = new URLSearchParams();
 
   if (options?.schoolId) {
-    query.set('schoolId', options.schoolId);
+    query.set("schoolId", options.schoolId);
   }
 
   if (options?.search?.trim()) {
-    query.set('search', options.search.trim());
+    query.set("search", options.search.trim());
   }
 
   if (options?.category?.trim()) {
-    query.set('category', options.category.trim());
+    query.set("category", options.category.trim());
   }
 
   if (options?.status) {
-    query.set('status', options.status);
+    query.set("status", options.status);
   }
 
-  return apiFetch<LibraryItem[]>(`/library/items${query.size ? `?${query.toString()}` : ''}`);
+  return apiFetch<LibraryItem[]>(
+    `/library/items${query.size ? `?${query.toString()}` : ""}`,
+  );
 }
 
 export function createLibraryItem(input: CreateLibraryItemInput) {
-  return apiFetch<LibraryItem>('/library/items', {
-    method: 'POST',
+  return apiFetch<LibraryItem>("/library/items", {
+    method: "POST",
     json: input,
   });
 }
@@ -300,9 +373,12 @@ export function getLibraryItem(itemId: string) {
   return apiFetch<LibraryItem>(`/library/items/${itemId}`);
 }
 
-export function updateLibraryItem(itemId: string, input: UpdateLibraryItemInput) {
+export function updateLibraryItem(
+  itemId: string,
+  input: UpdateLibraryItemInput,
+) {
   return apiFetch<LibraryItem>(`/library/items/${itemId}`, {
-    method: 'PATCH',
+    method: "PATCH",
     json: input,
   });
 }
@@ -317,38 +393,43 @@ export function listLibraryLoans(options?: {
   const query = new URLSearchParams();
 
   if (options?.schoolId) {
-    query.set('schoolId', options.schoolId);
+    query.set("schoolId", options.schoolId);
   }
 
   if (options?.studentId) {
-    query.set('studentId', options.studentId);
+    query.set("studentId", options.studentId);
   }
 
   if (options?.itemId) {
-    query.set('itemId', options.itemId);
+    query.set("itemId", options.itemId);
   }
 
   if (options?.status) {
-    query.set('status', options.status);
+    query.set("status", options.status);
   }
 
   if (options?.activeOnly !== undefined) {
-    query.set('activeOnly', options.activeOnly ? 'true' : 'false');
+    query.set("activeOnly", options.activeOnly ? "true" : "false");
   }
 
-  return apiFetch<LibraryLoan[]>(`/library/loans${query.size ? `?${query.toString()}` : ''}`);
+  return apiFetch<LibraryLoan[]>(
+    `/library/loans${query.size ? `?${query.toString()}` : ""}`,
+  );
 }
 
 export function checkoutLibraryLoan(input: CheckoutLibraryLoanInput) {
-  return apiFetch<LibraryLoan>('/library/loans/checkout', {
-    method: 'POST',
+  return apiFetch<LibraryLoan>("/library/loans/checkout", {
+    method: "POST",
     json: input,
   });
 }
 
-export function returnLibraryLoan(loanId: string, options?: { returnedAt?: string }) {
+export function returnLibraryLoan(
+  loanId: string,
+  options?: { returnedAt?: string },
+) {
   return apiFetch<LibraryLoan>(`/library/loans/${loanId}/return`, {
-    method: 'POST',
+    method: "POST",
     json: options ?? {},
   });
 }
@@ -362,16 +443,19 @@ export function markLibraryLoanLost(
     fine: LibraryFine | null;
     fineCreated: boolean;
   }>(`/library/loans/${loanId}/mark-lost`, {
-    method: 'POST',
+    method: "POST",
     json: input ?? {},
   });
 }
 
 export function markLibraryLoanFound(loanId: string) {
-  return apiFetch<MarkLibraryLoanFoundResult>(`/library/loans/${loanId}/mark-found`, {
-    method: 'POST',
-    json: {},
-  });
+  return apiFetch<MarkLibraryLoanFoundResult>(
+    `/library/loans/${loanId}/mark-found`,
+    {
+      method: "POST",
+      json: {},
+    },
+  );
 }
 
 export function listLibraryOverdue(options?: {
@@ -382,18 +466,20 @@ export function listLibraryOverdue(options?: {
   const query = new URLSearchParams();
 
   if (options?.schoolId) {
-    query.set('schoolId', options.schoolId);
+    query.set("schoolId", options.schoolId);
   }
 
   if (options?.studentId) {
-    query.set('studentId', options.studentId);
+    query.set("studentId", options.studentId);
   }
 
   if (options?.search?.trim()) {
-    query.set('search', options.search.trim());
+    query.set("search", options.search.trim());
   }
 
-  return apiFetch<LibraryOverdueLoan[]>(`/library/overdue${query.size ? `?${query.toString()}` : ''}`);
+  return apiFetch<LibraryOverdueLoan[]>(
+    `/library/overdue${query.size ? `?${query.toString()}` : ""}`,
+  );
 }
 
 export function listParentStudentLibraryLoans(studentId: string) {
@@ -402,14 +488,87 @@ export function listParentStudentLibraryLoans(studentId: string) {
   );
 }
 
-export function getLibraryFineSettings(schoolId: string) {
-  const query = new URLSearchParams({ schoolId });
-  return apiFetch<LibraryFineSettings>(`/library/fine-settings?${query.toString()}`);
+export function listParentStudentLibraryCatalog(studentId: string) {
+  return apiFetch<LibraryItem[]>(
+    `/library/parent/students/${encodeURIComponent(studentId)}/catalog`,
+  );
 }
 
-export function upsertLibraryFineSettings(input: UpsertLibraryFineSettingsInput) {
-  return apiFetch<LibraryFineSettings>('/library/fine-settings', {
-    method: 'PATCH',
+export function listStudentLibraryCatalog() {
+  return apiFetch<LibraryItem[]>("/library/catalog");
+}
+
+export function createStudentLibraryHold(input: CreateLibraryHoldInput) {
+  return apiFetch<LibraryHold>("/library/holds", {
+    method: "POST",
+    json: input,
+  });
+}
+
+export function listMyStudentLibraryHolds() {
+  return apiFetch<LibraryHold[]>("/library/holds/me");
+}
+
+export function listLibraryHolds(options?: {
+  schoolId?: string;
+  studentId?: string;
+  itemId?: string;
+  status?: LibraryHoldStatus;
+}) {
+  const query = new URLSearchParams();
+
+  if (options?.schoolId) {
+    query.set("schoolId", options.schoolId);
+  }
+
+  if (options?.studentId) {
+    query.set("studentId", options.studentId);
+  }
+
+  if (options?.itemId) {
+    query.set("itemId", options.itemId);
+  }
+
+  if (options?.status) {
+    query.set("status", options.status);
+  }
+
+  return apiFetch<LibraryHold[]>(
+    `/library/holds${query.size ? `?${query.toString()}` : ""}`,
+  );
+}
+
+export function listParentStudentLibraryHolds(studentId: string) {
+  return apiFetch<ParentStudentLibraryHoldsResponse>(
+    `/library/parent/students/${encodeURIComponent(studentId)}/holds`,
+  );
+}
+
+export function createParentStudentLibraryHold(
+  studentId: string,
+  input: CreateLibraryHoldInput,
+) {
+  return apiFetch<LibraryHold>(
+    `/library/parent/students/${encodeURIComponent(studentId)}/holds`,
+    {
+      method: "POST",
+      json: input,
+    },
+  );
+}
+
+export function getLibraryFineSettings(schoolId: string) {
+  const query = new URLSearchParams({ schoolId });
+  return apiFetch<LibraryFineSettings>(
+    `/library/fine-settings?${query.toString()}`,
+  );
+}
+
+export function upsertLibraryFineSettings(
+  input: UpsertLibraryFineSettingsInput,
+) {
+  return apiFetch<LibraryFineSettings>("/library/fine-settings", {
+    method: "PATCH",
     json: input,
   });
 }
@@ -423,48 +582,58 @@ export function listLibraryFines(options?: {
   const query = new URLSearchParams();
 
   if (options?.schoolId) {
-    query.set('schoolId', options.schoolId);
+    query.set("schoolId", options.schoolId);
   }
 
   if (options?.studentId) {
-    query.set('studentId', options.studentId);
+    query.set("studentId", options.studentId);
   }
 
   if (options?.status) {
-    query.set('status', options.status);
+    query.set("status", options.status);
   }
 
   if (options?.reason) {
-    query.set('reason', options.reason);
+    query.set("reason", options.reason);
   }
 
-  return apiFetch<LibraryFine[]>(`/library/fines${query.size ? `?${query.toString()}` : ''}`);
+  return apiFetch<LibraryFine[]>(
+    `/library/fines${query.size ? `?${query.toString()}` : ""}`,
+  );
 }
 
 export function createManualLibraryFine(input: CreateManualLibraryFineInput) {
-  return apiFetch<LibraryFine>('/library/fines/manual', {
-    method: 'POST',
+  return apiFetch<LibraryFine>("/library/fines/manual", {
+    method: "POST",
     json: input,
   });
 }
 
-export function waiveLibraryFine(fineId: string, input?: WaiveLibraryFineInput) {
+export function waiveLibraryFine(
+  fineId: string,
+  input?: WaiveLibraryFineInput,
+) {
   return apiFetch<LibraryFine>(`/library/fines/${fineId}/waive`, {
-    method: 'POST',
+    method: "POST",
     json: input ?? {},
   });
 }
 
-export function assessLibraryOverdueFines(input: AssessLibraryOverdueFinesInput) {
-  return apiFetch<AssessLibraryOverdueFinesResult>('/library/fines/assess-overdue', {
-    method: 'POST',
-    json: input,
-  });
+export function assessLibraryOverdueFines(
+  input: AssessLibraryOverdueFinesInput,
+) {
+  return apiFetch<AssessLibraryOverdueFinesResult>(
+    "/library/fines/assess-overdue",
+    {
+      method: "POST",
+      json: input,
+    },
+  );
 }
 
 export function assessUnclaimedHoldFine(input: AssessUnclaimedHoldFineInput) {
-  return apiFetch<LibraryFine>('/library/fines/assess-unclaimed-hold', {
-    method: 'POST',
+  return apiFetch<LibraryFine>("/library/fines/assess-unclaimed-hold", {
+    method: "POST",
     json: input,
   });
 }

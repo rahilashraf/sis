@@ -113,6 +113,7 @@ export class AuthService {
     const updateData: {
       firstName?: string;
       lastName?: string;
+      phone?: string;
     } = {};
 
     if (data.firstName !== undefined) {
@@ -121,6 +122,10 @@ export class AuthService {
 
     if (data.lastName !== undefined) {
       updateData.lastName = data.lastName;
+    }
+
+    if (data.phone !== undefined) {
+      updateData.phone = data.phone;
     }
 
     if (Object.keys(updateData).length === 0) {

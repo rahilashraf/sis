@@ -191,9 +191,12 @@ export function activateForm(formId: string) {
 }
 
 export function deleteForm(formId: string) {
-  return apiFetch<{ success: boolean; removalMode: "deleted" }>(`/forms/${formId}`, {
-    method: "DELETE",
-  });
+  return apiFetch<{ success: boolean; removalMode: "deleted" }>(
+    `/forms/${formId}`,
+    {
+      method: "DELETE",
+    },
+  );
 }
 
 export function getFormResponses(formId: string) {

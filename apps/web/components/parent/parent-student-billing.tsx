@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useReducer } from "react";
 import { Badge } from "@/components/ui/badge";
 import { buttonClassName } from "@/components/ui/button";
 import {
@@ -100,7 +100,9 @@ function StatCard({
     <Card>
       <CardContent className="pt-6">
         <p className="text-sm text-slate-500 mb-1">{title}</p>
-        <p className={`text-2xl font-bold tabular-nums ${valueClass}`}>{value}</p>
+        <p className={`text-2xl font-bold tabular-nums ${valueClass}`}>
+          {value}
+        </p>
       </CardContent>
     </Card>
   );
@@ -108,7 +110,11 @@ function StatCard({
 
 // ── Charges table ────────────────────────────────────────────────────────────
 
-function OutstandingChargesTable({ charges }: { charges: AccountSummaryCharge[] }) {
+function OutstandingChargesTable({
+  charges,
+}: {
+  charges: AccountSummaryCharge[];
+}) {
   if (charges.length === 0) {
     return (
       <EmptyState
@@ -152,7 +158,9 @@ function OutstandingChargesTable({ charges }: { charges: AccountSummaryCharge[] 
               <td className="px-4 py-3 text-sm font-medium text-slate-900">
                 <div className="flex flex-wrap items-center gap-2">
                   <span>{charge.title}</span>
-                  {charge.libraryFine ? <Badge variant="primary">Library fine</Badge> : null}
+                  {charge.libraryFine ? (
+                    <Badge variant="primary">Library fine</Badge>
+                  ) : null}
                 </div>
               </td>
               <td className="px-4 py-3 text-sm text-slate-600">
@@ -185,7 +193,11 @@ function OutstandingChargesTable({ charges }: { charges: AccountSummaryCharge[] 
 
 // ── Payments table ───────────────────────────────────────────────────────────
 
-function PaymentHistoryTable({ payments }: { payments: AccountSummaryPayment[] }) {
+function PaymentHistoryTable({
+  payments,
+}: {
+  payments: AccountSummaryPayment[];
+}) {
   if (payments.length === 0) {
     return (
       <EmptyState
@@ -246,25 +258,51 @@ function PaymentHistoryTable({ payments }: { payments: AccountSummaryPayment[] }
 // ── Main component ───────────────────────────────────────────────────────────
 
 export function ParentStudentBilling({ studentId }: { studentId: string }) {
-  const [summary, setSummary] = useState<StudentAccountSummary | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  type BillingState = {
+    isLoading: boolean;
+    error: string | null;
+    summary: StudentAccountSummary | null;
+  };
+  type BillingAction =
+    | { type: "loading" }
+    | { type: "success"; summary: StudentAccountSummary }
+    | { type: "error"; message: string };
+
+  function billingReducer(
+    _: BillingState,
+    action: BillingAction,
+  ): BillingState {
+    if (action.type === "loading")
+      return { isLoading: true, error: null, summary: null };
+    if (action.type === "success")
+      return { isLoading: false, error: null, summary: action.summary };
+    return { isLoading: false, error: action.message, summary: null };
+  }
+
+  const [{ isLoading, error, summary }, dispatch] = useReducer(billingReducer, {
+    isLoading: true,
+    error: null,
+    summary: null,
+  });
 
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    setError(null);
+    dispatch({ type: "loading" });
 
     getParentStudentAccountSummary(studentId)
       .then((data) => {
         if (cancelled) return;
-        setSummary(data);
-        setIsLoading(false);
+        dispatch({ type: "success", summary: data });
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Unable to load billing information.");
-        setIsLoading(false);
+        dispatch({
+          type: "error",
+          message:
+            err instanceof Error
+              ? err.message
+              : "Unable to load billing information.",
+        });
       });
 
     return () => {
@@ -299,9 +337,7 @@ export function ParentStudentBilling({ studentId }: { studentId: string }) {
           </div>
         }
         meta={
-          studentName ? (
-            <Badge variant="neutral">{studentName}</Badge>
-          ) : null
+          studentName ? <Badge variant="neutral">{studentName}</Badge> : null
         }
       />
 
@@ -310,7 +346,9 @@ export function ParentStudentBilling({ studentId }: { studentId: string }) {
       {isLoading ? (
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Loading billing information…</p>
+            <p className="text-sm text-slate-500">
+              Loading billing information…
+            </p>
           </CardContent>
         </Card>
       ) : null}
@@ -322,12 +360,18 @@ export function ParentStudentBilling({ studentId }: { studentId: string }) {
             <StatCard
               title="Amount due"
               value={formatCurrency(summary.totalOutstanding)}
-              tone={getMoneyNumber(summary.totalOutstanding) > 0 ? "danger" : "default"}
+              tone={
+                getMoneyNumber(summary.totalOutstanding) > 0
+                  ? "danger"
+                  : "default"
+              }
             />
             <StatCard
               title="Overdue"
               value={formatCurrency(summary.totalOverdue)}
-              tone={getMoneyNumber(summary.totalOverdue) > 0 ? "danger" : "default"}
+              tone={
+                getMoneyNumber(summary.totalOverdue) > 0 ? "danger" : "default"
+              }
             />
           </div>
 

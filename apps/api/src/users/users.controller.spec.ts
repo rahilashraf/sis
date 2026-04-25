@@ -13,6 +13,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ROLES_KEY } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 
@@ -82,6 +83,9 @@ describe('UsersController (HTTP)', () => {
     school: { findUnique: jest.Mock };
     $transaction: jest.Mock;
   };
+  let auditService: {
+    log: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -105,6 +109,10 @@ describe('UsersController (HTTP)', () => {
       return arg;
     });
 
+    auditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+    };
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
       providers: [
@@ -113,6 +121,10 @@ describe('UsersController (HTTP)', () => {
         {
           provide: PrismaService,
           useValue: prisma,
+        },
+        {
+          provide: AuditService,
+          useValue: auditService,
         },
       ],
     })

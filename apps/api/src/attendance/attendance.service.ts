@@ -610,6 +610,32 @@ export class AttendanceService {
     }
   }
 
+  private async ensureAttendanceEnabledForClasses(classIds: string[]) {
+    const uniqueClassIds = [...new Set(classIds.filter(Boolean))];
+
+    if (uniqueClassIds.length === 0) {
+      return;
+    }
+
+    const classes = await this.prisma.class.findMany({
+      where: {
+        id: {
+          in: uniqueClassIds,
+        },
+      },
+      select: {
+        id: true,
+        takesAttendance: true,
+      },
+    });
+
+    const disabledClass = classes.find((schoolClass) => !schoolClass.takesAttendance);
+
+    if (disabledClass) {
+      throw new BadRequestException('Attendance is not enabled for this class.');
+    }
+  }
+
   private async ensureParentLinkedToStudent(
     parentId: string,
     studentId: string,
@@ -1204,6 +1230,10 @@ export class AttendanceService {
       );
     }
 
+    if (classes.some((schoolClass) => !schoolClass.takesAttendance)) {
+      throw new BadRequestException('Attendance is not enabled for this class.');
+    }
+
     const allowedStudentIds = new Set<string>();
     for (const cls of classes) {
       for (const enrollment of cls.students) {
@@ -1348,6 +1378,7 @@ export class AttendanceService {
       scopeClassIds && scopeClassIds.length > 0
         ? await this.getWritableClassIdsForRequestedScope(user, scopeClassIds)
         : await this.getWritableClassIdsForSession(user, existingClassIds);
+    await this.ensureAttendanceEnabledForClasses(writableClassIds);
     const allowedStudentIds = await this.getStudentIdsForClasses(
       writableClassIds,
     );
@@ -2241,6 +2272,7 @@ export class AttendanceService {
 
     const classIds = existing.attendanceSession.classes.map((c) => c.classId);
     await this.ensureUserCanAccessClasses(user, classIds);
+    await this.ensureAttendanceEnabledForClasses(classIds);
 
     const customStatusesById = await this.getActiveCustomStatusMapForSchool(
       existing.attendanceSession.schoolId,

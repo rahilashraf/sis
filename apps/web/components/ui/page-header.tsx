@@ -34,11 +34,15 @@ export function PageHeader({
               {description}
             </p>
           ) : null}
-          {meta ? <div className="mt-4 flex flex-wrap gap-2">{meta}</div> : null}
+          {meta ? (
+            <div className="mt-4 flex flex-wrap gap-2">{meta}</div>
+          ) : null}
         </div>
 
         {actions ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {actions}
+          </div>
         ) : null}
       </div>
     </section>

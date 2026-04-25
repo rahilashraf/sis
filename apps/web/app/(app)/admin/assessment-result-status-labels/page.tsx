@@ -3,4 +3,3 @@ import { AssessmentResultStatusLabelsManagement } from "@/components/admin/asses
 export default function AdminAssessmentResultStatusLabelsPage() {
   return <AssessmentResultStatusLabelsManagement />;
 }
-

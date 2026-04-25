@@ -36,7 +36,9 @@ function parseDateOnlyParts(value: string) {
   return { year, month, day };
 }
 
-export function normalizeDateOnlyPayload(value: string | Date | null | undefined) {
+export function normalizeDateOnlyPayload(
+  value: string | Date | null | undefined,
+) {
   if (!value) {
     return "";
   }
@@ -77,7 +79,10 @@ export function parseDateOnly(value: string | Date | null | undefined) {
   return new Date(year, month - 1, day, 12);
 }
 
-export function formatDateOnly(value: string | Date | null | undefined, fallback = "—") {
+export function formatDateOnly(
+  value: string | Date | null | undefined,
+  fallback = "—",
+) {
   const parsed = parseDateOnly(value);
   if (!parsed) {
     return fallback;

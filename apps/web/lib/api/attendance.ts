@@ -158,7 +158,9 @@ export function getAttendanceSessions(schoolId: string, date: string) {
     date,
   });
 
-  return apiFetch<AttendanceSession[]>(`/attendance/sessions?${query.toString()}`);
+  return apiFetch<AttendanceSession[]>(
+    `/attendance/sessions?${query.toString()}`,
+  );
 }
 
 export function getAttendanceSession(sessionId: string) {

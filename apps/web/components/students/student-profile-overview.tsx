@@ -9,7 +9,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { StudentProfile } from "@/lib/api/students";
+import type {
+  StudentLinkedParentContact,
+  StudentProfile,
+} from "@/lib/api/students";
 import { formatDateOnly } from "@/lib/date";
 import {
   formatDateTimeLabel,
@@ -17,13 +20,7 @@ import {
   getDisplayText,
 } from "@/lib/utils";
 
-function DetailItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: ReactNode;
-}) {
+function DetailItem({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -44,12 +41,14 @@ function formatGenderLabel(value: StudentProfile["gender"]) {
 
 type StudentProfileOverviewProps = {
   student: StudentProfile;
+  linkedParentContacts?: StudentLinkedParentContact[];
   showSensitiveHealthInfo?: boolean;
   showInternalIds?: boolean;
 };
 
 export function StudentProfileOverview({
   student,
+  linkedParentContacts = [],
   showSensitiveHealthInfo = false,
   showInternalIds = true,
 }: StudentProfileOverviewProps) {
@@ -65,14 +64,16 @@ export function StudentProfileOverview({
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               School access
             </p>
-            <p className="mt-2 text-sm font-medium text-slate-900">{schoolLabel}</p>
+            <p className="mt-2 text-sm font-medium text-slate-900">
+              {schoolLabel}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-6">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Student number
+              Student ID
             </p>
             <p className="mt-2 text-sm font-medium text-slate-900">
               {getDisplayText(student.studentNumber)}
@@ -119,17 +120,34 @@ export function StudentProfileOverview({
               label="Student name"
               value={`${student.firstName} ${student.lastName}`}
             />
-            <DetailItem label="Username" value={getDisplayText(student.username)} />
-            <DetailItem label="Account email" value={getDisplayText(student.email)} />
-            <DetailItem label="Student email" value={getDisplayText(student.studentEmail)} />
+            <DetailItem
+              label="Username"
+              value={getDisplayText(student.username)}
+            />
+            <DetailItem
+              label="Account email"
+              value={getDisplayText(student.email)}
+            />
+            <DetailItem
+              label="Student email"
+              value={getDisplayText(student.studentEmail)}
+            />
             <DetailItem
               label="Grade level"
               value={getDisplayText(student.gradeLevel?.name)}
             />
-            <DetailItem label="Student number" value={getDisplayText(student.studentNumber)} />
+            <DetailItem
+              label="Student ID"
+              value={getDisplayText(student.studentNumber)}
+            />
             <DetailItem label="OEN" value={getDisplayText(student.oen)} />
-            <DetailItem label="Gender" value={formatGenderLabel(student.gender)} />
-            {showInternalIds ? <DetailItem label="System ID" value={student.id} /> : null}
+            <DetailItem
+              label="Gender"
+              value={formatGenderLabel(student.gender)}
+            />
+            {showInternalIds ? (
+              <DetailItem label="System ID" value={student.id} />
+            ) : null}
             <DetailItem
               label="Created"
               value={formatDateTimeLabel(student.createdAt)}
@@ -171,18 +189,70 @@ export function StudentProfileOverview({
 
         <Card>
           <CardHeader>
+            <CardTitle>Linked Parent Contacts</CardTitle>
+            <CardDescription>
+              Contact details below are sourced directly from linked parent
+              profiles.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {linkedParentContacts.length === 0 ? (
+              <p className="text-sm text-slate-600">
+                No linked parent profiles.
+              </p>
+            ) : (
+              linkedParentContacts.map((parent) => (
+                <div
+                  className="rounded-xl border border-slate-200 px-3 py-3"
+                  key={parent.linkId}
+                >
+                  <p className="text-sm font-medium text-slate-900">
+                    {parent.firstName} {parent.lastName}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {getDisplayText(parent.email, `@${parent.username}`)}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {getDisplayText(parent.phone, "No phone on file")}
+                  </p>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Guardian 1</CardTitle>
             <CardDescription>
-              Administrative guardian contact details stored on the student file.
+              Legacy guardian details stored directly on the student record.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-5 md:grid-cols-2">
-            <DetailItem label="Name" value={getDisplayText(student.guardian1Name)} />
-            <DetailItem label="Relationship" value={getDisplayText(student.guardian1Relationship)} />
-            <DetailItem label="Email" value={getDisplayText(student.guardian1Email)} />
-            <DetailItem label="Phone" value={getDisplayText(student.guardian1Phone)} />
-            <DetailItem label="Work phone" value={getDisplayText(student.guardian1WorkPhone)} />
-            <DetailItem label="Address" value={getDisplayText(student.guardian1Address)} />
+            <DetailItem
+              label="Name"
+              value={getDisplayText(student.guardian1Name)}
+            />
+            <DetailItem
+              label="Relationship"
+              value={getDisplayText(student.guardian1Relationship)}
+            />
+            <DetailItem
+              label="Email"
+              value={getDisplayText(student.guardian1Email)}
+            />
+            <DetailItem
+              label="Phone"
+              value={getDisplayText(student.guardian1Phone)}
+            />
+            <DetailItem
+              label="Work phone"
+              value={getDisplayText(student.guardian1WorkPhone)}
+            />
+            <DetailItem
+              label="Address"
+              value={getDisplayText(student.guardian1Address)}
+            />
           </CardContent>
         </Card>
 
@@ -190,16 +260,34 @@ export function StudentProfileOverview({
           <CardHeader>
             <CardTitle>Guardian 2</CardTitle>
             <CardDescription>
-              Secondary guardian contact details stored separately from parent links.
+              Legacy secondary guardian details stored on the student record.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-5 md:grid-cols-2">
-            <DetailItem label="Name" value={getDisplayText(student.guardian2Name)} />
-            <DetailItem label="Relationship" value={getDisplayText(student.guardian2Relationship)} />
-            <DetailItem label="Email" value={getDisplayText(student.guardian2Email)} />
-            <DetailItem label="Phone" value={getDisplayText(student.guardian2Phone)} />
-            <DetailItem label="Work phone" value={getDisplayText(student.guardian2WorkPhone)} />
-            <DetailItem label="Address" value={getDisplayText(student.guardian2Address)} />
+            <DetailItem
+              label="Name"
+              value={getDisplayText(student.guardian2Name)}
+            />
+            <DetailItem
+              label="Relationship"
+              value={getDisplayText(student.guardian2Relationship)}
+            />
+            <DetailItem
+              label="Email"
+              value={getDisplayText(student.guardian2Email)}
+            />
+            <DetailItem
+              label="Phone"
+              value={getDisplayText(student.guardian2Phone)}
+            />
+            <DetailItem
+              label="Work phone"
+              value={getDisplayText(student.guardian2WorkPhone)}
+            />
+            <DetailItem
+              label="Address"
+              value={getDisplayText(student.guardian2Address)}
+            />
           </CardContent>
         </Card>
 
@@ -207,16 +295,28 @@ export function StudentProfileOverview({
           <CardHeader>
             <CardTitle>Additional Contact</CardTitle>
             <CardDescription>
-              Existing address and emergency contact details retained on the student
-              record.
+              Existing address and emergency contact details retained on the
+              student record.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-5 md:grid-cols-2">
-            <DetailItem label="Address line 1" value={getDisplayText(student.addressLine1)} />
-            <DetailItem label="Address line 2" value={getDisplayText(student.addressLine2)} />
+            <DetailItem
+              label="Address line 1"
+              value={getDisplayText(student.addressLine1)}
+            />
+            <DetailItem
+              label="Address line 2"
+              value={getDisplayText(student.addressLine2)}
+            />
             <DetailItem label="City" value={getDisplayText(student.city)} />
-            <DetailItem label="Province" value={getDisplayText(student.province)} />
-            <DetailItem label="Postal code" value={getDisplayText(student.postalCode)} />
+            <DetailItem
+              label="Province"
+              value={getDisplayText(student.province)}
+            />
+            <DetailItem
+              label="Postal code"
+              value={getDisplayText(student.postalCode)}
+            />
             <DetailItem
               label="Emergency contact"
               value={getDisplayText(student.emergencyContactName)}

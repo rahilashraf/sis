@@ -5,7 +5,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AuditLogSeverity, Prisma, UserRole } from '@prisma/client';
+import {
+  AuditLogSeverity,
+  Prisma,
+  TeacherClassAssignmentType,
+  UserRole,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../common/auth/auth-user';
 import {
@@ -157,6 +162,7 @@ type StudentProfileRecord = Prisma.UserGetPayload<{
   select: typeof studentProfileSelect;
 }>;
 
+
 @Injectable()
 export class StudentsService {
   constructor(
@@ -281,6 +287,27 @@ export class StudentsService {
   ): StudentProfileRecord {
     if (this.isAdminLike(actor.role)) {
       return student;
+    }
+
+    if (
+      actor.role === UserRole.TEACHER ||
+      actor.role === UserRole.SUPPLY_TEACHER
+    ) {
+      return {
+        ...student,
+        username: '',
+        email: null,
+        studentEmail: null,
+        healthCardNumber: null,
+        guardian1Address: null,
+        guardian2Address: null,
+        addressLine1: null,
+        addressLine2: null,
+        city: null,
+        province: null,
+        postalCode: null,
+        memberships: [],
+      };
     }
 
     return {
@@ -421,6 +448,49 @@ export class StudentsService {
     }
   }
 
+  private buildActiveSupplyAssignmentWindowWhere(now: Date) {
+    return {
+      assignmentType: TeacherClassAssignmentType.SUPPLY,
+      startsAt: { lte: now },
+      OR: [{ endsAt: null }, { endsAt: { gte: now } }],
+    } satisfies Prisma.TeacherClassAssignmentWhereInput;
+  }
+
+  private async ensureTeacherCanAccessStudent(
+    actor: AuthenticatedUser,
+    studentId: string,
+  ) {
+    const now = new Date();
+
+    const assignment = await this.prisma.teacherClassAssignment.findFirst({
+      where: {
+        teacherId: actor.id,
+        class: {
+          students: {
+            some: {
+              studentId,
+            },
+          },
+        },
+        ...(actor.role === UserRole.SUPPLY_TEACHER
+          ? {
+              OR: [
+                { assignmentType: TeacherClassAssignmentType.REGULAR },
+                this.buildActiveSupplyAssignmentWindowWhere(now),
+              ],
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!assignment) {
+      throw new ForbiddenException('You do not have student access');
+    }
+  }
+
   async findParents(actor: AuthenticatedUser, studentId: string) {
     if (!this.isAdminLike(actor.role)) {
       throw new ForbiddenException('You do not have student access');
@@ -452,6 +522,11 @@ export class StudentsService {
 
     if (this.isAdminLike(actor.role)) {
       this.ensureAdminCanAccessStudent(actor, student);
+    } else if (
+      actor.role === UserRole.TEACHER ||
+      actor.role === UserRole.SUPPLY_TEACHER
+    ) {
+      await this.ensureTeacherCanAccessStudent(actor, studentId);
     } else if (actor.role === UserRole.PARENT) {
       await this.ensureParentLinkedToStudent(actor.id, studentId);
     } else {

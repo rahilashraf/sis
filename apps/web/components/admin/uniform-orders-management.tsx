@@ -101,7 +101,9 @@ export function UniformOrdersManagement() {
         setSchools(schoolResponse);
 
         const defaultSchoolId =
-          getDefaultSchoolContextId(session?.user) ?? schoolResponse[0]?.id ?? "";
+          getDefaultSchoolContextId(session?.user) ??
+          schoolResponse[0]?.id ??
+          "";
         const resolvedSchoolId =
           schoolResponse.find((school) => school.id === defaultSchoolId)?.id ??
           schoolResponse[0]?.id ??
@@ -109,7 +111,11 @@ export function UniformOrdersManagement() {
 
         setSchoolId(resolvedSchoolId);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load schools.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load schools.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -172,7 +178,11 @@ export function UniformOrdersManagement() {
       <PageHeader
         title="Uniform Orders"
         description="Review parent orders and track fulfillment status."
-        meta={<Badge variant="neutral">{selectedSchool?.name ?? "All schools"}</Badge>}
+        meta={
+          <Badge variant="neutral">
+            {selectedSchool?.name ?? "All schools"}
+          </Badge>
+        }
       />
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
@@ -201,7 +211,9 @@ export function UniformOrdersManagement() {
           <Field htmlFor="uniform-orders-status" label="Status">
             <Select
               id="uniform-orders-status"
-              onChange={(event) => setStatus(event.target.value as "" | UniformOrderStatus)}
+              onChange={(event) =>
+                setStatus(event.target.value as "" | UniformOrderStatus)
+              }
               value={status}
             >
               <option value="">All statuses</option>
@@ -219,7 +231,9 @@ export function UniformOrdersManagement() {
         <CardHeader>
           <CardTitle>Orders</CardTitle>
           <CardDescription>
-            {isRefreshing ? "Refreshing..." : `${orders.length} order${orders.length === 1 ? "" : "s"}`}
+            {isRefreshing
+              ? "Refreshing..."
+              : `${orders.length} order${orders.length === 1 ? "" : "s"}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -235,25 +249,46 @@ export function UniformOrdersManagement() {
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50/80">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Order</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Student</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Parent</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Total</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Action</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Order
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Student
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Parent
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Total
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {orders.map((order) => (
-                      <tr className="align-top hover:bg-slate-50" key={order.id}>
+                      <tr
+                        className="align-top hover:bg-slate-50"
+                        key={order.id}
+                      >
                         <td className="px-4 py-3">
-                          <p className="font-medium text-slate-900">#{order.id.slice(0, 8)}</p>
+                          <p className="font-medium text-slate-900">
+                            #{order.id.slice(0, 8)}
+                          </p>
                           <p className="mt-1 text-xs text-slate-500">
                             {formatDateTimeLabel(order.createdAt)}
                           </p>
                         </td>
-                        <td className="px-4 py-3 text-slate-700">{getPersonLabel(order.student)}</td>
-                        <td className="px-4 py-3 text-slate-700">{getPersonLabel(order.parent)}</td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {getPersonLabel(order.student)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {getPersonLabel(order.parent)}
+                        </td>
                         <td className="px-4 py-3">
                           <Badge variant={getStatusVariant(order.status)}>
                             {formatUniformOrderStatusLabel(order.status)}
@@ -264,7 +299,10 @@ export function UniformOrdersManagement() {
                         </td>
                         <td className="px-4 py-3">
                           <Link
-                            className={buttonClassName({ size: "sm", variant: "secondary" })}
+                            className={buttonClassName({
+                              size: "sm",
+                              variant: "secondary",
+                            })}
                             href={`/admin/uniform/orders/${encodeURIComponent(order.id)}`}
                           >
                             View

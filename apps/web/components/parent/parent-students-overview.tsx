@@ -18,11 +18,23 @@ import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth/auth-context";
-import { listMyParentStudents, type ParentStudentLink } from "@/lib/api/students";
-import { getStudentAcademicOverview, type StudentAcademicOverview } from "@/lib/api/gradebook";
-import { getAttendanceStudentSummary, type AttendanceStudentSummary } from "@/lib/api/attendance";
+import {
+  listMyParentStudents,
+  type ParentStudentLink,
+} from "@/lib/api/students";
+import {
+  getStudentAcademicOverview,
+  type StudentAcademicOverview,
+} from "@/lib/api/gradebook";
+import {
+  getAttendanceStudentSummary,
+  type AttendanceStudentSummary,
+} from "@/lib/api/attendance";
 import { listSchoolYears } from "@/lib/api/schools";
-import { getReRegistrationWindowStatus, type ReRegistrationWindowStatus } from "@/lib/api/re-registration";
+import {
+  getReRegistrationWindowStatus,
+  type ReRegistrationWindowStatus,
+} from "@/lib/api/re-registration";
 import { listParentForms, type ParentFormSummary } from "@/lib/api/forms";
 import { getDefaultSchoolContextId } from "@/lib/auth/school-membership";
 import { dateOnlyFromDate, parseDateOnly } from "@/lib/date";
@@ -37,9 +49,12 @@ export function ParentStudentsOverview() {
   const { session } = useAuth();
   const [links, setLinks] = useState<ParentStudentLink[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string>("");
-  const [academicOverview, setAcademicOverview] = useState<StudentAcademicOverview | null>(null);
-  const [attendanceSummary, setAttendanceSummary] = useState<AttendanceStudentSummary | null>(null);
-  const [reRegistrationStatus, setReRegistrationStatus] = useState<ReRegistrationWindowStatus | null>(null);
+  const [academicOverview, setAcademicOverview] =
+    useState<StudentAcademicOverview | null>(null);
+  const [attendanceSummary, setAttendanceSummary] =
+    useState<AttendanceStudentSummary | null>(null);
+  const [reRegistrationStatus, setReRegistrationStatus] =
+    useState<ReRegistrationWindowStatus | null>(null);
   const [parentForms, setParentForms] = useState<ParentFormSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,9 +74,10 @@ export function ParentStudentsOverview() {
         setLinks(response);
         const requestedStudentId = searchParams.get("studentId") ?? "";
         const defaultStudentId =
-          requestedStudentId && response.some((entry) => entry.studentId === requestedStudentId)
+          requestedStudentId &&
+          response.some((entry) => entry.studentId === requestedStudentId)
             ? requestedStudentId
-            : response[0]?.studentId ?? "";
+            : (response[0]?.studentId ?? "");
         setSelectedStudentId((current) => current || defaultStudentId);
       } catch (loadError) {
         setError(
@@ -100,27 +116,31 @@ export function ParentStudentsOverview() {
         const start = new Date(today);
         start.setDate(today.getDate() - 30);
 
-        const [overviewResponse, attendanceResponse, formsResponse] = await Promise.all([
-          getStudentAcademicOverview(selectedStudentId),
-          getAttendanceStudentSummary({
-            studentId: selectedStudentId,
-            startDate: toISODate(start),
-            endDate: toISODate(today),
-          }),
-          listParentForms(selectedStudentId),
-        ]);
+        const [overviewResponse, attendanceResponse, formsResponse] =
+          await Promise.all([
+            getStudentAcademicOverview(selectedStudentId),
+            getAttendanceStudentSummary({
+              studentId: selectedStudentId,
+              startDate: toISODate(start),
+              endDate: toISODate(today),
+            }),
+            listParentForms(selectedStudentId),
+          ]);
 
         setAcademicOverview(overviewResponse);
         setAttendanceSummary(attendanceResponse);
         setParentForms(formsResponse);
 
-        const membershipSchoolId = getDefaultSchoolContextId(selectedLink?.student) ?? "";
+        const membershipSchoolId =
+          getDefaultSchoolContextId(selectedLink?.student) ?? "";
         if (!membershipSchoolId) {
           setReRegistrationStatus(null);
           return;
         }
 
-        const schoolYears = await listSchoolYears(membershipSchoolId, { includeInactive: true });
+        const schoolYears = await listSchoolYears(membershipSchoolId, {
+          includeInactive: true,
+        });
         const now = new Date();
         const upcoming =
           schoolYears
@@ -129,8 +149,12 @@ export function ParentStudentsOverview() {
               return startDate ? startDate > now : false;
             })
             .sort((a, b) => {
-              const startA = parseDateOnly(a.startDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-              const startB = parseDateOnly(b.startDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+              const startA =
+                parseDateOnly(a.startDate)?.getTime() ??
+                Number.MAX_SAFE_INTEGER;
+              const startB =
+                parseDateOnly(b.startDate)?.getTime() ??
+                Number.MAX_SAFE_INTEGER;
               return startA - startB;
             })[0] ??
           schoolYears.find((year) => year.isActive) ??
@@ -168,7 +192,9 @@ export function ParentStudentsOverview() {
         description="Summary-first academic and attendance view for your linked students."
         meta={
           <Badge variant="neutral">
-            {isLoading ? "Loading..." : `${links.length} linked child${links.length === 1 ? "" : "ren"}`}
+            {isLoading
+              ? "Loading..."
+              : `${links.length} linked child${links.length === 1 ? "" : "ren"}`}
           </Badge>
         }
         title="Parent Portal"
@@ -311,7 +337,9 @@ export function ParentStudentsOverview() {
                     Re-registration is now open
                   </p>
                   <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
-                    {selectedLink?.student.firstName} {selectedLink?.student.lastName} is ready for next-year confirmation.
+                    {selectedLink?.student.firstName}{" "}
+                    {selectedLink?.student.lastName} is ready for next-year
+                    confirmation.
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-slate-700">
                     Complete the re-registration form while the window is open
@@ -338,7 +366,8 @@ export function ParentStudentsOverview() {
                 </div>
               </CardContent>
             </Card>
-          ) : selectedStudentId && reRegistrationStatus?.status === "UPCOMING" ? (
+          ) : selectedStudentId &&
+            reRegistrationStatus?.status === "UPCOMING" ? (
             <Card className="border-blue-200 bg-blue-50/60">
               <CardContent className="pt-6">
                 <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">
@@ -347,12 +376,15 @@ export function ParentStudentsOverview() {
                 <p className="mt-2 text-sm leading-6 text-slate-700">
                   Re-registration opens on{" "}
                   {reRegistrationStatus.window?.opensAt
-                    ? new Date(reRegistrationStatus.window.opensAt).toLocaleDateString("en-CA", {
+                    ? new Date(
+                        reRegistrationStatus.window.opensAt,
+                      ).toLocaleDateString("en-CA", {
                         year: "numeric",
                         month: "long",
                         day: "numeric",
                       })
-                    : "a future date"}.
+                    : "a future date"}
+                  .
                 </p>
               </CardContent>
             </Card>
@@ -366,26 +398,37 @@ export function ParentStudentsOverview() {
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Attendance (30 days)</CardTitle>
-                  <CardDescription>Present / Late / Absent summary</CardDescription>
+                  <CardTitle className="text-base">
+                    Attendance (30 days)
+                  </CardTitle>
+                  <CardDescription>
+                    Present / Late / Absent summary
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">Present</span>
-                    <span className="font-medium text-slate-900">{attendanceSummary?.presentCount ?? "—"}</span>
+                    <span className="font-medium text-slate-900">
+                      {attendanceSummary?.presentCount ?? "—"}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">Late</span>
-                    <span className="font-medium text-slate-900">{attendanceSummary?.lateCount ?? "—"}</span>
+                    <span className="font-medium text-slate-900">
+                      {attendanceSummary?.lateCount ?? "—"}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">Absent</span>
-                    <span className="font-medium text-slate-900">{attendanceSummary?.absentCount ?? "—"}</span>
+                    <span className="font-medium text-slate-900">
+                      {attendanceSummary?.absentCount ?? "—"}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">Rate</span>
                     <span className="font-medium text-slate-900">
-                      {typeof attendanceSummary?.attendancePercentage === "number"
+                      {typeof attendanceSummary?.attendancePercentage ===
+                      "number"
                         ? `${attendanceSummary.attendancePercentage}%`
                         : "—"}
                     </span>
@@ -402,18 +445,27 @@ export function ParentStudentsOverview() {
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">Open</span>
                     <span className="font-medium text-slate-900">
-                      {parentForms.filter((form) => form.state === "OPEN").length}
+                      {
+                        parentForms.filter((form) => form.state === "OPEN")
+                          .length
+                      }
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">Submitted</span>
                     <span className="font-medium text-slate-900">
-                      {parentForms.filter((form) => form.state === "SUBMITTED").length}
+                      {
+                        parentForms.filter((form) => form.state === "SUBMITTED")
+                          .length
+                      }
                     </span>
                   </div>
                   <div className="pt-1">
                     <Link
-                      className={buttonClassName({ size: "sm", variant: "secondary" })}
+                      className={buttonClassName({
+                        size: "sm",
+                        variant: "secondary",
+                      })}
                       href={`/parent/forms?studentId=${encodeURIComponent(selectedStudentId)}`}
                     >
                       Open forms
@@ -427,7 +479,9 @@ export function ParentStudentsOverview() {
           <Card>
             <CardHeader>
               <CardTitle>Courses</CardTitle>
-              <CardDescription>Course-by-course overview with parent-visible grades.</CardDescription>
+              <CardDescription>
+                Course-by-course overview with parent-visible grades.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {!academicOverview ? (
@@ -448,34 +502,60 @@ export function ParentStudentsOverview() {
                     <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                       <thead className="bg-slate-50/80">
                         <tr>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Course</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">School year</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Progress</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">%</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Grade</th>
-                          <th className="px-4 py-3 font-semibold text-slate-700">Action</th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Course
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            School year
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Progress
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            %
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Grade
+                          </th>
+                          <th className="px-4 py-3 font-semibold text-slate-700">
+                            Action
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 bg-white">
                         {academicOverview.classes.map((entry) => (
-                          <tr className="align-top hover:bg-slate-50" key={entry.class.id}>
+                          <tr
+                            className="align-top hover:bg-slate-50"
+                            key={entry.class.id}
+                          >
                             <td className="px-4 py-3">
-                              <p className="font-medium text-slate-900">{entry.class.name}</p>
+                              <p className="font-medium text-slate-900">
+                                {entry.class.name}
+                              </p>
                               <p className="mt-1 text-xs text-slate-500">
-                                {entry.class.subject ?? "—"} • {entry.class.school.shortName ?? entry.class.school.name}
+                                {entry.class.subject ?? "—"} •{" "}
+                                {entry.class.school.shortName ??
+                                  entry.class.school.name}
                               </p>
                             </td>
-                            <td className="px-4 py-3 text-slate-600">{entry.class.schoolYear.name}</td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {entry.class.schoolYear.name}
+                            </td>
                             <td className="px-4 py-3 text-slate-600">
                               {entry.gradedCount}/{entry.assessmentCount} graded
                             </td>
                             <td className="px-4 py-3 text-slate-900">
                               {formatDisplayedPercent(entry.averagePercent)}
                             </td>
-                            <td className="px-4 py-3 text-slate-900">{entry.averageLetterGrade ?? "—"}</td>
+                            <td className="px-4 py-3 text-slate-900">
+                              {entry.averageLetterGrade ?? "—"}
+                            </td>
                             <td className="px-4 py-3">
                               <Link
-                                className={buttonClassName({ size: "sm", variant: "secondary" })}
+                                className={buttonClassName({
+                                  size: "sm",
+                                  variant: "secondary",
+                                })}
                                 href={`/parent/students/${selectedStudentId}/classes/${entry.class.id}`}
                               >
                                 View
