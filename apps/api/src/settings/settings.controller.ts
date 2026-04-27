@@ -6,7 +6,7 @@ import type { AuthenticatedRequest } from '../common/auth/auth-user';
 import { UpdateAuditSettingsDto } from './dto/update-audit-settings.dto';
 import { SettingsService } from './settings.service';
 
-@Controller('settings')
+@Controller(['settings', 'api/settings'])
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
