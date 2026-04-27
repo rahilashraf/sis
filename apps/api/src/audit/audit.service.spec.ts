@@ -16,6 +16,9 @@ describe('AuditService', () => {
     auditArchiveHistory: {
       create: jest.Mock;
     };
+    systemSetting: {
+      findUnique: jest.Mock;
+    };
     $transaction: jest.Mock;
   };
   let tx: {
@@ -56,6 +59,9 @@ describe('AuditService', () => {
       auditArchiveHistory: {
         create: jest.fn(),
       },
+      systemSetting: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
       $transaction: jest.fn().mockImplementation(async (arg: unknown) => {
         if (typeof arg === 'function') {
           return arg(tx);
@@ -84,6 +90,38 @@ describe('AuditService', () => {
     });
 
     expect(prisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('uses database setting override when present (false over env true)', async () => {
+    process.env.AUDIT_LOGS_ENABLED = 'true';
+    process.env.AUDIT_LOG_LEVEL = 'verbose';
+    prisma.systemSetting.findUnique.mockResolvedValue({
+      value: 'false',
+    });
+
+    await service.log({
+      entityType: 'AttendanceSession',
+      action: 'UPDATE',
+      summary: 'Updated attendance session',
+    });
+
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('uses database setting override when present (true over env false)', async () => {
+    process.env.AUDIT_LOGS_ENABLED = 'false';
+    process.env.AUDIT_LOG_LEVEL = 'critical';
+    prisma.systemSetting.findUnique.mockResolvedValue({
+      value: 'true',
+    });
+
+    await service.log({
+      entityType: 'AttendanceSession',
+      action: 'UPDATE',
+      summary: 'Updated attendance session',
+    });
+
+    expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
   });
 
   it('logs critical actions when audit level is critical', async () => {

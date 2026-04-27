@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import type { AuthenticatedUser } from '../common/auth/auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { SYSTEM_SETTING_KEY_AUDIT_LOGS_ENABLED } from '../settings/settings.constants';
 import {
   AUDIT_EXPORT_MAX_ROWS,
   AUDIT_PURGE_CONFIRMATION_TEXT,
@@ -72,6 +73,20 @@ function toCsvValue(value: unknown) {
   return `"${escaped}"`;
 }
 
+function parseBooleanSettingValue(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+
+  if (['0', 'false', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+
+  return null;
+}
+
 const STANDARD_WRITE_ACTION_PREFIXES = [
   'CREATE',
   'UPDATE',
@@ -127,10 +142,32 @@ export class AuditService {
 
   private getAuditConfig() {
     return {
-      enabled: resolveAuditLogsEnabled(),
       level: resolveAuditLogLevel(),
       retentionDays: resolveAuditRetentionDays(),
     };
+  }
+
+  private async resolveAuditLogsEnabledEffective() {
+    try {
+      const setting = await this.prisma.systemSetting.findUnique({
+        where: {
+          key: SYSTEM_SETTING_KEY_AUDIT_LOGS_ENABLED,
+        },
+        select: {
+          value: true,
+        },
+      });
+
+      const parsed = setting ? parseBooleanSettingValue(setting.value) : null;
+
+      if (typeof parsed === 'boolean') {
+        return parsed;
+      }
+    } catch (error) {
+      console.error('Audit setting lookup failed, falling back to env:', error);
+    }
+
+    return resolveAuditLogsEnabled();
   }
 
   private isStandardWriteAction(action: string) {
@@ -168,10 +205,12 @@ export class AuditService {
     );
   }
 
-  shouldLog(input: Pick<AuditLogInput, 'entityType' | 'action'>) {
+  async shouldLog(input: Pick<AuditLogInput, 'entityType' | 'action'>) {
     const config = this.getAuditConfig();
 
-    if (!config.enabled) {
+    const enabled = await this.resolveAuditLogsEnabledEffective();
+
+    if (!enabled) {
       return false;
     }
 
@@ -383,7 +422,7 @@ export class AuditService {
       });
 
       if (
-        this.shouldLog({
+        await this.shouldLog({
           entityType: 'AuditLog',
           action: 'RETENTION_PURGE',
         })
@@ -414,7 +453,7 @@ export class AuditService {
   }
 
   async log(input: AuditLogInput) {
-    if (!this.shouldLog(input)) {
+    if (!(await this.shouldLog(input))) {
       return;
     }
 
@@ -937,7 +976,7 @@ export class AuditService {
       });
 
       if (
-        this.shouldLog({
+        await this.shouldLog({
           entityType: 'AuditLog',
           action: 'PURGE',
         })

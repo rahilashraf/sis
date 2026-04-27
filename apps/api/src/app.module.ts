@@ -29,6 +29,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { LibraryModule } from './library/library.module';
 import { UniformModule } from './uniform/uniform.module';
 import { InterviewsModule } from './interviews/interviews.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { InterviewsModule } from './interviews/interviews.module';
     LibraryModule,
     UniformModule,
     InterviewsModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

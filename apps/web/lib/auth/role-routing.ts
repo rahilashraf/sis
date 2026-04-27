@@ -203,6 +203,7 @@ export function getNavigationItems(role: UserRole) {
         includeSchoolChildren: true,
       }),
       { href: "/notifications", label: "Notifications" },
+      { href: "/admin/audit", label: "Audit Logs" },
     );
 
     return items;

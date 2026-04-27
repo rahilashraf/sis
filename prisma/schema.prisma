@@ -1318,6 +1318,16 @@ model AuditArchiveHistory {
   @@index([fromDate, toDate])
 }
 
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
+
 enum ChargeStatus {
   PENDING
   PAID

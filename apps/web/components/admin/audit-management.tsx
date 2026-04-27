@@ -28,6 +28,7 @@ import {
   type AuditSummary,
   type AuditLogSeverity,
 } from "@/lib/api/audit";
+import { getAuditSettings, updateAuditSettings } from "@/lib/api/settings";
 import { listUsers, type ManagedUser } from "@/lib/api/users";
 
 type FilterState = {
@@ -89,6 +90,10 @@ function severityColor(severity: AuditLogSeverity) {
 
 export function AuditManagement() {
   const { user } = useAuth();
+  const canManageAuditSettings =
+    user?.role === "OWNER" || user?.role === "SUPER_ADMIN";
+  const canViewAuditLogs = user?.role === "OWNER";
+
   const [filters, setFilters] = useState<FilterState>({
     fromDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
       .toISOString()
@@ -119,19 +124,57 @@ export function AuditManagement() {
   const [showPurgeDialog, setShowPurgeDialog] = useState(false);
   const [purgeConfirmation, setPurgeConfirmation] = useState("");
   const [purging, setPurging] = useState(false);
+  const [auditEnabled, setAuditEnabled] = useState<boolean | null>(null);
+  const [loadingAuditSetting, setLoadingAuditSetting] = useState(false);
+  const [savingAuditSetting, setSavingAuditSetting] = useState(false);
+  const [showDisableDialog, setShowDisableDialog] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!canManageAuditSettings) {
+      return;
+    }
+
+    setLoadingAuditSetting(true);
+    setSettingsError(null);
+
+    getAuditSettings()
+      .then((result) => {
+        setAuditEnabled(result.enabled);
+      })
+      .catch((loadError) => {
+        setSettingsError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Failed to load audit setting",
+        );
+      })
+      .finally(() => {
+        setLoadingAuditSetting(false);
+      });
+  }, [canManageAuditSettings]);
 
   // Load actors on mount
   useEffect(() => {
+    if (!canViewAuditLogs) {
+      return;
+    }
+
     listUsers({ sort: "name" }).then(setActors).catch(console.error);
-  }, []);
+  }, [canViewAuditLogs]);
 
   // Load logs and summary
   useEffect(() => {
+    if (!canViewAuditLogs) {
+      return;
+    }
+
     (async () => {
       await loadLogs();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
+  }, [canViewAuditLogs, filters]);
 
   async function loadLogs() {
     setLoading(true);
@@ -221,6 +264,59 @@ export function AuditManagement() {
     }
   }
 
+  async function persistAuditEnabled(nextEnabled: boolean) {
+    const previousValue = auditEnabled;
+
+    setSavingAuditSetting(true);
+    setSettingsError(null);
+    setSettingsSuccess(null);
+    setAuditEnabled(nextEnabled);
+
+    try {
+      const result = await updateAuditSettings({
+        enabled: nextEnabled,
+      });
+      setAuditEnabled(result.enabled);
+      setSettingsSuccess(
+        result.enabled ? "Audit logs enabled." : "Audit logs disabled.",
+      );
+      return true;
+    } catch (saveError) {
+      setAuditEnabled(previousValue);
+      setSettingsError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to update audit setting",
+      );
+      return false;
+    } finally {
+      setSavingAuditSetting(false);
+    }
+  }
+
+  function handleEnableAuditLogs() {
+    if (auditEnabled === null || auditEnabled || savingAuditSetting) {
+      return;
+    }
+
+    void persistAuditEnabled(true);
+  }
+
+  function handleDisableAuditLogsRequest() {
+    if (auditEnabled !== true || savingAuditSetting) {
+      return;
+    }
+
+    setShowDisableDialog(true);
+  }
+
+  async function handleDisableAuditLogsConfirm() {
+    const success = await persistAuditEnabled(false);
+    if (success) {
+      setShowDisableDialog(false);
+    }
+  }
+
   async function handlePurge() {
     if (purgeConfirmation !== "PURGE AUDIT LOGS") {
       setError("Confirmation text must be exactly 'PURGE AUDIT LOGS'");
@@ -249,10 +345,10 @@ export function AuditManagement() {
     }
   }
 
-  if (!user || user.role !== "OWNER") {
+  if (!user || !canManageAuditSettings) {
     return (
       <Notice tone="danger" title="Access Denied">
-        Only account owners can access audit logs.
+        Only owners and super admins can access audit settings.
       </Notice>
     );
   }
@@ -264,11 +360,67 @@ export function AuditManagement() {
         description="View and manage system audit logs for compliance and monitoring."
       />
 
-      {error && (
+      {settingsError ? (
+        <Notice tone="danger" title="Settings Error">
+          {settingsError}
+        </Notice>
+      ) : null}
+      {settingsSuccess ? <Notice tone="success">{settingsSuccess}</Notice> : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Security / System Settings</CardTitle>
+          <CardDescription>
+            Audit Logs: Record critical system actions for accountability.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="text-sm text-slate-600">Status</div>
+            <Badge variant={auditEnabled ? "success" : "danger"}>
+              {loadingAuditSetting
+                ? "Loading..."
+                : auditEnabled
+                  ? "ON"
+                  : "OFF"}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              disabled={
+                loadingAuditSetting ||
+                savingAuditSetting ||
+                auditEnabled === null ||
+                auditEnabled === true
+              }
+              onClick={handleEnableAuditLogs}
+              variant={auditEnabled ? "secondary" : "primary"}
+            >
+              {savingAuditSetting && auditEnabled !== true ? "Saving..." : "ON"}
+            </Button>
+            <Button
+              disabled={
+                loadingAuditSetting ||
+                savingAuditSetting ||
+                auditEnabled === null ||
+                auditEnabled !== true
+              }
+              onClick={handleDisableAuditLogsRequest}
+              variant={auditEnabled ? "danger" : "secondary"}
+            >
+              {savingAuditSetting && auditEnabled !== false ? "Saving..." : "OFF"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {canViewAuditLogs ? (
+        <>
+          {error && (
         <Notice tone="danger" title="Error">
           {error}
         </Notice>
-      )}
+          )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -610,6 +762,25 @@ export function AuditManagement() {
           </Card>
         </div>
       )}
+        </>
+      ) : (
+        <Notice tone="info" title="Owner Access">
+          Only account owners can view, export, and purge audit logs. You can
+          still enable or disable audit logging from this page.
+        </Notice>
+      )}
+
+      <ConfirmDialog
+        title="Disable audit logs?"
+        description="This will stop recording future audit events until re-enabled."
+        isOpen={showDisableDialog}
+        isPending={savingAuditSetting}
+        onCancel={() => setShowDisableDialog(false)}
+        onConfirm={handleDisableAuditLogsConfirm}
+        confirmVariant="danger"
+        confirmLabel="Disable"
+        pendingLabel="Disabling..."
+      />
     </div>
   );
 }
