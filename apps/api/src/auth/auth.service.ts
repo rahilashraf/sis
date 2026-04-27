@@ -7,9 +7,13 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { safeUserSelect } from '../common/prisma/safe-user-response';
+import {
+  safeUserSchoolMembershipSelect,
+  safeUserSelect,
+} from '../common/prisma/safe-user-response';
 import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +22,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private readonly auditService: AuditService,
   ) {}
 
   async login(username: string, password: string) {
@@ -41,6 +46,15 @@ export class AuthService {
     });
 
     if (!user) {
+      await this.auditService.logCritical({
+        entityType: 'Auth',
+        action: 'LOGIN_FAILED',
+        summary: `Failed login attempt for username ${username}`,
+        targetDisplay: username,
+        metadataJson: {
+          reason: 'USER_NOT_FOUND',
+        },
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -52,6 +66,22 @@ export class AuthService {
     });
 
     if (!user.isActive) {
+      await this.auditService.logCritical({
+        actor: {
+          id: user.id,
+          role: user.role,
+          memberships: user.memberships,
+        },
+        schoolId: user.schoolId ?? user.memberships[0]?.schoolId ?? null,
+        entityType: 'Auth',
+        entityId: user.id,
+        action: 'LOGIN_FAILED',
+        summary: `Failed login for inactive user ${user.username}`,
+        targetDisplay: user.username,
+        metadataJson: {
+          reason: 'INACTIVE_USER',
+        },
+      });
       throw new UnauthorizedException('User account is inactive');
     }
 
@@ -65,6 +95,22 @@ export class AuthService {
     });
 
     if (!isMatch) {
+      await this.auditService.logCritical({
+        actor: {
+          id: user.id,
+          role: user.role,
+          memberships: user.memberships,
+        },
+        schoolId: user.schoolId ?? user.memberships[0]?.schoolId ?? null,
+        entityType: 'Auth',
+        entityId: user.id,
+        action: 'LOGIN_FAILED',
+        summary: `Failed login due to invalid password for user ${user.username}`,
+        targetDisplay: user.username,
+        metadataJson: {
+          reason: 'INVALID_PASSWORD',
+        },
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -81,6 +127,20 @@ export class AuthService {
       username,
       userId: user.id,
       tokenCreated: Boolean(accessToken),
+    });
+
+    await this.auditService.logCritical({
+      actor: {
+        id: user.id,
+        role: user.role,
+        memberships: user.memberships,
+      },
+      schoolId: user.schoolId ?? user.memberships[0]?.schoolId ?? null,
+      entityType: 'Auth',
+      entityId: user.id,
+      action: 'LOGIN_SUCCESS',
+      summary: `User ${user.username} logged in successfully`,
+      targetDisplay: user.username,
     });
 
     const safeUser = { ...user };
@@ -157,6 +217,14 @@ export class AuthService {
       select: {
         id: true,
         isActive: true,
+        schoolId: true,
+        role: true,
+        memberships: {
+          where: {
+            isActive: true,
+          },
+          select: safeUserSchoolMembershipSelect,
+        },
         passwordHash: true,
       },
     });
@@ -185,6 +253,19 @@ export class AuthService {
       data: {
         passwordHash,
       },
+    });
+
+    await this.auditService.logCritical({
+      actor: {
+        id: user.id,
+        role: user.role,
+        memberships: user.memberships,
+      },
+      schoolId: user.schoolId ?? user.memberships[0]?.schoolId ?? null,
+      entityType: 'User',
+      entityId: user.id,
+      action: 'PASSWORD_CHANGED',
+      summary: 'User changed account password',
     });
 
     return {

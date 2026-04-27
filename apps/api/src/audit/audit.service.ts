@@ -14,8 +14,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   AUDIT_EXPORT_MAX_ROWS,
   AUDIT_PURGE_CONFIRMATION_TEXT,
-  AUDIT_RETENTION_DAYS,
   AUDIT_RETENTION_RUN_INTERVAL_MS,
+  resolveAuditLogLevel,
+  resolveAuditLogsEnabled,
+  resolveAuditRetentionDays,
 } from './audit.constants';
 import { createSimplePdf } from './pdf/simple-pdf';
 import { ExportAuditLogsQueryDto } from './dto/export-audit-logs-query.dto';
@@ -70,12 +72,125 @@ function toCsvValue(value: unknown) {
   return `"${escaped}"`;
 }
 
+const STANDARD_WRITE_ACTION_PREFIXES = [
+  'CREATE',
+  'UPDATE',
+  'DELETE',
+  'ARCHIVE',
+  'ACTIVATE',
+  'DEACTIVATE',
+  'LOCK',
+  'UNLOCK',
+  'VOID',
+  'ENROLL',
+  'UNENROLL',
+  'ASSIGN',
+  'REMOVE',
+  'RE_REGISTER',
+  'MEMBERSHIP_CHANGED',
+  'ROLE_CHANGED',
+  'PASSWORD_CHANGED',
+  'BATCH_CREATE',
+  'BULK_CREATE',
+  'PURGE',
+  'RETENTION_PURGE',
+  'LOGIN_',
+];
+
+const CRITICAL_ENTITY_PREFIXES = ['Attendance', 'Billing'];
+const CRITICAL_ENTITY_TYPES = new Set([
+  'GradeRecord',
+  'AssessmentResult',
+  'GradeOverride',
+  'School',
+  'SchoolYear',
+  'ReportingPeriod',
+]);
+const CRITICAL_ACTIONS = new Set([
+  'LOGIN_SUCCESS',
+  'LOGIN_FAILED',
+  'PASSWORD_CHANGED',
+  'ROLE_CHANGED',
+  'MEMBERSHIP_CHANGED',
+  'DELETE',
+  'DEACTIVATE',
+  'PURGE',
+  'RETENTION_PURGE',
+]);
+
 @Injectable()
 export class AuditService {
   private retentionLastRunAt = 0;
   private retentionInFlight: Promise<void> | null = null;
 
   constructor(private readonly prisma: PrismaService) {}
+
+  private getAuditConfig() {
+    return {
+      enabled: resolveAuditLogsEnabled(),
+      level: resolveAuditLogLevel(),
+      retentionDays: resolveAuditRetentionDays(),
+    };
+  }
+
+  private isStandardWriteAction(action: string) {
+    return STANDARD_WRITE_ACTION_PREFIXES.some((prefix) =>
+      action.startsWith(prefix),
+    );
+  }
+
+  private isCriticalAction(input: Pick<AuditLogInput, 'entityType' | 'action'>) {
+    const action = input.action.trim().toUpperCase();
+    const entityType = input.entityType.trim();
+
+    if (CRITICAL_ACTIONS.has(action)) {
+      return true;
+    }
+
+    if (action.includes('DELETE')) {
+      return true;
+    }
+
+    if (entityType === 'User') {
+      return ['ROLE_CHANGED', 'PASSWORD_CHANGED', 'DEACTIVATE'].includes(action);
+    }
+
+    if (entityType === 'UserSchoolMembership') {
+      return action === 'MEMBERSHIP_CHANGED';
+    }
+
+    if (CRITICAL_ENTITY_TYPES.has(entityType)) {
+      return true;
+    }
+
+    return CRITICAL_ENTITY_PREFIXES.some((prefix) =>
+      entityType.startsWith(prefix),
+    );
+  }
+
+  shouldLog(input: Pick<AuditLogInput, 'entityType' | 'action'>) {
+    const config = this.getAuditConfig();
+
+    if (!config.enabled) {
+      return false;
+    }
+
+    const action = input.action.trim().toUpperCase();
+
+    if (config.level === 'verbose') {
+      return true;
+    }
+
+    if (config.level === 'standard') {
+      if (this.isStandardWriteAction(action)) {
+        return true;
+      }
+
+      return !['READ', 'LIST', 'GET', 'VIEW'].includes(action);
+    }
+
+    return this.isCriticalAction(input);
+  }
 
   private ensureOwner(user: AuthenticatedUser) {
     if (user.role !== UserRole.OWNER) {
@@ -214,7 +329,8 @@ export class AuditService {
   }
 
   private async runRetentionPolicy() {
-    const cutoff = new Date(Date.now() - AUDIT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    const { retentionDays } = this.getAuditConfig();
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
     const aggregate = await this.prisma.auditLog.aggregate({
       where: {
         createdAt: {
@@ -259,31 +375,49 @@ export class AuditService {
           rowCount: deleted.count,
           purgedAt: now,
           purgedByNameSnapshot: 'SYSTEM_RETENTION',
-          notes: `Automatic retention purge for logs older than ${AUDIT_RETENTION_DAYS} days`,
+          notes: `Automatic retention purge for logs older than ${retentionDays} days`,
           metadataJson: {
             cutoff,
           },
         },
       });
 
-      await tx.auditLog.create({
-        data: {
-          actorNameSnapshot: 'SYSTEM_RETENTION',
+      if (
+        this.shouldLog({
           entityType: 'AuditLog',
           action: 'RETENTION_PURGE',
-          severity: AuditLogSeverity.WARNING,
-          summary: `Automatic retention purge deleted ${deleted.count} audit rows older than ${cutoff.toISOString()}`,
-          changesJson: {
-            fromDate: rangeFrom,
-            toDate: rangeTo,
-            rowCount: deleted.count,
+        })
+      ) {
+        await tx.auditLog.create({
+          data: {
+            actorNameSnapshot: 'SYSTEM_RETENTION',
+            entityType: 'AuditLog',
+            action: 'RETENTION_PURGE',
+            severity: AuditLogSeverity.WARNING,
+            summary: `Automatic retention purge deleted ${deleted.count} audit rows older than ${cutoff.toISOString()}`,
+            changesJson: {
+              fromDate: rangeFrom,
+              toDate: rangeTo,
+              rowCount: deleted.count,
+            },
           },
-        },
-      });
+        });
+      }
+    });
+  }
+
+  async logCritical(input: Omit<AuditLogInput, 'severity'>) {
+    return this.log({
+      ...input,
+      severity: AuditLogSeverity.CRITICAL,
     });
   }
 
   async log(input: AuditLogInput) {
+    if (!this.shouldLog(input)) {
+      return;
+    }
+
     try {
       const actorSnapshot = await this.resolveActorSnapshot(input.actor);
 
@@ -304,6 +438,10 @@ export class AuditService {
     } catch (error) {
       console.error('Audit log write failed:', error);
     }
+  }
+
+  async cleanupExpiredLogs() {
+    await this.runRetentionPolicy();
   }
 
   async list(user: AuthenticatedUser, query: ListAuditLogsQueryDto) {
@@ -798,22 +936,29 @@ export class AuditService {
         },
       });
 
-      await tx.auditLog.create({
-        data: {
-          actorUserId: actorSnapshot.actorUserId,
-          actorNameSnapshot: actorSnapshot.actorNameSnapshot,
-          actorRoleSnapshot: actorSnapshot.actorRoleSnapshot,
+      if (
+        this.shouldLog({
           entityType: 'AuditLog',
           action: 'PURGE',
-          severity: AuditLogSeverity.HIGH,
-          summary: `Purged ${deleted.count} audit rows for selected range`,
-          changesJson: {
-            fromDate: range.fromDate,
-            toDate: range.toDate,
-            rowCount: deleted.count,
+        })
+      ) {
+        await tx.auditLog.create({
+          data: {
+            actorUserId: actorSnapshot.actorUserId,
+            actorNameSnapshot: actorSnapshot.actorNameSnapshot,
+            actorRoleSnapshot: actorSnapshot.actorRoleSnapshot,
+            entityType: 'AuditLog',
+            action: 'PURGE',
+            severity: AuditLogSeverity.HIGH,
+            summary: `Purged ${deleted.count} audit rows for selected range`,
+            changesJson: {
+              fromDate: range.fromDate,
+              toDate: range.toDate,
+              rowCount: deleted.count,
+            },
           },
-        },
-      });
+        });
+      }
 
       return deleted.count;
     });

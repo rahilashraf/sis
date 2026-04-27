@@ -16,6 +16,9 @@ describe('AuthService', () => {
   let jwtService: {
     signAsync: jest.Mock;
   };
+  let auditService: {
+    logCritical: jest.Mock;
+  };
 
   beforeEach(() => {
     prisma = {
@@ -26,8 +29,15 @@ describe('AuthService', () => {
     jwtService = {
       signAsync: jest.fn().mockResolvedValue('signed-token'),
     };
+    auditService = {
+      logCritical: jest.fn().mockResolvedValue(undefined),
+    };
 
-    service = new AuthService(prisma as never, jwtService as never);
+    service = new AuthService(
+      prisma as never,
+      jwtService as never,
+      auditService as never,
+    );
   });
 
   it('returns a sanitized login response without passwordHash', async () => {
@@ -64,6 +74,7 @@ describe('AuthService', () => {
       username: 'owner',
       passwordHash: 'hash',
       role: 'OWNER',
+      isActive: true,
       memberships: [],
     });
     (bcrypt.compare as jest.Mock).mockResolvedValue(false);

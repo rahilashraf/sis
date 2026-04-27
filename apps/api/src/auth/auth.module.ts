@@ -8,6 +8,7 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RolesGuard } from './roles.guard';
 import type { StringValue } from 'ms';
+import { AuditModule } from '../audit/audit.module';
 
 function getJwtSecret(configService: ConfigService) {
   const jwtSecret = configService.get<string>('JWT_SECRET');
@@ -26,6 +27,7 @@ function getJwtSecret(configService: ConfigService) {
 @Module({
   imports: [
     PrismaModule,
+    AuditModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     ConfigModule,
     JwtModule.registerAsync({
