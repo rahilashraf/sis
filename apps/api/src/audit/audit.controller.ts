@@ -20,7 +20,7 @@ import { AuditService } from './audit.service';
 
 @Controller('audit')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('OWNER')
+@Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
@@ -41,6 +41,7 @@ export class AuditController {
   }
 
   @Get('export/pdf')
+  @Roles('OWNER')
   async exportPdf(
     @Req() req: AuthenticatedRequest,
     @Query() query: ExportAuditLogsQueryDto,
@@ -54,6 +55,7 @@ export class AuditController {
   }
 
   @Get('export/csv')
+  @Roles('OWNER')
   async exportCsv(
     @Req() req: AuthenticatedRequest,
     @Query() query: ExportAuditLogsQueryDto,
@@ -67,6 +69,7 @@ export class AuditController {
   }
 
   @Post('purge')
+  @Roles('OWNER')
   purge(
     @Req() req: AuthenticatedRequest,
     @Body() body: PurgeAuditLogsDto,

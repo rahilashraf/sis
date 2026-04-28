@@ -44,8 +44,13 @@ type FilterState = {
 
 const ENTITY_TYPES = [
   "User",
+  "Auth",
+  "AccessControl",
   "Attendance",
   "Grade",
+  "BillingReport",
+  "StudentDocument",
+  "BehaviorAttachment",
   "BehaviorRecord",
   "SchoolYear",
   "ReportingPeriod",
@@ -68,9 +73,15 @@ const ACTIONS = [
   "ADD",
   "REMOVE",
   "EXPORT",
+  "EXPORT_ATTEMPT",
   "PURGE",
   "RETENTION_PURGE",
   "LOCK",
+  "LOGIN_SUCCESS",
+  "LOGIN_FAILED",
+  "LOGIN_THROTTLED",
+  "ROLE_ACCESS_DENIED",
+  "DOWNLOAD",
 ];
 
 const SEVERITIES: AuditLogSeverity[] = ["INFO", "WARNING", "HIGH", "CRITICAL"];
@@ -92,7 +103,12 @@ export function AuditManagement() {
   const { user } = useAuth();
   const canManageAuditSettings =
     user?.role === "OWNER" || user?.role === "SUPER_ADMIN";
-  const canViewAuditLogs = user?.role === "OWNER";
+  const canViewAuditLogs =
+    user?.role === "OWNER" ||
+    user?.role === "SUPER_ADMIN" ||
+    user?.role === "ADMIN";
+  const canExportAuditLogs = user?.role === "OWNER";
+  const canPurgeAuditLogs = user?.role === "OWNER";
 
   const [filters, setFilters] = useState<FilterState>({
     fromDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
@@ -236,6 +252,11 @@ export function AuditManagement() {
   }
 
   async function handleExport(format: "pdf" | "csv") {
+    if (!canExportAuditLogs) {
+      setError("Only account owners can export audit logs.");
+      return;
+    }
+
     setExporting(true);
     try {
       const exporter =
@@ -318,6 +339,11 @@ export function AuditManagement() {
   }
 
   async function handlePurge() {
+    if (!canPurgeAuditLogs) {
+      setError("Only account owners can purge audit logs.");
+      return;
+    }
+
     if (purgeConfirmation !== "PURGE AUDIT LOGS") {
       setError("Confirmation text must be exactly 'PURGE AUDIT LOGS'");
       return;
@@ -345,10 +371,10 @@ export function AuditManagement() {
     }
   }
 
-  if (!user || !canManageAuditSettings) {
+  if (!user || (!canManageAuditSettings && !canViewAuditLogs)) {
     return (
       <Notice tone="danger" title="Access Denied">
-        Only owners and super admins can access audit settings.
+        Only owners, super admins, and admins can access audit logs.
       </Notice>
     );
   }
@@ -360,59 +386,68 @@ export function AuditManagement() {
         description="View and manage system audit logs for compliance and monitoring."
       />
 
-      {settingsError ? (
-        <Notice tone="danger" title="Settings Error">
-          {settingsError}
-        </Notice>
-      ) : null}
-      {settingsSuccess ? <Notice tone="success">{settingsSuccess}</Notice> : null}
+      {canManageAuditSettings ? (
+        <>
+          {settingsError ? (
+            <Notice tone="danger" title="Settings Error">
+              {settingsError}
+            </Notice>
+          ) : null}
+          {settingsSuccess ? <Notice tone="success">{settingsSuccess}</Notice> : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Security / System Settings</CardTitle>
-          <CardDescription>
-            Audit Logs: Record critical system actions for accountability.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-center justify-between gap-4">
-          <div className="space-y-2">
-            <div className="text-sm text-slate-600">Status</div>
-            <Badge variant={auditEnabled ? "success" : "danger"}>
-              {loadingAuditSetting
-                ? "Loading..."
-                : auditEnabled
-                  ? "ON"
-                  : "OFF"}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              disabled={
-                loadingAuditSetting ||
-                savingAuditSetting ||
-                auditEnabled === null ||
-                auditEnabled === true
-              }
-              onClick={handleEnableAuditLogs}
-              variant={auditEnabled ? "secondary" : "primary"}
-            >
-              {savingAuditSetting && auditEnabled !== true ? "Saving..." : "ON"}
-            </Button>
-            <Button
-              disabled={
-                loadingAuditSetting ||
-                savingAuditSetting ||
-                auditEnabled === null ||
-                auditEnabled !== true
-              }
-              onClick={handleDisableAuditLogsRequest}
-              variant={auditEnabled ? "danger" : "secondary"}
-            >
-              {savingAuditSetting && auditEnabled !== false ? "Saving..." : "OFF"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Security / System Settings</CardTitle>
+              <CardDescription>
+                Audit Logs: Record critical system actions for accountability.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center justify-between gap-4">
+              <div className="space-y-2">
+                <div className="text-sm text-slate-600">Status</div>
+                <Badge variant={auditEnabled ? "success" : "danger"}>
+                  {loadingAuditSetting
+                    ? "Loading..."
+                    : auditEnabled
+                      ? "ON"
+                      : "OFF"}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  disabled={
+                    loadingAuditSetting ||
+                    savingAuditSetting ||
+                    auditEnabled === null ||
+                    auditEnabled === true
+                  }
+                  onClick={handleEnableAuditLogs}
+                  variant={auditEnabled ? "secondary" : "primary"}
+                >
+                  {savingAuditSetting && auditEnabled !== true ? "Saving..." : "ON"}
+                </Button>
+                <Button
+                  disabled={
+                    loadingAuditSetting ||
+                    savingAuditSetting ||
+                    auditEnabled === null ||
+                    auditEnabled !== true
+                  }
+                  onClick={handleDisableAuditLogsRequest}
+                  variant={auditEnabled ? "danger" : "secondary"}
+                >
+                  {savingAuditSetting && auditEnabled !== false ? "Saving..." : "OFF"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        <Notice tone="info" title="Owner / Super Admin Settings">
+          Audit logging can only be enabled or disabled by account owners and
+          super admins.
+        </Notice>
+      )}
 
       {canViewAuditLogs ? (
         <>
@@ -570,16 +605,29 @@ export function AuditManagement() {
             >
               Reset
             </Button>
-            <Button disabled={exporting} onClick={() => handleExport("pdf")}>
+            <Button
+              disabled={exporting || !canExportAuditLogs}
+              onClick={() => handleExport("pdf")}
+            >
               {exporting ? "Exporting..." : "Export PDF"}
             </Button>
-            <Button disabled={exporting} onClick={() => handleExport("csv")}>
+            <Button
+              disabled={exporting || !canExportAuditLogs}
+              onClick={() => handleExport("csv")}
+            >
               {exporting ? "Exporting..." : "Export CSV"}
             </Button>
-            <Button variant="danger" onClick={() => setShowPurgeDialog(true)}>
-              Purge Logs
-            </Button>
+            {canPurgeAuditLogs ? (
+              <Button variant="danger" onClick={() => setShowPurgeDialog(true)}>
+                Purge Logs
+              </Button>
+            ) : null}
           </div>
+          {!canExportAuditLogs ? (
+            <Notice tone="info" title="Owner-only Actions">
+              Export and purge are restricted to account owners.
+            </Notice>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -765,8 +813,8 @@ export function AuditManagement() {
         </>
       ) : (
         <Notice tone="info" title="Owner Access">
-          Only account owners can view, export, and purge audit logs. You can
-          still enable or disable audit logging from this page.
+          Viewing is restricted to OWNER, SUPER_ADMIN, and ADMIN. Export and
+          purge remain owner-only.
         </Notice>
       )}
 

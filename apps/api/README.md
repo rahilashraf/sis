@@ -35,6 +35,21 @@ Optional but recommended:
 JWT_EXPIRES_IN=1d
 CORS_ORIGIN=http://localhost:3001
 CORS_CREDENTIALS=true
+THROTTLE_TTL_MS=60000
+THROTTLE_LIMIT=120
+THROTTLE_BLOCK_DURATION_MS=60000
+LOGIN_THROTTLE_LIMIT=8
+LOGIN_THROTTLE_TTL_MS=60000
+LOGIN_THROTTLE_BLOCK_DURATION_MS=300000
+LOGIN_FAILURE_DELAY_MS=200
+LOGIN_FAILURE_DELAY_JITTER_MS=150
+BILLING_REPORT_MAX_ROWS=5000
+AUTH_COOKIE_NAME=sis_access_token
+AUTH_COOKIE_SAME_SITE=lax
+AUTH_COOKIE_SECURE=true
+AUTH_COOKIE_MAX_AGE_MS=86400000
+API_SLOW_REQUEST_THRESHOLD_MS=1200
+# AUTH_COOKIE_DOMAIN=.yourdomain.com
 SHADOW_DATABASE_URL=postgresql://... # only needed for prisma migrate dev
 ```
 
@@ -108,5 +123,8 @@ npm run prisma:seed
 
 - `prisma migrate deploy` is the production-safe path and is expected to work from the checked-in migration history alone.
 - The seed is intended for local and demo setup and is idempotent enough to rerun.
-- CORS is disabled unless `CORS_ORIGIN` is set.
+- In production, `CORS_ORIGIN` must be set to one or more explicit origins (comma-separated). Wildcard `*` is rejected.
+- In local development, CORS defaults to `http://localhost:3001,http://localhost:3000` when `CORS_ORIGIN` is not set.
 - `JWT_SECRET` is required outside tests.
+- `GET /health` and `GET /healthz` provide lightweight health probes for load balancers and uptime checks.
+- Slow, failed, auth-denied, throttled login, and export-failure API events are emitted as structured logs and can be wired to your log drain/alerting stack.

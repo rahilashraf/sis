@@ -12,6 +12,9 @@ describe('AuditService', () => {
       create: jest.Mock;
       aggregate: jest.Mock;
       deleteMany: jest.Mock;
+      count: jest.Mock;
+      findMany: jest.Mock;
+      groupBy: jest.Mock;
     };
     auditArchiveHistory: {
       create: jest.Mock;
@@ -55,6 +58,9 @@ describe('AuditService', () => {
         create: jest.fn(),
         aggregate: jest.fn(),
         deleteMany: jest.fn(),
+        count: jest.fn(),
+        findMany: jest.fn(),
+        groupBy: jest.fn(),
       },
       auditArchiveHistory: {
         create: jest.fn(),
@@ -65,6 +71,10 @@ describe('AuditService', () => {
       $transaction: jest.fn().mockImplementation(async (arg: unknown) => {
         if (typeof arg === 'function') {
           return arg(tx);
+        }
+
+        if (Array.isArray(arg)) {
+          return Promise.all(arg as Array<Promise<unknown>>);
         }
 
         return arg;
@@ -178,5 +188,65 @@ describe('AuditService', () => {
       },
     });
     expect(tx.auditArchiveHistory.create).toHaveBeenCalled();
+  });
+
+  it('scopes audit list queries to admin school memberships', async () => {
+    process.env.AUDIT_LOGS_ENABLED = 'true';
+    prisma.auditLog.aggregate.mockResolvedValue({
+      _count: { _all: 0 },
+      _min: { createdAt: null },
+      _max: { createdAt: null },
+    });
+    prisma.auditLog.count.mockResolvedValue(1);
+    prisma.auditLog.findMany.mockResolvedValue([]);
+
+    await service.list(
+      {
+        id: 'admin-1',
+        role: 'ADMIN',
+        schoolId: 'school-a',
+        memberships: [
+          { schoolId: 'school-a', isActive: true },
+          { schoolId: 'school-b', isActive: true },
+        ],
+      } as any,
+      {
+        page: 1,
+        pageSize: 50,
+        normalize: () => ({}),
+      } as any,
+    );
+
+    expect(prisma.auditLog.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        schoolId: {
+          in: ['school-a', 'school-b'],
+        },
+      }),
+    });
+  });
+
+  it('denies admin audit list access without an active school scope', async () => {
+    process.env.AUDIT_LOGS_ENABLED = 'true';
+    prisma.auditLog.aggregate.mockResolvedValue({
+      _count: { _all: 0 },
+      _min: { createdAt: null },
+      _max: { createdAt: null },
+    });
+
+    await expect(
+      service.list(
+        {
+          id: 'admin-2',
+          role: 'ADMIN',
+          memberships: [],
+        } as any,
+        {
+          page: 1,
+          pageSize: 50,
+          normalize: () => ({}),
+        } as any,
+      ),
+    ).rejects.toThrow('No school scope available for audit access');
   });
 });

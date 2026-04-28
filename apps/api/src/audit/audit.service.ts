@@ -237,6 +237,58 @@ export class AuditService {
     }
   }
 
+  private ensureAuditReadAccess(user: AuthenticatedUser) {
+    if (
+      user.role === UserRole.OWNER ||
+      user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.ADMIN
+    ) {
+      return;
+    }
+
+    throw new ForbiddenException(
+      'Only owner, super admin, or admin can access audit reports',
+    );
+  }
+
+  private resolveActorSchoolScope(user: AuthenticatedUser) {
+    const schoolIds = new Set<string>();
+
+    if (user.schoolId) {
+      schoolIds.add(user.schoolId);
+    }
+
+    for (const membership of user.memberships ?? []) {
+      if (membership?.isActive && membership.schoolId) {
+        schoolIds.add(membership.schoolId);
+      }
+    }
+
+    return Array.from(schoolIds);
+  }
+
+  private applyAuditReadScope(
+    user: AuthenticatedUser,
+    where: Prisma.AuditLogWhereInput,
+  ): Prisma.AuditLogWhereInput {
+    if (user.role === UserRole.OWNER || user.role === UserRole.SUPER_ADMIN) {
+      return where;
+    }
+
+    const schoolIds = this.resolveActorSchoolScope(user);
+
+    if (schoolIds.length === 0) {
+      throw new ForbiddenException('No school scope available for audit access');
+    }
+
+    return {
+      ...where,
+      schoolId: {
+        in: schoolIds,
+      },
+    };
+  }
+
   private parseDateOrThrow(
     value: string,
     fieldLabel: string,
@@ -484,7 +536,7 @@ export class AuditService {
   }
 
   async list(user: AuthenticatedUser, query: ListAuditLogsQueryDto) {
-    this.ensureOwner(user);
+    this.ensureAuditReadAccess(user);
     await this.applyRetentionPolicyIfDue();
 
     const normalized = query.normalize();
@@ -497,7 +549,7 @@ export class AuditService {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
 
-    const where = this.buildWhere({
+    const baseWhere = this.buildWhere({
       range,
       filters: {
         actorUserId: normalized.actorUserId,
@@ -506,6 +558,7 @@ export class AuditService {
         severity: normalized.severity,
       },
     });
+    const where = this.applyAuditReadScope(user, baseWhere);
 
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.auditLog.count({ where }),
@@ -528,7 +581,7 @@ export class AuditService {
   }
 
   async summary(user: AuthenticatedUser, query: ListAuditLogsQueryDto) {
-    this.ensureOwner(user);
+    this.ensureAuditReadAccess(user);
     await this.applyRetentionPolicyIfDue();
 
     const normalized = query.normalize();
@@ -538,7 +591,7 @@ export class AuditService {
       required: false,
     });
 
-    const where = this.buildWhere({
+    const baseWhere = this.buildWhere({
       range,
       filters: {
         actorUserId: normalized.actorUserId,
@@ -547,6 +600,7 @@ export class AuditService {
         severity: normalized.severity,
       },
     });
+    const where = this.applyAuditReadScope(user, baseWhere);
 
     const destructiveActions = [
       'DELETE',
