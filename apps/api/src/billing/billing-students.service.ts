@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ChargeStatus, Prisma, UserRole } from '@prisma/client';
+import { ChargeStatus, NotificationType, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedUser } from '../common/auth/auth-user';
 import {
@@ -13,8 +13,10 @@ import {
   isBypassRole,
 } from '../common/access/school-access.util';
 import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
+import { NotificationsService } from '../notifications/notifications.service';
 import { GetStudentAccountSummaryQueryDto } from './dto/get-student-account-summary-query.dto';
 import { ListBillingOverdueQueryDto } from './dto/list-billing-overdue-query.dto';
+import { SendBillingOverdueRemindersDto } from './dto/send-billing-overdue-reminders.dto';
 
 const accountSummaryChargeSelect = Prisma.validator<Prisma.BillingChargeSelect>()({
   id: true,
@@ -94,7 +96,10 @@ type OverdueStudentRow = {
 
 @Injectable()
 export class BillingStudentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   private ensureCanRead(actor: AuthenticatedUser) {
     const allowed: UserRole[] = [
@@ -756,6 +761,134 @@ export class BillingStudentsService {
         totalOverdueCharges,
       },
       sorting: 'totalOverdue_desc_oldestDueDate_asc',
+    };
+  }
+
+  async sendOverdueReminders(
+    actor: AuthenticatedUser,
+    query?: ListBillingOverdueQueryDto,
+    options?: SendBillingOverdueRemindersDto,
+  ) {
+    this.ensureCanRead(actor);
+
+    const cooldownDays = options?.cooldownDays ?? 7;
+    const dryRun = options?.dryRun ?? false;
+    const overdueRowsResponse = await this.listOverdue(actor, {
+      ...(query ?? {}),
+      page: 1,
+      limit: 500,
+    });
+    const overdueRows = overdueRowsResponse.items;
+
+    if (overdueRows.length === 0) {
+      return {
+        dryRun,
+        cooldownDays,
+        studentsEvaluated: 0,
+        linkedParents: 0,
+        remindersSent: 0,
+        skippedNoParents: 0,
+        skippedRecentReminder: 0,
+      };
+    }
+
+    const studentIds = overdueRows.map((row) => row.studentId);
+    const links = await this.prisma.studentParentLink.findMany({
+      where: {
+        studentId: { in: studentIds },
+        parent: {
+          role: UserRole.PARENT,
+          isActive: true,
+        },
+      },
+      select: {
+        studentId: true,
+        parentId: true,
+      },
+    });
+
+    const parentIdsByStudentId = new Map<string, Set<string>>();
+    for (const link of links) {
+      const existing = parentIdsByStudentId.get(link.studentId);
+      if (existing) {
+        existing.add(link.parentId);
+        continue;
+      }
+
+      parentIdsByStudentId.set(link.studentId, new Set([link.parentId]));
+    }
+
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - cooldownDays * 24 * 60 * 60 * 1000);
+    const entityIds = overdueRows.map((row) => `${row.schoolId}:${row.studentId}`);
+    const allParentIds = [...new Set(links.map((link) => link.parentId))];
+
+    const recentReminders =
+      allParentIds.length > 0
+        ? await this.prisma.notification.findMany({
+            where: {
+              recipientUserId: { in: allParentIds },
+              entityType: 'BillingOverdueReminder',
+              entityId: { in: entityIds },
+              type: NotificationType.SYSTEM_ANNOUNCEMENT,
+              createdAt: { gte: cutoff },
+            },
+            select: {
+              recipientUserId: true,
+              entityId: true,
+            },
+          })
+        : [];
+
+    const recentlyRemindedKeys = new Set(
+      recentReminders.map(
+        (entry) => `${entry.recipientUserId}:${entry.entityId ?? ''}`,
+      ),
+    );
+
+    const inputs: Parameters<NotificationsService['createMany']>[0] = [];
+    let skippedNoParents = 0;
+    let skippedRecentReminder = 0;
+
+    for (const row of overdueRows) {
+      const parentIds = parentIdsByStudentId.get(row.studentId);
+      if (!parentIds || parentIds.size === 0) {
+        skippedNoParents += 1;
+        continue;
+      }
+
+      const reminderEntityId = `${row.schoolId}:${row.studentId}`;
+      for (const parentId of parentIds) {
+        const dedupeKey = `${parentId}:${reminderEntityId}`;
+        if (recentlyRemindedKeys.has(dedupeKey)) {
+          skippedRecentReminder += 1;
+          continue;
+        }
+
+        inputs.push({
+          schoolId: row.schoolId,
+          recipientUserId: parentId,
+          type: NotificationType.SYSTEM_ANNOUNCEMENT,
+          title: `Overdue balance reminder for ${row.studentName}`,
+          message: `${row.studentName} has an overdue balance of ${row.totalOverdue}. Please review the billing statement.`,
+          entityType: 'BillingOverdueReminder',
+          entityId: reminderEntityId,
+        });
+      }
+    }
+
+    if (!dryRun && inputs.length > 0) {
+      await this.notificationsService.createMany(inputs);
+    }
+
+    return {
+      dryRun,
+      cooldownDays,
+      studentsEvaluated: overdueRows.length,
+      linkedParents: allParentIds.length,
+      remindersSent: dryRun ? 0 : inputs.length,
+      skippedNoParents,
+      skippedRecentReminder,
     };
   }
 }

@@ -653,6 +653,47 @@ export function listBillingOverdue(options?: {
   ).then(normalizeBillingOverdueResponse);
 }
 
+export type SendBillingOverdueRemindersInput = {
+  schoolId?: string;
+  search?: string;
+  minAmount?: string;
+  classId?: string;
+  cooldownDays?: number;
+  dryRun?: boolean;
+};
+
+export type SendBillingOverdueRemindersResult = {
+  dryRun: boolean;
+  cooldownDays: number;
+  studentsEvaluated: number;
+  linkedParents: number;
+  remindersSent: number;
+  skippedNoParents: number;
+  skippedRecentReminder: number;
+};
+
+export function sendBillingOverdueReminders(
+  input: SendBillingOverdueRemindersInput,
+) {
+  const query = new URLSearchParams();
+
+  if (input.schoolId) query.set("schoolId", input.schoolId);
+  if (input.search) query.set("search", input.search);
+  if (input.minAmount) query.set("minAmount", input.minAmount);
+  if (input.classId) query.set("classId", input.classId);
+
+  return apiFetch<SendBillingOverdueRemindersResult>(
+    `/billing/overdue/reminders${query.size ? `?${query.toString()}` : ""}`,
+    {
+      method: "POST",
+      json: {
+        cooldownDays: input.cooldownDays,
+        dryRun: input.dryRun,
+      },
+    },
+  );
+}
+
 async function apiFetchBlob(path: string): Promise<Blob> {
   const session = getStoredSessionSnapshot();
   const headers: Record<string, string> = {};

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { buttonClassName } from "@/components/ui/button";
 import {
   Card,
@@ -21,8 +22,10 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { getDefaultSchoolContextId } from "@/lib/auth/school-membership";
 import {
   listBillingOverdue,
+  sendBillingOverdueReminders,
   type BillingOverdueResponse,
   type BillingOverdueRow,
+  type SendBillingOverdueRemindersResult,
 } from "@/lib/api/billing";
 import { listSchools, type School } from "@/lib/api/schools";
 import { formatDateLabel } from "@/lib/utils";
@@ -105,6 +108,10 @@ export function BillingOverdueManagement() {
 
   const [data, setData] = useState<BillingOverdueResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSendingReminders, setIsSendingReminders] = useState(false);
+  const [cooldownDays, setCooldownDays] = useState("7");
+  const [reminderResult, setReminderResult] =
+    useState<SendBillingOverdueRemindersResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const selectedSchool = useMemo(
@@ -183,6 +190,37 @@ export function BillingOverdueManagement() {
 
   const rows: BillingOverdueRow[] = data?.items ?? [];
 
+  async function handleSendReminders(dryRun: boolean) {
+    setIsSendingReminders(true);
+    setError(null);
+
+    try {
+      const parsedCooldown = Number(cooldownDays);
+      const cooldown = Number.isFinite(parsedCooldown)
+        ? Math.max(1, Math.min(30, parsedCooldown))
+        : 7;
+
+      const result = await sendBillingOverdueReminders({
+        schoolId: schoolId || undefined,
+        search: search.trim() || undefined,
+        minAmount: minAmount.trim() || undefined,
+        cooldownDays: cooldown,
+        dryRun,
+      });
+
+      setReminderResult(result);
+    } catch (sendError) {
+      setReminderResult(null);
+      setError(
+        sendError instanceof Error
+          ? sendError.message
+          : "Unable to send overdue reminders.",
+      );
+    } finally {
+      setIsSendingReminders(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -212,6 +250,13 @@ export function BillingOverdueManagement() {
       />
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      {reminderResult ? (
+        <Notice tone="success">
+          {reminderResult.dryRun
+            ? `Dry run complete: ${reminderResult.studentsEvaluated} students scanned, ${reminderResult.skippedNoParents} with no linked parents, ${reminderResult.skippedRecentReminder} skipped by cooldown.`
+            : `Sent ${reminderResult.remindersSent} reminder notifications. Skipped ${reminderResult.skippedNoParents} with no linked parents and ${reminderResult.skippedRecentReminder} due to cooldown.`}
+        </Notice>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <SummaryCard
@@ -274,6 +319,47 @@ export function BillingOverdueManagement() {
               onChange={(event) => setMinAmount(event.target.value)}
             />
           </Field>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Overdue reminders</CardTitle>
+          <CardDescription>
+            Send parent reminders for currently filtered overdue balances.
+            Duplicate reminders are skipped within the configured cooldown.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-end gap-3">
+          <Field htmlFor="overdue-reminder-cooldown" label="Cooldown (days)">
+            <Input
+              id="overdue-reminder-cooldown"
+              min={1}
+              max={30}
+              type="number"
+              value={cooldownDays}
+              onChange={(event) => setCooldownDays(event.target.value)}
+            />
+          </Field>
+          <Button
+            disabled={isSendingReminders || isLoading}
+            onClick={() => {
+              void handleSendReminders(true);
+            }}
+            type="button"
+            variant="secondary"
+          >
+            {isSendingReminders ? "Running..." : "Dry run reminders"}
+          </Button>
+          <Button
+            disabled={isSendingReminders || isLoading}
+            onClick={() => {
+              void handleSendReminders(false);
+            }}
+            type="button"
+          >
+            {isSendingReminders ? "Sending..." : "Send reminders"}
+          </Button>
         </CardContent>
       </Card>
 
