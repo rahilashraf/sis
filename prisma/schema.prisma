@@ -1151,6 +1151,7 @@ model LibraryItem {
   isbn            String?
   barcode         String?
   category        String?
+  lostFeeOverride Decimal?          @db.Decimal(12, 2)
   status          LibraryItemStatus @default(AVAILABLE)
   totalCopies     Int               @default(1)
   availableCopies Int               @default(1)

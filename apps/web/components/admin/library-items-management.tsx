@@ -38,6 +38,7 @@ type ItemForm = {
   isbn: string;
   barcode: string;
   category: string;
+  lostFeeOverride: string;
   totalCopies: string;
 };
 
@@ -47,8 +48,27 @@ const emptyForm: ItemForm = {
   isbn: "",
   barcode: "",
   category: "",
+  lostFeeOverride: "",
   totalCopies: "1",
 };
+
+function formatCurrency(value: string | null) {
+  if (!value) {
+    return "School default";
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return value;
+  }
+
+  return new Intl.NumberFormat("en-CA", {
+    style: "currency",
+    currency: "CAD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(parsed);
+}
 
 function getStatusVariant(
   status: LibraryItemStatus,
@@ -255,6 +275,7 @@ export function LibraryItemsManagement() {
         isbn: form.isbn.trim() || undefined,
         barcode: form.barcode.trim() || undefined,
         category: form.category.trim() || undefined,
+        lostFeeOverride: form.lostFeeOverride.trim() || undefined,
         totalCopies: parsedTotal,
       });
 
@@ -501,6 +522,25 @@ export function LibraryItemsManagement() {
               />
             </Field>
 
+            <Field
+              htmlFor="library-items-lost-fee-override"
+              label="Lost Fee Override (CAD)"
+              description="Leave blank to use the school default lost fee."
+            >
+              <Input
+                id="library-items-lost-fee-override"
+                inputMode="decimal"
+                placeholder="e.g. 35.00"
+                value={form.lostFeeOverride}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    lostFeeOverride: event.target.value,
+                  }))
+                }
+              />
+            </Field>
+
             <div className="md:col-span-2 flex items-end justify-end">
               <Button disabled={isSaving} type="submit">
                 {isSaving ? "Saving..." : "Add item"}
@@ -547,6 +587,9 @@ export function LibraryItemsManagement() {
                       <th className="px-4 py-3 font-semibold text-slate-700">
                         Category
                       </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Lost Fee
+                      </th>
                       <th className="px-4 py-3 font-semibold text-right text-slate-700">
                         Available
                       </th>
@@ -580,6 +623,9 @@ export function LibraryItemsManagement() {
                         </td>
                         <td className="px-4 py-4 text-slate-700">
                           {item.category ?? "—"}
+                        </td>
+                        <td className="px-4 py-4 text-slate-700">
+                          {formatCurrency(item.lostFeeOverride)}
                         </td>
                         <td className="px-4 py-4 text-right tabular-nums font-semibold text-slate-900">
                           {item.availableCopies}

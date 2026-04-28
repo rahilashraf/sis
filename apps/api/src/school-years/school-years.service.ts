@@ -255,40 +255,134 @@ export class SchoolYearsService {
   }
 
   async archive(user: AuthenticatedUser, id: string) {
-    const existing = await this.prisma.schoolYear.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        schoolId: true,
+    const { updated, archivedClassCount, schoolId } = await this.prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.schoolYear.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            schoolId: true,
+          },
+        });
+
+        if (!existing) {
+          throw new NotFoundException('School year not found');
+        }
+
+        ensureUserHasSchoolAccess(user, existing.schoolId);
+
+        const archivedClasses = await tx.class.updateMany({
+          where: {
+            schoolYearId: existing.id,
+            isActive: true,
+          },
+          data: {
+            isActive: false,
+          },
+        });
+
+        const updated = await tx.schoolYear.update({
+          where: { id: existing.id },
+          data: {
+            isActive: false,
+          },
+          include: this.buildInclude(),
+        });
+
+        return {
+          updated,
+          archivedClassCount: archivedClasses.count,
+          schoolId: existing.schoolId,
+        };
       },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('School year not found');
-    }
-
-    ensureUserHasSchoolAccess(user, existing.schoolId);
-
-    const updated = await this.prisma.schoolYear.update({
-      where: { id },
-      data: {
-        isActive: false,
-      },
-      include: this.buildInclude(),
-    });
+    );
 
     await this.auditService.log({
       actor: user,
-      schoolId: existing.schoolId,
+      schoolId,
       entityType: 'SchoolYear',
       entityId: updated.id,
-      action: 'ARCHIVE',
+      action: 'END',
       severity: AuditLogSeverity.WARNING,
-      summary: `Archived school year ${updated.name}`,
+      summary: `Ended school year ${updated.name}`,
       targetDisplay: updated.name,
+      metadataJson: {
+        archivedClassCount,
+      },
     });
 
     return updated;
+  }
+
+  async autoEndExpiredSchoolYearsAndArchiveClasses(referenceDate = new Date()) {
+    const thresholdDate = new Date(referenceDate);
+    thresholdDate.setHours(0, 0, 0, 0);
+    thresholdDate.setDate(thresholdDate.getDate() - 15);
+
+    const candidates = await this.prisma.schoolYear.findMany({
+      where: {
+        endDate: {
+          lt: thresholdDate,
+        },
+        OR: [
+          { isActive: true },
+          {
+            classes: {
+              some: {
+                isActive: true,
+              },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+      },
+      orderBy: [{ endDate: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    let endedSchoolYearCount = 0;
+    let archivedClassCount = 0;
+
+    for (const year of candidates) {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const endedYears = await tx.schoolYear.updateMany({
+          where: {
+            id: year.id,
+            isActive: true,
+          },
+          data: {
+            isActive: false,
+          },
+        });
+
+        const archivedClasses = await tx.class.updateMany({
+          where: {
+            schoolYearId: year.id,
+            isActive: true,
+          },
+          data: {
+            isActive: false,
+          },
+        });
+
+        return {
+          endedSchoolYears: endedYears.count,
+          archivedClasses: archivedClasses.count,
+        };
+      });
+
+      endedSchoolYearCount += result.endedSchoolYears;
+      archivedClassCount += result.archivedClasses;
+    }
+
+    return {
+      evaluatedSchoolYears: candidates.length,
+      endedSchoolYearCount,
+      archivedClassCount,
+      thresholdDate: thresholdDate.toISOString(),
+      rule: 'endDate_plus_15_days',
+    };
   }
 
   async remove(user: AuthenticatedUser, id: string) {
@@ -315,11 +409,14 @@ export class SchoolYearsService {
 
       ensureUserHasSchoolAccess(user, existing.schoolId);
 
-      const dependencyLabels: string[] = [
+      const dependencyPairs: Array<[string, number]> = [
         ['classes', existing._count.classes],
         ['attendance sessions', existing._count.attendanceSessions],
         ['reporting periods', existing._count.reportingPeriods],
-      ].flatMap(([label, count]: [string, number]) => (count > 0 ? [label] : []));
+      ];
+      const dependencyLabels: string[] = dependencyPairs.flatMap(
+        ([label, count]) => (count > 0 ? [label] : []),
+      );
 
       if (dependencyLabels.length === 0) {
         await this.prisma.schoolYear.delete({

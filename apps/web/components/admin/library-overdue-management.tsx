@@ -159,7 +159,8 @@ export function LibraryOverdueManagement() {
         <CardHeader>
           <CardTitle>Overdue loans</CardTitle>
           <CardDescription>
-            Active loans where due date is before today.
+            Active loans where due date is before today. Late fees are capped
+            at 20 overdue days before lost fee is added.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -189,6 +190,9 @@ export function LibraryOverdueManagement() {
                       <th className="px-4 py-3 font-semibold text-right text-slate-700">
                         Days overdue
                       </th>
+                      <th className="px-4 py-3 font-semibold text-slate-700">
+                        Lost transition
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
@@ -215,6 +219,16 @@ export function LibraryOverdueManagement() {
                         </td>
                         <td className="px-4 py-4 text-right font-semibold tabular-nums text-red-600">
                           {row.daysOverdue}
+                        </td>
+                        <td className="px-4 py-4 text-slate-700">
+                          <p className="text-sm">
+                            Late fee days charged: {row.lateFeeDaysCharged}/20
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {row.daysUntilLost > 0
+                              ? `${row.daysUntilLost} day(s) until auto-lost (${formatDateLabel(row.becomesLostOn)})`
+                              : "Past 20 overdue days; next overdue assessment marks as lost."}
+                          </p>
                         </td>
                       </tr>
                     ))}

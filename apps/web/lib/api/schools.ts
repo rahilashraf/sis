@@ -161,9 +161,9 @@ export async function updateSchoolYear(
   return normalizeSchoolYear(response);
 }
 
-export async function archiveSchoolYear(schoolYearId: string) {
+export async function endSchoolYear(schoolYearId: string) {
   const response = await apiFetch<RawSchoolYear>(
-    `/school-years/${schoolYearId}/archive`,
+    `/school-years/${schoolYearId}/end`,
     {
       method: "PATCH",
     },
@@ -171,6 +171,8 @@ export async function archiveSchoolYear(schoolYearId: string) {
 
   return normalizeSchoolYear(response);
 }
+
+export const archiveSchoolYear = endSchoolYear;
 
 export async function activateSchoolYear(schoolYearId: string) {
   const response = await apiFetch<RawSchoolYear>(

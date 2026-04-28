@@ -403,27 +403,139 @@ describe('LibraryService fines', () => {
     expect(tx.libraryFine.update).toHaveBeenCalledTimes(1);
   });
 
-  it('prevents duplicate overdue fine creation', async () => {
+  it('assesses capped late fee and auto-marks lost with item lost fee override after 20 overdue days', async () => {
     prisma.libraryFineSettings.upsert.mockResolvedValue(buildFineSettings());
+    const daysAgo = 25;
     prisma.libraryLoan.findMany.mockResolvedValue([
       {
         id: 'loan-1',
         schoolId: 'school-1',
         studentId: 'student-1',
         itemId: 'item-1',
-        dueDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-        item: { title: 'Algebra Book' },
+        dueDate: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000),
+        item: {
+          title: 'Algebra Book',
+          lostFeeOverride: new Prisma.Decimal('40.00'),
+        },
       },
     ]);
-    prisma.libraryFine.findUnique.mockResolvedValue({ id: 'fine-existing' });
+    prisma.libraryFine.findUnique.mockResolvedValue(null);
+    prisma.billingCategory.upsert.mockResolvedValue({
+      id: 'cat-1',
+      schoolId: 'school-1',
+      name: 'Library Fines',
+    });
+    tx.billingCharge.create
+      .mockResolvedValueOnce({ id: 'charge-late' })
+      .mockResolvedValueOnce({ id: 'charge-lost' });
+    tx.libraryFine.create
+      .mockResolvedValueOnce(
+        buildFineRecord({
+          id: 'fine-late',
+          reason: LibraryFineReason.LATE,
+          amount: new Prisma.Decimal('40.00'),
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildFineRecord({
+          id: 'fine-lost',
+          reason: LibraryFineReason.LOST,
+          amount: new Prisma.Decimal('40.00'),
+        }),
+      );
+
+    jest.spyOn(service, 'markLoanLost').mockResolvedValue({
+      loan: buildLoanRecord({ status: 'LOST' }),
+      fine: null,
+      fineCreated: false,
+    } as never);
 
     const result = await service.assessOverdueFines(adminActor as never, {
       schoolId: 'school-1',
     });
 
     expect(result.evaluatedLoans).toBe(1);
-    expect(result.createdCount).toBe(0);
-    expect(result.duplicateCount).toBe(1);
+    expect(result.createdCount).toBe(2);
+    expect(result.markedLostCount).toBe(1);
+    expect(service.markLoanLost).toHaveBeenCalledTimes(1);
+  });
+
+  it('infers checkoutId for late manual fine from student + item active checkout', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'student-1',
+      role: UserRole.STUDENT,
+      schoolId: 'school-1',
+      firstName: 'Test',
+      lastName: 'Student',
+      memberships: [{ schoolId: 'school-1' }],
+    });
+    prisma.libraryItem.findFirst.mockResolvedValue({ id: 'item-1' });
+    prisma.libraryLoan.findMany.mockResolvedValue([
+      {
+        id: 'loan-1',
+        schoolId: 'school-1',
+        studentId: 'student-1',
+        itemId: 'item-1',
+      },
+    ]);
+    prisma.libraryFineSettings.upsert.mockResolvedValue(buildFineSettings());
+    prisma.billingCategory.upsert.mockResolvedValue({
+      id: 'cat-1',
+      schoolId: 'school-1',
+      name: 'Library Fines',
+    });
+    tx.billingCharge.create.mockResolvedValue({ id: 'charge-1' });
+    tx.libraryFine.create.mockResolvedValue(
+      buildFineRecord({
+        reason: LibraryFineReason.LATE,
+        checkoutId: 'loan-1',
+      }),
+    );
+
+    const created = await service.createManualFine(adminActor as never, {
+      schoolId: 'school-1',
+      studentId: 'student-1',
+      reason: LibraryFineReason.LATE,
+      libraryItemId: 'item-1',
+    });
+
+    expect(prisma.libraryLoan.findMany).toHaveBeenCalledTimes(1);
+    expect(created.checkoutId).toBe('loan-1');
+  });
+
+  it('rejects late/lost manual fine when checkout inference is ambiguous', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'student-1',
+      role: UserRole.STUDENT,
+      schoolId: 'school-1',
+      firstName: 'Test',
+      lastName: 'Student',
+      memberships: [{ schoolId: 'school-1' }],
+    });
+    prisma.libraryItem.findFirst.mockResolvedValue({ id: 'item-1' });
+    prisma.libraryLoan.findMany.mockResolvedValue([
+      {
+        id: 'loan-1',
+        schoolId: 'school-1',
+        studentId: 'student-1',
+        itemId: 'item-1',
+      },
+      {
+        id: 'loan-2',
+        schoolId: 'school-1',
+        studentId: 'student-1',
+        itemId: 'item-1',
+      },
+    ]);
+
+    await expect(
+      service.createManualFine(adminActor as never, {
+        schoolId: 'school-1',
+        studentId: 'student-1',
+        reason: LibraryFineReason.LOST,
+        libraryItemId: 'item-1',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('uses configured settings amount when manual fine amount is omitted', async () => {

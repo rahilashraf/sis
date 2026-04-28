@@ -19,6 +19,7 @@ export type LibraryItem = {
   isbn: string | null;
   barcode: string | null;
   category: string | null;
+  lostFeeOverride: string | null;
   status: LibraryItemStatus;
   totalCopies: number;
   availableCopies: number;
@@ -81,6 +82,9 @@ export type LibraryLoan = {
 
 export type LibraryOverdueLoan = LibraryLoan & {
   daysOverdue: number;
+  daysUntilLost: number;
+  lateFeeDaysCharged: number;
+  becomesLostOn: string;
 };
 
 export type ParentStudentLibraryLoansResponse = {
@@ -154,6 +158,7 @@ export type CreateLibraryItemInput = {
   isbn?: string | null;
   barcode?: string | null;
   category?: string | null;
+  lostFeeOverride?: string | null;
   totalCopies?: number;
   availableCopies?: number;
   status?: LibraryItemStatus;
@@ -167,6 +172,7 @@ export type UpdateLibraryItemInput = Partial<
     | "isbn"
     | "barcode"
     | "category"
+    | "lostFeeOverride"
     | "totalCopies"
     | "availableCopies"
     | "status"
@@ -320,8 +326,10 @@ export type AssessLibraryOverdueFinesResult = {
   schoolId: string;
   evaluatedLoans: number;
   createdCount: number;
+  updatedCount?: number;
   skippedCount: number;
   duplicateCount: number;
+  markedLostCount?: number;
 };
 
 export type AssessUnclaimedHoldFineInput = {

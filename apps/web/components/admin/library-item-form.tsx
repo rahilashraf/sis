@@ -36,6 +36,7 @@ type LibraryItemFormState = {
   isbn: string;
   barcode: string;
   category: string;
+  lostFeeOverride: string;
   totalCopies: string;
   status: LibraryItemStatus;
 };
@@ -47,6 +48,7 @@ function toFormState(item: LibraryItem): LibraryItemFormState {
     isbn: item.isbn ?? "",
     barcode: item.barcode ?? "",
     category: item.category ?? "",
+    lostFeeOverride: item.lostFeeOverride ?? "",
     totalCopies: String(item.totalCopies),
     status: item.status,
   };
@@ -174,6 +176,7 @@ export function LibraryItemForm({ itemId }: { itemId: string }) {
         isbn: form.isbn.trim() || null,
         barcode: form.barcode.trim() || null,
         category: form.category.trim() || null,
+        lostFeeOverride: form.lostFeeOverride.trim() || null,
         totalCopies: parsedTotalCopies,
         status: form.status,
       });
@@ -347,6 +350,26 @@ export function LibraryItemForm({ itemId }: { itemId: string }) {
                   )
                 }
                 value={form.category}
+              />
+            </Field>
+
+            <Field
+              htmlFor="library-item-lost-fee-override"
+              label="Lost Fee Override (CAD)"
+              description="Leave blank to use the school default lost fee."
+            >
+              <Input
+                id="library-item-lost-fee-override"
+                inputMode="decimal"
+                onChange={(event) =>
+                  setForm((current) =>
+                    current
+                      ? { ...current, lostFeeOverride: event.target.value }
+                      : current,
+                  )
+                }
+                placeholder="e.g. 35.00"
+                value={form.lostFeeOverride}
               />
             </Field>
 

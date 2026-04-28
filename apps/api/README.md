@@ -128,3 +128,16 @@ npm run prisma:seed
 - `JWT_SECRET` is required outside tests.
 - `GET /health` and `GET /healthz` provide lightweight health probes for load balancers and uptime checks.
 - Slow, failed, auth-denied, throttled login, and export-failure API events are emitted as structured logs and can be wired to your log drain/alerting stack.
+
+## School Year Lifecycle Automation
+
+The API includes an owner/super-admin endpoint to automatically end school years and archive their connected classes after a 15-day grace period past year end date.
+
+- Endpoint: `POST /school-years/auto-end-expired`
+- Rule: if `schoolYear.endDate + 15 days < today`, the year is marked inactive and active classes in that year are archived.
+- This endpoint is idempotent and safe to run repeatedly.
+
+Recommended production setup:
+
+- Run daily from your platform scheduler (for example, a cron job, cloud scheduler, or CI scheduled workflow).
+- Use a privileged service account token with `OWNER` or `SUPER_ADMIN` permissions.

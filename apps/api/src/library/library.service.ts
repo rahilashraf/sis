@@ -34,7 +34,6 @@ import { ListLibraryItemsQueryDto } from './dto/list-library-items-query.dto';
 import { ListLibraryHoldsQueryDto } from './dto/list-library-holds-query.dto';
 import { ListLibraryLoansQueryDto } from './dto/list-library-loans-query.dto';
 import { ListLibraryOverdueQueryDto } from './dto/list-library-overdue-query.dto';
-import { GetLibraryFineSettingsQueryDto } from './dto/get-library-fine-settings-query.dto';
 import { ListLibraryFinesQueryDto } from './dto/list-library-fines-query.dto';
 import { UpsertLibraryFineSettingsDto } from './dto/upsert-library-fine-settings.dto';
 import { CreateManualLibraryFineDto } from './dto/create-manual-library-fine.dto';
@@ -63,6 +62,7 @@ const libraryItemSelect = Prisma.validator<Prisma.LibraryItemSelect>()({
   isbn: true,
   barcode: true,
   category: true,
+  lostFeeOverride: true,
   status: true,
   totalCopies: true,
   availableCopies: true,
@@ -361,6 +361,17 @@ export class LibraryService {
     return new Prisma.Decimal(normalized);
   }
 
+  private parseOptionalMoneyOrThrow(
+    value: string | null | undefined,
+    fieldName: string,
+  ) {
+    if (value === null || value === undefined || value.trim() === '') {
+      return null;
+    }
+
+    return this.parseMoneyOrThrow(value, fieldName);
+  }
+
   private startOfToday() {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -643,6 +654,7 @@ export class LibraryService {
     settings: Prisma.LibraryFineSettingsGetPayload<{ select: typeof libraryFineSettingsSelect }>;
     reason: LibraryFineReason;
     daysOverdue?: number;
+    itemLostFeeOverride?: Prisma.Decimal | null;
   }) {
     if (input.reason === LibraryFineReason.LATE) {
       const dailyAmount = new Prisma.Decimal(input.settings.lateFineAmount);
@@ -656,6 +668,10 @@ export class LibraryService {
     }
 
     if (input.reason === LibraryFineReason.LOST) {
+      if (input.itemLostFeeOverride !== null && input.itemLostFeeOverride !== undefined) {
+        return new Prisma.Decimal(input.itemLostFeeOverride);
+      }
+
       return new Prisma.Decimal(input.settings.lostItemFineAmount);
     }
 
@@ -672,6 +688,174 @@ export class LibraryService {
     }
 
     return this.parseDateOrThrow(value, 'dueDate');
+  }
+
+  private async resolveActiveCheckoutForFine(input: {
+    schoolId: string;
+    studentId: string;
+    libraryItemId: string;
+  }) {
+    const activeCheckouts = await this.prisma.libraryLoan.findMany({
+      where: {
+        schoolId: input.schoolId,
+        studentId: input.studentId,
+        itemId: input.libraryItemId,
+        returnedAt: null,
+        status: {
+          in: [
+            LibraryLoanStatus.ACTIVE,
+            LibraryLoanStatus.OVERDUE,
+            LibraryLoanStatus.LOST,
+          ],
+        },
+      },
+      select: {
+        id: true,
+        schoolId: true,
+        studentId: true,
+        itemId: true,
+      },
+      orderBy: [{ checkoutDate: 'desc' }],
+      take: 2,
+    });
+
+    if (activeCheckouts.length === 0) {
+      throw new BadRequestException(
+        'No active checkout found for the selected student and item. Provide a valid checkout ID or select the active checkout item pair.',
+      );
+    }
+
+    if (activeCheckouts.length > 1) {
+      throw new BadRequestException(
+        'Multiple active checkouts were found for this student and item. Provide checkoutId to disambiguate.',
+      );
+    }
+
+    return activeCheckouts[0];
+  }
+
+  private async createOrUpdateCheckoutFineWithCharge(input: {
+    actor: AuthenticatedUser;
+    schoolId: string;
+    studentId: string;
+    checkoutId: string;
+    reason: LibraryFineReason;
+    amount: Prisma.Decimal;
+    description?: string | null;
+    libraryItemId?: string | null;
+    dueDate?: Date | null;
+  }) {
+    const existingFine = await this.prisma.libraryFine.findUnique({
+      where: {
+        checkoutId_reason: {
+          checkoutId: input.checkoutId,
+          reason: input.reason,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+        billingChargeId: true,
+        billingCharge: {
+          select: {
+            id: true,
+            status: true,
+            amountPaid: true,
+          },
+        },
+      },
+    });
+
+    if (!existingFine) {
+      return {
+        fine: await this.createFineWithCharge({
+          actor: input.actor,
+          schoolId: input.schoolId,
+          studentId: input.studentId,
+          reason: input.reason,
+          amount: input.amount,
+          description: input.description ?? null,
+          libraryItemId: input.libraryItemId ?? null,
+          checkoutId: input.checkoutId,
+          dueDate: input.dueDate ?? null,
+        }),
+        created: true,
+        updated: false,
+      };
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      let billingChargeId = existingFine.billingChargeId;
+
+      if (!billingChargeId) {
+        const category = await this.ensureLibraryFineCategory(input.schoolId);
+        const createdCharge = await tx.billingCharge.create({
+          data: {
+            schoolId: input.schoolId,
+            schoolYearId: null,
+            studentId: input.studentId,
+            categoryId: category.id,
+            createdById: input.actor.id,
+            title: this.buildLibraryFineChargeTitle(input.reason),
+            description: input.description ?? null,
+            amount: input.amount,
+            amountPaid: new Prisma.Decimal(0),
+            amountDue: input.amount,
+            status: ChargeStatus.PENDING,
+            sourceType: ChargeSourceType.SYSTEM,
+            issuedAt: new Date(),
+            dueDate: input.dueDate ?? null,
+          },
+          select: { id: true },
+        });
+
+        billingChargeId = createdCharge.id;
+      } else if (
+        existingFine.status === LibraryFineStatus.OPEN &&
+        existingFine.billingCharge &&
+        new Prisma.Decimal(existingFine.billingCharge.amountPaid).eq(0) &&
+        (existingFine.billingCharge.status === ChargeStatus.PENDING ||
+          existingFine.billingCharge.status === ChargeStatus.PARTIAL)
+      ) {
+        await tx.billingCharge.update({
+          where: { id: billingChargeId },
+          data: {
+            amount: input.amount,
+            amountDue: input.amount,
+            status: ChargeStatus.PENDING,
+            ...(input.description !== undefined
+              ? { description: input.description ?? null }
+              : {}),
+            ...(input.dueDate !== undefined ? { dueDate: input.dueDate } : {}),
+          },
+        });
+      }
+
+      const fine = await tx.libraryFine.update({
+        where: { id: existingFine.id },
+        data: {
+          ...(existingFine.status === LibraryFineStatus.OPEN
+            ? { amount: input.amount }
+            : {}),
+          ...(input.description !== undefined
+            ? { description: input.description ?? null }
+            : {}),
+          ...(input.libraryItemId !== undefined
+            ? { libraryItemId: input.libraryItemId ?? null }
+            : {}),
+          billingChargeId,
+        },
+        select: libraryFineSelect,
+      });
+
+      return fine;
+    });
+
+    return {
+      fine: this.mapFineRecord(result),
+      created: false,
+      updated: true,
+    };
   }
 
   async getFineSettings(actor: AuthenticatedUser, schoolId: string) {
@@ -774,10 +958,6 @@ export class LibraryService {
       }
     }
 
-    if ((reason === LibraryFineReason.LATE || reason === LibraryFineReason.LOST) && !body.checkoutId) {
-      throw new BadRequestException('checkoutId is required for LATE and LOST fines');
-    }
-
     if (reason === LibraryFineReason.UNCLAIMED_HOLD && !body.holdReference) {
       throw new BadRequestException('holdReference is required for UNCLAIMED_HOLD fines');
     }
@@ -797,6 +977,23 @@ export class LibraryService {
       }
 
       libraryItemId = item.id;
+    }
+
+    if (
+      (reason === LibraryFineReason.LATE || reason === LibraryFineReason.LOST) &&
+      !checkout
+    ) {
+      if (!libraryItemId) {
+        throw new BadRequestException(
+          'libraryItemId is required when checkoutId is not provided for LATE and LOST fines',
+        );
+      }
+
+      checkout = await this.resolveActiveCheckoutForFine({
+        schoolId: body.schoolId,
+        studentId: student.id,
+        libraryItemId,
+      });
     }
 
     let amount: Prisma.Decimal;
@@ -935,6 +1132,7 @@ export class LibraryService {
         item: {
           select: {
             title: true,
+            lostFeeOverride: true,
           },
         },
       },
@@ -942,8 +1140,10 @@ export class LibraryService {
     });
 
     let createdCount = 0;
+    let updatedCount = 0;
     let skippedCount = 0;
     let duplicateCount = 0;
+    let markedLostCount = 0;
 
     for (const loan of overdueLoans) {
       const daysRaw = Math.floor(
@@ -951,60 +1151,87 @@ export class LibraryService {
       );
       const billableDays = Math.max(0, daysRaw - settings.lateFineGraceDays);
 
-      if (billableDays <= 0) {
+      if (daysRaw <= 0 || billableDays <= 0) {
         skippedCount += 1;
         continue;
       }
 
-      const existing = await this.prisma.libraryFine.findUnique({
-        where: {
-          checkoutId_reason: {
-            checkoutId: loan.id,
-            reason: LibraryFineReason.LATE,
-          },
-        },
-        select: { id: true },
-      });
-
-      if (existing) {
-        duplicateCount += 1;
-        continue;
-      }
+      const lateFeeDays = Math.min(billableDays, 20);
+      const isPastLostThreshold = daysRaw > 20;
 
       const amount = this.resolveFineAmountFromSettings({
         settings,
         reason: LibraryFineReason.LATE,
-        daysOverdue: billableDays,
+        daysOverdue: lateFeeDays,
       });
 
       if (amount.lte(0)) {
         skippedCount += 1;
-        continue;
-      }
 
-      try {
-        await this.createFineWithCharge({
+      } else {
+        const upsertedLateFine = await this.createOrUpdateCheckoutFineWithCharge({
           actor,
           schoolId: loan.schoolId,
           studentId: loan.studentId,
           reason: LibraryFineReason.LATE,
           amount,
-          description: `Overdue by ${billableDays} day(s) for "${loan.item.title}"`,
+          description: `Overdue by ${daysRaw} day(s) for "${loan.item.title}" (late fee billed for first ${lateFeeDays} day(s))`,
           libraryItemId: loan.itemId,
           checkoutId: loan.id,
         });
-        createdCount += 1;
-      } catch (error) {
-        if (
-          error instanceof ConflictException ||
-          (error instanceof Prisma.PrismaClientKnownRequestError &&
-            error.code === 'P2002')
-        ) {
-          duplicateCount += 1;
-          continue;
-        }
 
-        throw error;
+        if (upsertedLateFine.created) {
+          createdCount += 1;
+        } else if (upsertedLateFine.updated) {
+          updatedCount += 1;
+        } else {
+          duplicateCount += 1;
+        }
+      }
+
+      if (!isPastLostThreshold) {
+        continue;
+      }
+
+      try {
+        await this.markLoanLost(actor, loan.id, {
+          description: `Automatically marked lost after ${daysRaw} overdue day(s)`,
+        });
+        markedLostCount += 1;
+      } catch (error) {
+        if (!(error instanceof ConflictException)) {
+          throw error;
+        }
+      }
+
+      const lostAmount = this.resolveFineAmountFromSettings({
+        settings,
+        reason: LibraryFineReason.LOST,
+        itemLostFeeOverride: loan.item.lostFeeOverride,
+      });
+
+      if (lostAmount.lte(0)) {
+        continue;
+      }
+
+      const upsertedLostFine = await this.createOrUpdateCheckoutFineWithCharge({
+        actor,
+        schoolId: loan.schoolId,
+        studentId: loan.studentId,
+        checkoutId: loan.id,
+        reason: LibraryFineReason.LOST,
+        amount: lostAmount,
+        description: `Lost item charge for "${loan.item.title}" after exceeding 20 overdue day(s)`,
+        libraryItemId: loan.itemId,
+        dueDate: loan.dueDate,
+      });
+
+      if (upsertedLostFine.created) {
+        createdCount += 1;
+      } else if (upsertedLostFine.updated) {
+        updatedCount += 1;
+      } else {
+        duplicateCount += 1;
       }
     }
 
@@ -1012,8 +1239,10 @@ export class LibraryService {
       schoolId: body.schoolId,
       evaluatedLoans: overdueLoans.length,
       createdCount,
+      updatedCount,
       skippedCount,
       duplicateCount,
+      markedLostCount,
     };
   }
 
@@ -1309,6 +1538,10 @@ export class LibraryService {
         isbn: body.isbn ?? null,
         barcode: body.barcode ?? null,
         category: body.category ?? null,
+        lostFeeOverride: this.parseOptionalMoneyOrThrow(
+          body.lostFeeOverride,
+          'lostFeeOverride',
+        ),
         totalCopies,
         availableCopies,
         status,
@@ -1396,6 +1629,14 @@ export class LibraryService {
         ...(body.isbn !== undefined ? { isbn: body.isbn } : {}),
         ...(body.barcode !== undefined ? { barcode: body.barcode } : {}),
         ...(body.category !== undefined ? { category: body.category } : {}),
+        ...(body.lostFeeOverride !== undefined
+          ? {
+              lostFeeOverride: this.parseOptionalMoneyOrThrow(
+                body.lostFeeOverride,
+                'lostFeeOverride',
+              ),
+            }
+          : {}),
         ...(body.totalCopies !== undefined ? { totalCopies: nextTotalCopies } : {}),
         ...(body.availableCopies !== undefined || body.totalCopies !== undefined
           ? { availableCopies: nextAvailableCopies }
@@ -2003,10 +2244,16 @@ export class LibraryService {
       const dueDateMs = new Date(row.dueDate).getTime();
       const todayMs = todayStart.getTime();
       const daysOverdue = Math.max(1, Math.floor((todayMs - dueDateMs) / (1000 * 60 * 60 * 24)));
+      const daysUntilLost = Math.max(0, 20 - daysOverdue);
+      const becomesLostOn = new Date(row.dueDate);
+      becomesLostOn.setDate(becomesLostOn.getDate() + 21);
 
       return {
         ...this.mapLoanRecord(row),
         daysOverdue,
+        daysUntilLost,
+        lateFeeDaysCharged: Math.min(daysOverdue, 20),
+        becomesLostOn: becomesLostOn.toISOString(),
       };
     });
   }

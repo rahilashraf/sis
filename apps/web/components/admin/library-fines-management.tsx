@@ -745,7 +745,9 @@ export function LibraryFinesManagement() {
         <CardHeader>
           <CardTitle>Operational Actions</CardTitle>
           <CardDescription>
-            Run fine assessments and issue manual fines.
+            Run fine assessments and issue manual fines. For late/lost manual
+            fines, checkout ID is optional when student and item identify a
+            single active checkout.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -939,7 +941,8 @@ export function LibraryFinesManagement() {
 
             <Field
               htmlFor="library-manual-checkout-id"
-              label="Checkout ID (if late/lost)"
+              label="Checkout ID (optional)"
+              description="Leave blank to infer from student + item active checkout."
             >
               <Input
                 id="library-manual-checkout-id"
@@ -953,7 +956,11 @@ export function LibraryFinesManagement() {
               />
             </Field>
 
-            <Field htmlFor="library-manual-item-id" label="Item ID (optional)">
+            <Field
+              htmlFor="library-manual-item-id"
+              label="Item ID (optional)"
+              description="Required for late/lost when checkout ID is blank."
+            >
               <Input
                 id="library-manual-item-id"
                 value={manualForm.libraryItemId}

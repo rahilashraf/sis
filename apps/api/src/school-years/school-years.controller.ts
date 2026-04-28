@@ -67,8 +67,18 @@ export class SchoolYearsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('OWNER', 'SUPER_ADMIN')
+  @Patch(':id/end')
+  endSchoolYear(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', NonEmptyStringPipe) id: string,
+  ) {
+    return this.schoolYearsService.archive(req.user, id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'SUPER_ADMIN')
   @Patch(':id/archive')
-  archive(
+  archiveAlias(
     @Req() req: AuthenticatedRequest,
     @Param('id', NonEmptyStringPipe) id: string,
   ) {
@@ -83,6 +93,13 @@ export class SchoolYearsController {
     @Param('id', NonEmptyStringPipe) id: string,
   ) {
     return this.schoolYearsService.archive(req.user, id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'SUPER_ADMIN')
+  @Post('auto-end-expired')
+  autoEndExpired() {
+    return this.schoolYearsService.autoEndExpiredSchoolYearsAndArchiveClasses();
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

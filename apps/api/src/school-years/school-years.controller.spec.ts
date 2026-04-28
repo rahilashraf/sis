@@ -61,6 +61,9 @@ describe('SchoolYearsController (HTTP)', () => {
       updateMany: jest.Mock;
       update: jest.Mock;
     };
+    class: {
+      updateMany: jest.Mock;
+    };
     $transaction: jest.Mock;
   };
 
@@ -76,6 +79,9 @@ describe('SchoolYearsController (HTTP)', () => {
         delete: jest.fn(),
         updateMany: jest.fn(),
         update: jest.fn(),
+      },
+      class: {
+        updateMany: jest.fn(),
       },
       $transaction: jest.fn(async (callback: (tx: typeof prisma) => unknown) =>
         callback(prisma),
@@ -306,11 +312,12 @@ describe('SchoolYearsController (HTTP)', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('archives a school year for owner/super admin roles', async () => {
+  it('ends a school year for owner/super admin roles', async () => {
     prisma.schoolYear.findUnique.mockResolvedValue({
       id: 'year-1',
       schoolId: 'school-1',
     });
+    prisma.class.updateMany.mockResolvedValue({ count: 2 });
     prisma.schoolYear.update.mockResolvedValue({
       id: 'year-1',
       schoolId: 'school-1',
@@ -320,7 +327,7 @@ describe('SchoolYearsController (HTTP)', () => {
     });
 
     await request(app.getHttpServer())
-      .patch('/school-years/year-1/archive')
+      .patch('/school-years/year-1/end')
       .set('x-test-user-id', 'owner-1')
       .set('x-test-role', UserRole.OWNER)
       .expect(200)
@@ -331,6 +338,16 @@ describe('SchoolYearsController (HTTP)', () => {
         isActive: false,
         school: { id: 'school-1', name: 'North School' },
       });
+
+    expect(prisma.class.updateMany).toHaveBeenCalledWith({
+      where: {
+        schoolYearId: 'year-1',
+        isActive: true,
+      },
+      data: {
+        isActive: false,
+      },
+    });
   });
 
   it('deactivates a school year through the alias endpoint', async () => {
@@ -338,6 +355,7 @@ describe('SchoolYearsController (HTTP)', () => {
       id: 'year-1',
       schoolId: 'school-1',
     });
+    prisma.class.updateMany.mockResolvedValue({ count: 1 });
     prisma.schoolYear.update.mockResolvedValue({
       id: 'year-1',
       schoolId: 'school-1',

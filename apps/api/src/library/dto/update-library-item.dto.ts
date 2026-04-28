@@ -3,8 +3,10 @@ import { LibraryItemStatus } from '@prisma/client';
 import {
   IsEnum,
   IsInt,
+  IsNumberString,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -40,6 +42,14 @@ export class UpdateLibraryItemDto {
   @IsString()
   @MaxLength(120)
   category?: string | null;
+
+  @Transform(({ value }) => toNullableTrimmedString(value))
+  @IsOptional()
+  @IsNumberString()
+  @Matches(/^\d+(\.\d{1,2})?$/, {
+    message: 'lostFeeOverride must be a non-negative number with at most 2 decimal places',
+  })
+  lostFeeOverride?: string | null;
 
   @Transform(({ value }) => toOptionalNumber(value))
   @IsOptional()

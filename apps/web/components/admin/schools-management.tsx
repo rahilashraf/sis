@@ -23,7 +23,7 @@ import {
   activateSchool,
   activateSchoolYear,
   archiveSchool,
-  archiveSchoolYear,
+  endSchoolYear,
   createSchool,
   createSchoolYear,
   deleteSchool,
@@ -186,8 +186,8 @@ function getActionTitle(actionTarget: ActionTarget | null) {
   }
 
   return actionTarget.action === "archive"
-    ? "Archive school year"
-    : "Unarchive school year";
+    ? "End school year"
+    : "Activate school year";
 }
 
 function getActionDescription(actionTarget: ActionTarget | null) {
@@ -206,12 +206,12 @@ function getActionDescription(actionTarget: ActionTarget | null) {
   }
 
   if (actionTarget.action === "delete") {
-    return `Remove ${actionTarget.label} from active admin workflows? Empty school years are deleted permanently. Years with linked classes, attendance, or reporting periods are archived instead.`;
+    return `Remove ${actionTarget.label} from active admin workflows? Empty school years are deleted permanently. Years with linked classes, attendance, or reporting periods are ended instead.`;
   }
 
   return actionTarget.action === "archive"
-    ? `Archive ${actionTarget.label}? This sets the school year inactive without deleting linked records.`
-    : `Unarchive ${actionTarget.label}? This makes the school year active again and deactivates any other active year for the same school.`;
+    ? `End ${actionTarget.label}? This marks the school year inactive and archives connected classes without deleting historical records.`
+    : `Activate ${actionTarget.label}? This makes the school year active again and deactivates any other active year for the same school.`;
 }
 
 function getActionConfirmLabel(actionTarget: ActionTarget | null) {
@@ -228,10 +228,10 @@ function getActionConfirmLabel(actionTarget: ActionTarget | null) {
   return actionTarget.action === "archive"
     ? actionTarget.kind === "school"
       ? "Archive school"
-      : "Archive school year"
+      : "End school year"
     : actionTarget.kind === "school"
       ? "Unarchive school"
-      : "Unarchive school year";
+      : "Activate school year";
 }
 
 function getActionPendingLabel(actionTarget: ActionTarget | null) {
@@ -243,7 +243,7 @@ function getActionPendingLabel(actionTarget: ActionTarget | null) {
     return "Deleting...";
   }
 
-  return actionTarget.action === "archive" ? "Archiving..." : "Unarchiving...";
+  return actionTarget.action === "archive" ? "Ending..." : "Activating...";
 }
 
 function getActionConfirmVariant(actionTarget: ActionTarget | null) {
@@ -650,7 +650,7 @@ export function SchoolsManagement() {
         );
       } else {
         if (actionTarget.action === "archive") {
-          await archiveSchoolYear(actionTarget.id);
+          await endSchoolYear(actionTarget.id);
         } else if (actionTarget.action === "activate") {
           await activateSchoolYear(actionTarget.id);
         } else {
@@ -670,8 +670,8 @@ export function SchoolsManagement() {
         syncEditingSchoolYearState(updatedSchoolYears);
         setSuccessMessage(
           actionTarget.action === "archive"
-            ? "School year archived successfully."
-            : "School year unarchived successfully.",
+            ? "School year ended successfully."
+            : "School year activated successfully.",
         );
       }
 
@@ -1140,8 +1140,8 @@ export function SchoolsManagement() {
           <div>
             <CardTitle>School Years</CardTitle>
             <CardDescription>
-              Active school years are shown by default. Removed school years are
-              archived safely when linked academic records still exist.
+              Active school years are shown by default. Ended school years are
+              shown when inactive records are included.
             </CardDescription>
           </div>
           <div className="flex flex-col gap-3 sm:items-end">
@@ -1280,7 +1280,7 @@ export function SchoolsManagement() {
                               schoolYear.isActive ? "success" : "neutral"
                             }
                           >
-                            {schoolYear.isActive ? "Active" : "Archived"}
+                            {schoolYear.isActive ? "Active" : "Ended"}
                           </Badge>
                         </td>
                         <td className="px-4 py-4">
@@ -1316,7 +1316,7 @@ export function SchoolsManagement() {
                                   schoolYear.isActive ? "danger" : "primary"
                                 }
                               >
-                                {schoolYear.isActive ? "Archive" : "Unarchive"}
+                                {schoolYear.isActive ? "End" : "Activate"}
                               </Button>
                               <Button
                                 disabled={isSavingSchoolYear || isRunningAction}

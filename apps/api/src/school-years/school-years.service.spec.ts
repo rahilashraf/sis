@@ -9,6 +9,7 @@ describe('SchoolYearsService', () => {
     schoolYear: {
       findMany: jest.Mock;
       findUnique: jest.Mock;
+      updateMany: jest.Mock;
       update: jest.Mock;
       delete: jest.Mock;
     };
@@ -27,6 +28,7 @@ describe('SchoolYearsService', () => {
       schoolYear: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        updateMany: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
       },
@@ -39,7 +41,7 @@ describe('SchoolYearsService', () => {
             schoolYear: {
               findUnique: prisma.schoolYear.findUnique,
               update: prisma.schoolYear.update,
-              updateMany: jest.fn(),
+              updateMany: prisma.schoolYear.updateMany,
               delete: prisma.schoolYear.delete,
             },
             class: {
@@ -104,6 +106,117 @@ describe('SchoolYearsService', () => {
 
     expect(prisma.schoolYear.delete).not.toHaveBeenCalled();
     expect(prisma.$transaction).toHaveBeenCalled();
+  });
+
+  it('ends school year and archives connected classes in one transaction', async () => {
+    prisma.schoolYear.findUnique.mockResolvedValue({
+      id: 'year-1',
+      schoolId: 'school-1',
+    });
+    prisma.class.updateMany.mockResolvedValue({ count: 3 });
+    prisma.schoolYear.update.mockResolvedValue({
+      id: 'year-1',
+      schoolId: 'school-1',
+      name: '2025-2026',
+      isActive: false,
+      school: {
+        id: 'school-1',
+        name: 'North School',
+      },
+    });
+
+    const result = await service.archive(
+      {
+        id: 'owner-1',
+        role: UserRole.OWNER,
+        memberships: [{ schoolId: 'school-1', isActive: true }],
+      } as never,
+      'year-1',
+    );
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.class.updateMany).toHaveBeenCalledWith({
+      where: {
+        schoolYearId: 'year-1',
+        isActive: true,
+      },
+      data: {
+        isActive: false,
+      },
+    });
+    expect(result.isActive).toBe(false);
+  });
+
+  it('active list excludes ended school years by default', async () => {
+    prisma.schoolYear.findMany.mockResolvedValue([{ id: 'active-year' }]);
+
+    await service.findAllForSchool(
+      {
+        id: 'staff-1',
+        role: UserRole.STAFF,
+        memberships: [{ schoolId: 'school-1', isActive: true }],
+      } as never,
+      'school-1',
+      false,
+    );
+
+    expect(prisma.schoolYear.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          schoolId: 'school-1',
+          isActive: true,
+        },
+      }),
+    );
+  });
+
+  it('includeInactive list keeps ended school years readable', async () => {
+    prisma.schoolYear.findMany.mockResolvedValue([
+      { id: 'active-year', isActive: true },
+      { id: 'ended-year', isActive: false },
+    ]);
+
+    const rows = await service.findAllForSchool(
+      {
+        id: 'staff-1',
+        role: UserRole.STAFF,
+        memberships: [{ schoolId: 'school-1', isActive: true }],
+      } as never,
+      'school-1',
+      true,
+    );
+
+    expect(prisma.schoolYear.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          schoolId: 'school-1',
+        },
+      }),
+    );
+    expect(rows).toHaveLength(2);
+  });
+
+  it('automatically ends years past endDate+15 days and archives classes', async () => {
+    prisma.schoolYear.findMany.mockResolvedValue([
+      { id: 'year-1' },
+      { id: 'year-2' },
+    ]);
+    prisma.schoolYear.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    prisma.class.updateMany
+      .mockResolvedValueOnce({ count: 2 })
+      .mockResolvedValueOnce({ count: 1 });
+
+    const result = await service.autoEndExpiredSchoolYearsAndArchiveClasses(
+      new Date('2026-04-28T00:00:00.000Z'),
+    );
+
+    expect(prisma.schoolYear.findMany).toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(result.evaluatedSchoolYears).toBe(2);
+    expect(result.endedSchoolYearCount).toBe(1);
+    expect(result.archivedClassCount).toBe(3);
   });
 
   it('deletes an empty school year', async () => {
