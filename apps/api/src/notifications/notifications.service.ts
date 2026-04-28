@@ -63,7 +63,10 @@ export class NotificationsService {
     );
   }
 
-  private buildDefaultStudentAlertTitle(type: NotificationType, studentName: string) {
+  private buildDefaultStudentAlertTitle(
+    type: NotificationType,
+    studentName: string,
+  ) {
     if (type === NotificationType.FORM_REMINDER) {
       return `Form reminder for ${studentName}`;
     }
@@ -76,7 +79,10 @@ export class NotificationsService {
     return `New published grade for ${studentName}`;
   }
 
-  private buildDefaultStudentAlertMessage(type: NotificationType, studentName: string) {
+  private buildDefaultStudentAlertMessage(
+    type: NotificationType,
+    studentName: string,
+  ) {
     if (type === NotificationType.FORM_REMINDER) {
       return `A form requires attention for ${studentName}.`;
     }
@@ -123,11 +129,13 @@ export class NotificationsService {
   }
 
   listForUser(user: AuthenticatedUser, query: ListNotificationsQueryDto) {
+    const notificationType = query.type as NotificationType | undefined;
+
     return this.prisma.notification.findMany({
       where: {
         recipientUserId: user.id,
         ...(query.unreadOnly ? { isRead: false } : {}),
-        ...(query.type ? { type: query.type } : {}),
+        ...(notificationType ? { type: notificationType } : {}),
       },
       orderBy: [{ createdAt: 'desc' }],
       take: query.limit ?? 25,
@@ -193,14 +201,20 @@ export class NotificationsService {
     input: CreateStudentNotificationAlertDto,
   ) {
     if (!this.canSendStudentAlerts(actor.role)) {
-      throw new ForbiddenException('You do not have permission to send student alerts');
+      throw new ForbiddenException(
+        'You do not have permission to send student alerts',
+      );
     }
+
+    const notificationType = input.type as NotificationType;
 
     const includeStudent = input.includeStudent ?? true;
     const includeParents = input.includeParents ?? true;
 
     if (!includeStudent && !includeParents) {
-      throw new BadRequestException('At least one recipient group must be enabled');
+      throw new BadRequestException(
+        'At least one recipient group must be enabled',
+      );
     }
 
     const student = await this.prisma.user.findFirst({
@@ -225,7 +239,8 @@ export class NotificationsService {
       throw new NotFoundException('Student not found');
     }
 
-    const studentSchoolId = student.memberships[0]?.schoolId ?? student.schoolId ?? null;
+    const studentSchoolId =
+      student.memberships[0]?.schoolId ?? student.schoolId ?? null;
     if (!isBypassRole(actor.role)) {
       const actorSchoolIds = getAccessibleSchoolIds(actor);
       const studentSchoolIds = new Set(
@@ -234,7 +249,9 @@ export class NotificationsService {
           ...student.memberships.map((membership) => membership.schoolId),
         ].filter((schoolId): schoolId is string => Boolean(schoolId)),
       );
-      const hasOverlap = actorSchoolIds.some((schoolId) => studentSchoolIds.has(schoolId));
+      const hasOverlap = actorSchoolIds.some((schoolId) =>
+        studentSchoolIds.has(schoolId),
+      );
       if (!hasOverlap) {
         throw new ForbiddenException('You do not have school access');
       }
@@ -270,16 +287,16 @@ export class NotificationsService {
       `${student.firstName} ${student.lastName}`.trim() || 'Student';
     const title =
       input.title?.trim() ||
-      this.buildDefaultStudentAlertTitle(input.type, studentName);
+      this.buildDefaultStudentAlertTitle(notificationType, studentName);
     const message =
       input.message?.trim() ||
-      this.buildDefaultStudentAlertMessage(input.type, studentName);
+      this.buildDefaultStudentAlertMessage(notificationType, studentName);
 
     const result = await this.createMany(
       recipients.map((recipientUserId) => ({
         schoolId: studentSchoolId,
         recipientUserId,
-        type: input.type,
+        type: notificationType,
         title,
         message,
         entityType: input.entityType?.trim() || null,
@@ -291,7 +308,7 @@ export class NotificationsService {
       count: result.count,
       recipients: recipients.length,
       studentId: student.id,
-      type: input.type,
+      type: notificationType,
     };
   }
 
@@ -300,7 +317,9 @@ export class NotificationsService {
     input: CreateNotificationBroadcastDto,
   ) {
     if (!this.canSendBroadcast(actor.role)) {
-      throw new ForbiddenException('You do not have permission to send broadcasts');
+      throw new ForbiddenException(
+        'You do not have permission to send broadcasts',
+      );
     }
 
     const requestedSchoolId = input.schoolId?.trim() || null;
@@ -323,11 +342,19 @@ export class NotificationsService {
           ];
 
     let schoolId = requestedSchoolId;
-    if (!isBypassRole(actor.role)) {
+    if (isBypassRole(actor.role)) {
+      if (!schoolId) {
+        throw new BadRequestException(
+          'A school context is required for this broadcast',
+        );
+      }
+    } else {
       const actorSchoolIds = getAccessibleSchoolIds(actor);
       schoolId = requestedSchoolId ?? actorSchoolIds[0] ?? null;
       if (!schoolId) {
-        throw new BadRequestException('A school context is required for this broadcast');
+        throw new BadRequestException(
+          'A school context is required for this broadcast',
+        );
       }
       ensureUserHasSchoolAccess(actor, schoolId);
     }
@@ -351,12 +378,13 @@ export class NotificationsService {
       return { count: 0, recipients: 0 };
     }
 
-    const type =
-      input.type &&
-      (input.type === NotificationType.SYSTEM_ANNOUNCEMENT ||
-        input.type === NotificationType.ADMIN_BROADCAST)
-        ? input.type
-        : NotificationType.ADMIN_BROADCAST;
+    let type = 'ADMIN_BROADCAST' as NotificationType;
+    if (
+      input.type === 'SYSTEM_ANNOUNCEMENT' ||
+      input.type === 'ADMIN_BROADCAST'
+    ) {
+      type = input.type as NotificationType;
+    }
 
     const result = await this.createMany(
       users.map((user) => ({

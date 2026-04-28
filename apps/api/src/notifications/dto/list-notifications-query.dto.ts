@@ -1,5 +1,6 @@
+import { NotificationType } from '@prisma/client';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
 
 function toOptionalBoolean(value: unknown) {
   if (value === 'true') return true;
@@ -28,4 +29,8 @@ export class ListNotificationsQueryDto {
   @Min(1)
   @Max(100)
   limit?: number;
+
+  @IsOptional()
+  @IsEnum(NotificationType)
+  type?: NotificationType;
 }
