@@ -361,6 +361,11 @@ describe('ClassesController (HTTP)', () => {
   });
 
   it('removes a teacher from a class for admin access', async () => {
+    prisma.class.findUnique.mockResolvedValue({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
     prisma.teacherClassAssignment.findFirst.mockResolvedValue({
       id: 'assignment-1',
     });
@@ -374,6 +379,7 @@ describe('ClassesController (HTTP)', () => {
       .delete('/classes/class-1/teachers/teacher-1')
       .set('x-test-user-id', 'admin-1')
       .set('x-test-role', UserRole.ADMIN)
+      .set('x-test-school-ids', 'school-1')
       .expect(200)
       .expect({
         id: 'assignment-1',
@@ -393,6 +399,11 @@ describe('ClassesController (HTTP)', () => {
   });
 
   it('unenrolls a student from a class for admin access', async () => {
+    prisma.class.findUnique.mockResolvedValue({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
     prisma.studentClassEnrollment.findFirst.mockResolvedValue({
       id: 'enrollment-1',
     });
@@ -406,6 +417,7 @@ describe('ClassesController (HTTP)', () => {
       .delete('/classes/class-1/students/student-1')
       .set('x-test-user-id', 'admin-1')
       .set('x-test-role', UserRole.ADMIN)
+      .set('x-test-school-ids', 'school-1')
       .expect(200)
       .expect({
         id: 'enrollment-1',
@@ -496,7 +508,11 @@ describe('ClassesController (HTTP)', () => {
   });
 
   it('archives a class for admin access', async () => {
-    prisma.class.findUnique.mockResolvedValue({ id: 'class-1' });
+    prisma.class.findUnique.mockResolvedValue({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
     prisma.class.update.mockResolvedValue({
       id: 'class-1',
       name: 'Math',
@@ -511,6 +527,7 @@ describe('ClassesController (HTTP)', () => {
       .patch('/classes/class-1/archive')
       .set('x-test-user-id', 'admin-1')
       .set('x-test-role', UserRole.ADMIN)
+      .set('x-test-school-ids', 'school-1')
       .expect(200)
       .expect({
         id: 'class-1',
@@ -524,7 +541,11 @@ describe('ClassesController (HTTP)', () => {
   });
 
   it('reactivates a class for admin access', async () => {
-    prisma.class.findUnique.mockResolvedValue({ id: 'class-1' });
+    prisma.class.findUnique.mockResolvedValue({
+      id: 'class-1',
+      schoolId: 'school-1',
+      schoolYearId: 'year-1',
+    });
     prisma.class.update.mockResolvedValue({
       id: 'class-1',
       name: 'Math',
@@ -539,6 +560,7 @@ describe('ClassesController (HTTP)', () => {
       .patch('/classes/class-1/reactivate')
       .set('x-test-user-id', 'admin-1')
       .set('x-test-role', UserRole.ADMIN)
+      .set('x-test-school-ids', 'school-1')
       .expect(200)
       .expect({
         id: 'class-1',

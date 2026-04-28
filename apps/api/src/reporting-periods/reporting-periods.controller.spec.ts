@@ -10,6 +10,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UserRole } from '@prisma/client';
 import request from 'supertest';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AuditService } from '../audit/audit.service';
 import { ROLES_KEY } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
@@ -69,6 +70,7 @@ describe('ReportingPeriodsController (HTTP)', () => {
       create: jest.Mock;
       findMany: jest.Mock;
       findUnique: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
       findFirst: jest.Mock;
       update: jest.Mock;
       delete: jest.Mock;
@@ -87,6 +89,7 @@ describe('ReportingPeriodsController (HTTP)', () => {
         create: jest.fn(),
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
@@ -101,6 +104,10 @@ describe('ReportingPeriodsController (HTTP)', () => {
         {
           provide: PrismaService,
           useValue: prisma,
+        },
+        {
+          provide: AuditService,
+          useValue: { log: jest.fn(), logCritical: jest.fn() },
         },
       ],
     })
@@ -132,6 +139,16 @@ describe('ReportingPeriodsController (HTTP)', () => {
       schoolId: 'school-1',
       startDate: new Date('2025-09-01T00:00:00.000Z'),
       endDate: new Date('2026-06-30T23:59:59.999Z'),
+    });
+    prisma.reportingPeriod.findUniqueOrThrow.mockResolvedValue({
+      id: 'period-1',
+      name: 'Term 1',
+      key: 'term-1',
+      startsAt: new Date('2025-09-01T00:00:00.000Z'),
+      endsAt: new Date('2025-11-15T00:00:00.000Z'),
+      isActive: true,
+      isLocked: false,
+      order: 1,
     });
     prisma.reportingPeriod.findFirst.mockResolvedValue(null);
     prisma.reportingPeriod.create.mockResolvedValue({

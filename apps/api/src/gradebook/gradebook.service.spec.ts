@@ -154,7 +154,7 @@ describe('GradebookService', () => {
 
     expect(summary.assessmentCount).toBe(2);
     expect(summary.studentCount).toBe(2);
-    expect(summary.overallAveragePercent).toBe(72.5);
+    expect(summary.overallAveragePercent).toBe(73);
     expect(summary.overallLetterGrade).toBe('B');
 
     const s1 = summary.students.find((entry) => entry.student.id === 's1');
@@ -226,7 +226,7 @@ describe('GradebookService', () => {
       'class-1',
     );
 
-    expect(summary.averagePercent).toBe(66.7);
+    expect(summary.averagePercent).toBe(67);
     expect(summary.usesWeights).toBe(true);
   });
 

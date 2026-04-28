@@ -60,7 +60,7 @@ describe('UsersService', () => {
     service = new UsersService(prisma as never, auditService as unknown as AuditService);
   });
 
-  it('does not scope list queries for admins', async () => {
+  it('scopes list queries for admins to accessible schools', async () => {
     prisma.user.findMany.mockResolvedValue([]);
 
     await service.findAll({
@@ -71,9 +71,21 @@ describe('UsersService', () => {
 
     expect(prisma.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
+        where: expect.objectContaining({
           isActive: true,
-        },
+          OR: expect.arrayContaining([
+            expect.objectContaining({
+              memberships: expect.objectContaining({
+                some: expect.objectContaining({
+                  schoolId: { in: ['school-1'] },
+                }),
+              }),
+            }),
+            expect.objectContaining({
+              schoolId: { in: ['school-1'] },
+            }),
+          ]),
+        }),
       }),
     );
   });

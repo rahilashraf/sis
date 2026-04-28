@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 import { SchoolYearsService } from './school-years.service';
 
 describe('SchoolYearsService', () => {
@@ -16,6 +17,10 @@ describe('SchoolYearsService', () => {
     };
     $transaction: jest.Mock;
   };
+  let auditService: {
+    log: jest.Mock;
+    logCritical: jest.Mock;
+  };
 
   beforeEach(() => {
     prisma = {
@@ -28,10 +33,34 @@ describe('SchoolYearsService', () => {
       class: {
         updateMany: jest.fn(),
       },
-      $transaction: jest.fn().mockResolvedValue([]),
+      $transaction: jest.fn().mockImplementation(async (arg: unknown) => {
+        if (typeof arg === 'function') {
+          return arg({
+            schoolYear: {
+              findUnique: prisma.schoolYear.findUnique,
+              update: prisma.schoolYear.update,
+              updateMany: jest.fn(),
+              delete: prisma.schoolYear.delete,
+            },
+            class: {
+              updateMany: prisma.class.updateMany,
+            },
+          });
+        }
+
+        return arg;
+      }),
     };
 
-    service = new SchoolYearsService(prisma as never);
+    auditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+      logCritical: jest.fn().mockResolvedValue(undefined),
+    };
+
+    service = new SchoolYearsService(
+      prisma as never,
+      auditService as unknown as AuditService,
+    );
   });
 
   it('blocks listing school years outside the user school scope', async () => {

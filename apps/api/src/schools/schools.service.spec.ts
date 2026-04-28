@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 import { SchoolsService } from './schools.service';
 
 describe('SchoolsService', () => {
@@ -20,6 +21,10 @@ describe('SchoolsService', () => {
     };
     $transaction: jest.Mock;
   };
+  let auditService: {
+    log: jest.Mock;
+    logCritical: jest.Mock;
+  };
 
   beforeEach(() => {
     prisma = {
@@ -39,7 +44,15 @@ describe('SchoolsService', () => {
       $transaction: jest.fn().mockResolvedValue([]),
     };
 
-    service = new SchoolsService(prisma as never);
+    auditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+      logCritical: jest.fn().mockResolvedValue(undefined),
+    };
+
+    service = new SchoolsService(
+      prisma as never,
+      auditService as unknown as AuditService,
+    );
   });
 
   it('creates a school for owner users', async () => {

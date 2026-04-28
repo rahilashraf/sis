@@ -99,6 +99,6 @@ describe('AuthService', () => {
     await expect(service.login('owner', 'secret')).rejects.toThrow(
       'Invalid credentials',
     );
-    expect(bcrypt.compare).not.toHaveBeenCalled();
+    expect(bcrypt.compare).toHaveBeenCalledWith('secret', 'hash');
   });
 });

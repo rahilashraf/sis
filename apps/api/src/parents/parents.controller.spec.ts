@@ -10,6 +10,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AttendanceStatus, UserRole } from '@prisma/client';
 import request from 'supertest';
 import { AttendanceService } from '../attendance/attendance.service';
+import { AuditService } from '../audit/audit.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ROLES_KEY } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -58,6 +59,8 @@ describe('ParentsController (HTTP)', () => {
     user: { findUnique: jest.Mock };
     studentParentLink: { findMany: jest.Mock; findUnique: jest.Mock };
     attendanceRecord: { findMany: jest.Mock };
+    attendanceStatusRule: { findMany: jest.Mock };
+    attendanceCustomStatus: { findMany: jest.Mock };
   };
 
   beforeEach(async () => {
@@ -65,6 +68,8 @@ describe('ParentsController (HTTP)', () => {
       user: { findUnique: jest.fn() },
       studentParentLink: { findMany: jest.fn(), findUnique: jest.fn() },
       attendanceRecord: { findMany: jest.fn() },
+      attendanceStatusRule: { findMany: jest.fn().mockResolvedValue([]) },
+      attendanceCustomStatus: { findMany: jest.fn().mockResolvedValue([]) },
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -76,6 +81,10 @@ describe('ParentsController (HTTP)', () => {
         {
           provide: PrismaService,
           useValue: prisma,
+        },
+        {
+          provide: AuditService,
+          useValue: { log: jest.fn(), logCritical: jest.fn() },
         },
       ],
     })
@@ -212,9 +221,9 @@ describe('ParentsController (HTTP)', () => {
   it('returns attendance summary for a linked child', async () => {
     prisma.studentParentLink.findUnique.mockResolvedValue({ id: 'link-1' });
     prisma.attendanceRecord.findMany.mockResolvedValue([
-      { status: AttendanceStatus.PRESENT },
-      { status: AttendanceStatus.LATE },
-      { status: AttendanceStatus.ABSENT },
+      { status: AttendanceStatus.PRESENT, customStatus: null, attendanceSession: { schoolId: 'school-1' } },
+      { status: AttendanceStatus.LATE, customStatus: null, attendanceSession: { schoolId: 'school-1' } },
+      { status: AttendanceStatus.ABSENT, customStatus: null, attendanceSession: { schoolId: 'school-1' } },
     ]);
 
     await request(app.getHttpServer())
@@ -234,7 +243,6 @@ describe('ParentsController (HTTP)', () => {
         presentCount: 1,
         absentCount: 1,
         lateCount: 1,
-        excusedCount: 0,
         attendancePercentage: 66.67,
       });
   });

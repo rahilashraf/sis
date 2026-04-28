@@ -11,6 +11,7 @@ import request from 'supertest';
 import { AttendanceController } from './attendance.controller';
 import { AttendanceService } from './attendance.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 
@@ -20,10 +21,25 @@ class TestJwtAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const userId = request.headers['x-test-user-id'];
     const role = request.headers['x-test-role'];
+    const schoolIdsHeader = request.headers['x-test-school-ids'];
+    const schoolIdsRaw = Array.isArray(schoolIdsHeader)
+      ? schoolIdsHeader[0]
+      : schoolIdsHeader;
+    const schoolIds =
+      typeof schoolIdsRaw === 'string'
+        ? schoolIdsRaw
+            .split(',')
+            .map((entry: string) => entry.trim())
+            .filter(Boolean)
+        : ['school-1'];
 
     request.user = {
       id: Array.isArray(userId) ? userId[0] : userId,
       role: Array.isArray(role) ? role[0] : role,
+      memberships: schoolIds.map((schoolId: string) => ({
+        schoolId,
+        isActive: true,
+      })),
     };
 
     return true;
@@ -45,6 +61,8 @@ describe('AttendanceController (HTTP)', () => {
     studentParentLink: { findUnique: jest.Mock };
     studentClassEnrollment: { findFirst: jest.Mock; findMany: jest.Mock };
     attendanceRecord: { findMany: jest.Mock };
+    attendanceStatusRule: { findMany: jest.Mock };
+    attendanceCustomStatus: { findMany: jest.Mock };
     attendanceSession: { findUnique: jest.Mock; delete: jest.Mock };
   };
 
@@ -55,6 +73,8 @@ describe('AttendanceController (HTTP)', () => {
       studentParentLink: { findUnique: jest.fn() },
       studentClassEnrollment: { findFirst: jest.fn(), findMany: jest.fn() },
       attendanceRecord: { findMany: jest.fn() },
+      attendanceStatusRule: { findMany: jest.fn().mockResolvedValue([]) },
+      attendanceCustomStatus: { findMany: jest.fn().mockResolvedValue([]) },
       attendanceSession: { findUnique: jest.fn(), delete: jest.fn() },
     };
 
@@ -65,6 +85,10 @@ describe('AttendanceController (HTTP)', () => {
         {
           provide: PrismaService,
           useValue: prisma,
+        },
+        {
+          provide: AuditService,
+          useValue: { log: jest.fn(), logCritical: jest.fn() },
         },
       ],
     })
@@ -91,9 +115,9 @@ describe('AttendanceController (HTTP)', () => {
 
   it('returns student summary over HTTP for allowed access', async () => {
     prisma.attendanceRecord.findMany.mockResolvedValue([
-      { status: AttendanceStatus.PRESENT },
-      { status: AttendanceStatus.ABSENT },
-      { status: AttendanceStatus.LATE },
+      { status: AttendanceStatus.PRESENT, customStatus: null, attendanceSession: { schoolId: 'school-1' } },
+      { status: AttendanceStatus.ABSENT, customStatus: null, attendanceSession: { schoolId: 'school-1' } },
+      { status: AttendanceStatus.LATE, customStatus: null, attendanceSession: { schoolId: 'school-1' } },
     ]);
 
     await request(app.getHttpServer())
@@ -113,7 +137,6 @@ describe('AttendanceController (HTTP)', () => {
         presentCount: 1,
         absentCount: 1,
         lateCount: 1,
-        excusedCount: 0,
         attendancePercentage: 66.67,
       });
   });
@@ -163,10 +186,10 @@ describe('AttendanceController (HTTP)', () => {
 
   it('returns all-time student summary over HTTP when no date range is provided', async () => {
     prisma.attendanceRecord.findMany.mockResolvedValue([
-      { status: AttendanceStatus.PRESENT },
-      { status: AttendanceStatus.ABSENT },
-      { status: AttendanceStatus.LATE },
-      { status: AttendanceStatus.PRESENT },
+      { status: AttendanceStatus.PRESENT, customStatus: null, attendanceSession: { schoolId: 'school-1' } },
+      { status: AttendanceStatus.ABSENT, customStatus: null, attendanceSession: { schoolId: 'school-1' } },
+      { status: AttendanceStatus.LATE, customStatus: null, attendanceSession: { schoolId: 'school-1' } },
+      { status: AttendanceStatus.PRESENT, customStatus: null, attendanceSession: { schoolId: 'school-1' } },
     ]);
 
     await request(app.getHttpServer())
@@ -180,7 +203,7 @@ describe('AttendanceController (HTTP)', () => {
         presentCount: 2,
         absentCount: 1,
         lateCount: 1,
-        attendanceRate: 50,
+        attendanceRate: 75,
       });
   });
 
@@ -307,10 +330,10 @@ describe('AttendanceController (HTTP)', () => {
       { classId: 'class-a' },
     ]);
     prisma.attendanceRecord.findMany.mockResolvedValue([
-      { status: AttendanceStatus.PRESENT },
-      { status: AttendanceStatus.ABSENT },
-      { status: AttendanceStatus.LATE },
-      { status: AttendanceStatus.PRESENT },
+      { status: AttendanceStatus.PRESENT, customStatus: null, attendanceSession: { schoolId: 'school-1' } },
+      { status: AttendanceStatus.ABSENT, customStatus: null, attendanceSession: { schoolId: 'school-1' } },
+      { status: AttendanceStatus.LATE, customStatus: null, attendanceSession: { schoolId: 'school-1' } },
+      { status: AttendanceStatus.PRESENT, customStatus: null, attendanceSession: { schoolId: 'school-1' } },
     ]);
 
     await request(app.getHttpServer())
@@ -324,7 +347,7 @@ describe('AttendanceController (HTTP)', () => {
         presentCount: 2,
         absentCount: 1,
         lateCount: 1,
-        attendanceRate: 50,
+        attendanceRate: 75,
       });
   });
 
@@ -418,10 +441,14 @@ describe('AttendanceController (HTTP)', () => {
   it('deletes an attendance session over HTTP for allowed admin access', async () => {
     prisma.attendanceSession.findUnique.mockResolvedValue({
       id: 'session-1',
+      schoolId: 'school-1',
       classes: [{ classId: 'class-a' }],
     });
     prisma.attendanceSession.delete.mockResolvedValue({
       id: 'session-1',
+      schoolId: 'school-1',
+      date: new Date('2026-04-03T00:00:00.000Z'),
+      scopeLabel: null,
       school: { id: 'school-1', name: 'School' },
       schoolYear: null,
       takenBy: { id: 'admin-1' },
@@ -438,21 +465,24 @@ describe('AttendanceController (HTTP)', () => {
       .delete('/attendance/sessions/session-1')
       .set('x-test-user-id', 'admin-1')
       .set('x-test-role', UserRole.ADMIN)
+      .set('x-test-school-ids', 'school-1')
       .expect(200)
-      .expect({
-        id: 'session-1',
-        school: { id: 'school-1', name: 'School' },
-        schoolYear: null,
-        takenBy: { id: 'admin-1' },
-        classes: [
-          { classId: 'class-a', class: { id: 'class-a', name: 'Math' } },
-        ],
-        records: [
-          {
-            studentId: 'student-a',
-            student: { id: 'student-a', firstName: 'Ada' },
-          },
-        ],
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          id: 'session-1',
+          school: { id: 'school-1', name: 'School' },
+          schoolYear: null,
+          takenBy: { id: 'admin-1' },
+          classes: [
+            { classId: 'class-a', class: { id: 'class-a', name: 'Math' } },
+          ],
+          records: [
+            {
+              studentId: 'student-a',
+              student: { id: 'student-a', firstName: 'Ada' },
+            },
+          ],
+        });
       });
   });
 

@@ -10,6 +10,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Prisma, UserRole } from '@prisma/client';
 import request from 'supertest';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AuditService } from '../audit/audit.service';
 import { ROLES_KEY } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
@@ -80,6 +81,10 @@ describe('LinksController (HTTP)', () => {
         {
           provide: PrismaService,
           useValue: prisma,
+        },
+        {
+          provide: AuditService,
+          useValue: { log: jest.fn(), logCritical: jest.fn() },
         },
       ],
     })

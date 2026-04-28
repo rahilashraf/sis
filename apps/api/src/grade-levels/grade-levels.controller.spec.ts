@@ -8,6 +8,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
 import { GradeLevelsController } from './grade-levels.controller';
 import { GradeLevelsService } from './grade-levels.service';
 
@@ -45,6 +46,8 @@ describe('GradeLevelsController (HTTP)', () => {
     })
       .overrideGuard(JwtAuthGuard)
       .useClass(TestJwtAuthGuard)
+      .overrideGuard(RolesGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     app = module.createNestApplication();

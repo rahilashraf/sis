@@ -12,6 +12,7 @@ import request from 'supertest';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ROLES_KEY } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BehaviorController } from './behavior.controller';
 import { BehaviorService } from './behavior.service';
@@ -32,7 +33,7 @@ class TestJwtAuthGuard implements CanActivate {
             .split(',')
             .map((entry) => entry.trim())
             .filter(Boolean)
-        : [];
+        : ['school-1'];
 
     request.user = {
       id: Array.isArray(userId) ? userId[0] : userId,
@@ -122,6 +123,10 @@ describe('BehaviorController (HTTP)', () => {
         {
           provide: PrismaService,
           useValue: prisma,
+        },
+        {
+          provide: AuditService,
+          useValue: { log: jest.fn(), logCritical: jest.fn() },
         },
       ],
     })

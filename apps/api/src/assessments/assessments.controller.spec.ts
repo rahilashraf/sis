@@ -22,11 +22,25 @@ class TestJwtAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const userId = request.headers['x-test-user-id'];
     const role = request.headers['x-test-role'];
+    const schoolIdsHeader = request.headers['x-test-school-ids'];
+    const schoolIdsRaw = Array.isArray(schoolIdsHeader)
+      ? schoolIdsHeader[0]
+      : schoolIdsHeader;
+    const schoolIds =
+      typeof schoolIdsRaw === 'string'
+        ? schoolIdsRaw
+            .split(',')
+            .map((entry: string) => entry.trim())
+            .filter(Boolean)
+        : ['school-1'];
 
     request.user = {
       id: Array.isArray(userId) ? userId[0] : userId,
       role: Array.isArray(role) ? role[0] : role,
-      memberships: [],
+      memberships: schoolIds.map((schoolId: string) => ({
+        schoolId,
+        isActive: true,
+      })),
     };
 
     return true;
@@ -72,6 +86,10 @@ describe('AssessmentsController (HTTP)', () => {
       findMany: jest.Mock;
       upsert: jest.Mock;
     };
+    assessmentResultStatusLabel: {
+      findMany: jest.Mock;
+      createMany: jest.Mock;
+    };
     studentClassEnrollment: { findMany: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -95,10 +113,31 @@ describe('AssessmentsController (HTTP)', () => {
         findMany: jest.fn(),
         upsert: jest.fn(),
       },
+      assessmentResultStatusLabel: {
+        findMany: jest.fn().mockResolvedValue([]),
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       studentClassEnrollment: { findMany: jest.fn() },
-      $transaction: jest.fn(async (operations: Promise<unknown>[]) =>
-        Promise.all(operations),
-      ),
+      $transaction: jest.fn().mockImplementation(async (arg: unknown) => {
+        if (typeof arg === 'function') {
+          return arg({
+            assessmentResult: {
+              upsert: prisma.assessmentResult.upsert,
+              deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+            },
+            assessmentResultStatusLabel: {
+              findMany: prisma.assessmentResultStatusLabel.findMany,
+              createMany: prisma.assessmentResultStatusLabel.createMany,
+            },
+          });
+        }
+
+        if (Array.isArray(arg)) {
+          return Promise.all(arg as Array<Promise<unknown>>);
+        }
+
+        return arg;
+      }),
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({

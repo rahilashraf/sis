@@ -10,6 +10,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UserRole } from '@prisma/client';
 import request from 'supertest';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AuditService } from '../audit/audit.service';
 import { ROLES_KEY } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
@@ -22,10 +23,25 @@ class TestJwtAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const userId = request.headers['x-test-user-id'];
     const role = request.headers['x-test-role'];
+    const schoolIdsHeader = request.headers['x-test-school-ids'];
+    const schoolIdsRaw = Array.isArray(schoolIdsHeader)
+      ? schoolIdsHeader[0]
+      : schoolIdsHeader;
+    const schoolIds =
+      typeof schoolIdsRaw === 'string'
+        ? schoolIdsRaw
+            .split(',')
+            .map((entry: string) => entry.trim())
+            .filter(Boolean)
+        : ['school-1'];
 
     request.user = {
       id: Array.isArray(userId) ? userId[0] : userId,
       role: Array.isArray(role) ? role[0] : role,
+      memberships: schoolIds.map((schoolId: string) => ({
+        schoolId,
+        isActive: true,
+      })),
     };
 
     return true;
@@ -91,6 +107,10 @@ describe('GradesController (HTTP)', () => {
           provide: PrismaService,
           useValue: prisma,
         },
+        {
+          provide: AuditService,
+          useValue: { log: jest.fn(), logCritical: jest.fn() },
+        },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -132,8 +152,8 @@ describe('GradesController (HTTP)', () => {
       title: 'Quiz 1',
       score: 8,
       maxScore: 10,
-      class: { id: 'class-1', schoolYear: { id: 'year-1' } },
-      student: { id: 'student-1', firstName: 'Ada' },
+      class: { id: 'class-1', schoolId: 'school-1', schoolYear: { id: 'year-1' } },
+      student: { id: 'student-1', firstName: 'Ada', lastName: 'Lovelace' },
     });
 
     await request(app.getHttpServer())
@@ -154,8 +174,8 @@ describe('GradesController (HTTP)', () => {
         title: 'Quiz 1',
         score: 8,
         maxScore: 10,
-        class: { id: 'class-1', schoolYear: { id: 'year-1' } },
-        student: { id: 'student-1', firstName: 'Ada' },
+        class: { id: 'class-1', schoolId: 'school-1', schoolYear: { id: 'year-1' } },
+        student: { id: 'student-1', firstName: 'Ada', lastName: 'Lovelace' },
       });
 
     expect(prisma.gradeRecord.create).toHaveBeenCalledWith(
@@ -193,6 +213,8 @@ describe('GradesController (HTTP)', () => {
       title: 'Quiz 1',
       score: 8,
       maxScore: 10,
+      class: { id: 'class-1', schoolId: 'school-1' },
+      student: { id: 'student-1', firstName: 'Ada', lastName: 'Lovelace' },
     });
 
     await request(app.getHttpServer())
@@ -208,11 +230,13 @@ describe('GradesController (HTTP)', () => {
         gradedAt: '2026-04-10T00:00:00.000Z',
       })
       .expect(201)
-      .expect({
-        id: 'grade-1',
-        title: 'Quiz 1',
-        score: 8,
-        maxScore: 10,
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          id: 'grade-1',
+          title: 'Quiz 1',
+          score: 8,
+          maxScore: 10,
+        });
       });
 
     expect(prisma.teacherClassAssignment.findFirst).toHaveBeenCalled();
@@ -387,6 +411,8 @@ describe('GradesController (HTTP)', () => {
       title: 'Updated Quiz 1',
       score: 8,
       maxScore: 10,
+      class: { id: 'class-1', schoolId: 'school-1' },
+      student: { id: 'student-1', firstName: 'Ada', lastName: 'Lovelace' },
     });
 
     await request(app.getHttpServer())
@@ -397,11 +423,13 @@ describe('GradesController (HTTP)', () => {
         title: 'Updated Quiz 1',
       })
       .expect(200)
-      .expect({
-        id: 'grade-1',
-        title: 'Updated Quiz 1',
-        score: 8,
-        maxScore: 10,
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          id: 'grade-1',
+          title: 'Updated Quiz 1',
+          score: 8,
+          maxScore: 10,
+        });
       });
 
     expect(prisma.gradeRecord.update).toHaveBeenCalledWith(

@@ -12,7 +12,7 @@ export function isHighPrivilegeRole(role: UserRole) {
 }
 
 export function isSchoolAdminRole(role: UserRole) {
-  return role === UserRole.STAFF;
+  return role === UserRole.ADMIN || role === UserRole.STAFF;
 }
 
 export function isTeacherRole(role: UserRole) {
