@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -13,7 +13,13 @@ import {
   getPrimarySchoolName,
 } from "@/lib/auth/school-membership";
 import { formatRoleLabel, getInitials } from "@/lib/utils";
-import { getUnreadNotificationsCount } from "@/lib/api/notifications";
+import {
+  getUnreadNotificationsCount,
+  listNotifications,
+  markNotificationAsRead,
+  resolveNotificationHref,
+  type Notification,
+} from "@/lib/api/notifications";
 
 type TopbarProps = {
   user: AuthenticatedUser;
@@ -38,14 +44,48 @@ export function Topbar({
   const hasMultipleSchools = schoolMemberships.length > 1;
 
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  const [recentNotifications, setRecentNotifications] = useState<Notification[]>(
+    [],
+  );
+
+  const notificationPanelRef = useRef<HTMLDivElement | null>(null);
+
+  async function refreshUnreadCount() {
+    try {
+      const { count } = await getUnreadNotificationsCount();
+      setUnreadCount(count);
+    } catch {
+      // ignore refresh errors
+    }
+  }
+
+  async function refreshRecentNotifications() {
+    setIsLoadingNotifications(true);
+    try {
+      const [notificationList, unread] = await Promise.all([
+        listNotifications({ limit: 8 }),
+        getUnreadNotificationsCount(),
+      ]);
+      setRecentNotifications(notificationList);
+      setUnreadCount(unread.count);
+    } catch {
+      // ignore refresh errors
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
 
     function fetchCount() {
-      getUnreadNotificationsCount()
-        .then(({ count }) => {
-          if (!cancelled) setUnreadCount(count);
+      refreshUnreadCount()
+        .then(() => {
+          if (cancelled) {
+            return;
+          }
         })
         .catch(() => {});
     }
@@ -57,6 +97,49 @@ export function Topbar({
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isNotificationsOpen) {
+      return;
+    }
+
+    void refreshRecentNotifications();
+  }, [isNotificationsOpen]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        isNotificationsOpen &&
+        notificationPanelRef.current &&
+        !notificationPanelRef.current.contains(event.target as Node)
+      ) {
+        setIsNotificationsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isNotificationsOpen]);
+
+  async function handleNotificationClick(notification: Notification) {
+    if (!notification.isRead) {
+      try {
+        await markNotificationAsRead(notification.id);
+      } catch {
+        // ignore mark read errors
+      }
+    }
+
+    setRecentNotifications((current) =>
+      current.map((entry) =>
+        entry.id === notification.id ? { ...entry, isRead: true } : entry,
+      ),
+    );
+    void refreshUnreadCount();
+    setIsNotificationsOpen(false);
+  }
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -139,31 +222,101 @@ export function Topbar({
             ) : null}
           </div>
 
-          <Link
-            href="/notifications"
-            aria-label="Notifications"
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.75}
+          <div className="relative" ref={notificationPanelRef}>
+            <button
+              aria-expanded={isNotificationsOpen}
+              aria-label="Notifications"
+              className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
+              onClick={() => setIsNotificationsOpen((current) => !current)}
+              type="button"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-              />
-            </svg>
-            {unreadCount > 0 ? (
-              <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[10px] font-bold text-white">
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.75}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                />
+              </svg>
+              {unreadCount > 0 ? (
+                <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[10px] font-bold text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              ) : null}
+            </button>
+
+            {isNotificationsOpen ? (
+              <div className="absolute right-0 mt-2 w-[22rem] max-w-[90vw] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Notifications
+                  </p>
+                  <Link
+                    className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                    href="/notifications"
+                    onClick={() => setIsNotificationsOpen(false)}
+                  >
+                    View all
+                  </Link>
+                </div>
+                <div className="max-h-96 overflow-y-auto">
+                  {isLoadingNotifications ? (
+                    <p className="px-3 py-6 text-center text-sm text-slate-500">
+                      Loading...
+                    </p>
+                  ) : recentNotifications.length === 0 ? (
+                    <p className="px-3 py-6 text-center text-sm text-slate-500">
+                      No notifications yet.
+                    </p>
+                  ) : (
+                    recentNotifications.map((notification) => {
+                      const href =
+                        resolveNotificationHref(notification) ??
+                        "/notifications";
+                      return (
+                        <Link
+                          className={`block border-b border-slate-100 px-3 py-3 text-sm last:border-b-0 ${
+                            notification.isRead
+                              ? "bg-white"
+                              : "bg-blue-50/40 hover:bg-blue-50/60"
+                          }`}
+                          href={href}
+                          key={notification.id}
+                          onClick={() => {
+                            void handleNotificationClick(notification);
+                          }}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span
+                              className={`mt-1 inline-block h-2 w-2 shrink-0 rounded-full ${
+                                notification.isRead
+                                  ? "bg-slate-300"
+                                  : "bg-blue-500"
+                              }`}
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-slate-900">
+                                {notification.title}
+                              </p>
+                              <p className="mt-0.5 text-xs text-slate-600">
+                                {notification.message}
+                              </p>
+                            </div>
+                          </div>
+                        </Link>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
             ) : null}
-          </Link>
+          </div>
 
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-sm font-semibold text-white">
             {getInitials(user.firstName, user.lastName)}
