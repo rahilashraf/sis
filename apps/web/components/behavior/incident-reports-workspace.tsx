@@ -671,6 +671,15 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
     recordId: string,
     attachmentId: string,
   ) {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "Delete this attachment? This action cannot be undone.",
+      )
+    ) {
+      return;
+    }
+
     setDeletingAttachmentId(attachmentId);
     setError(null);
     setSuccessMessage(null);
@@ -786,17 +795,37 @@ export function IncidentReportsWorkspace({ mode }: { mode: Mode }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-          <Field htmlFor="incident-student-search" label="Student search">
-            <Input
-              id="incident-student-search"
-              placeholder="Search students"
-              value={studentSearch}
-              onChange={(event) => setStudentSearch(event.target.value)}
-              onBlur={() => {
-                void loadStudents(studentSearch.trim());
-              }}
-            />
-          </Field>
+          <div className="md:col-span-2 lg:col-span-2">
+            <Field
+              htmlFor="incident-student-search"
+              label="Student search"
+              description="Type and press Enter or Search to refresh student options."
+            >
+              <div className="flex gap-2">
+                <Input
+                  id="incident-student-search"
+                  placeholder="Search students"
+                  value={studentSearch}
+                  onChange={(event) => setStudentSearch(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void loadStudents(studentSearch.trim());
+                    }
+                  }}
+                />
+                <Button
+                  onClick={() => {
+                    void loadStudents(studentSearch.trim());
+                  }}
+                  type="button"
+                  variant="secondary"
+                >
+                  Search
+                </Button>
+              </div>
+            </Field>
+          </div>
 
           <Field htmlFor="incident-filter-student" label="Student">
             <Select

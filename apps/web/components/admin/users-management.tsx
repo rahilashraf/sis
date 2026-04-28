@@ -203,6 +203,7 @@ export function UsersManagement() {
   const [roleFilter, setRoleFilter] = useState<UserRole | "ALL">("ALL");
   const [gradeLevelFilter, setGradeLevelFilter] = useState<string>("");
   const [sortOption, setSortOption] = useState<"name" | "createdAt">("name");
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -220,6 +221,28 @@ export function UsersManagement() {
     () => users.filter((user) => user.isActive).length,
     [users],
   );
+
+  const filteredUsers = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return users;
+    }
+
+    return users.filter((user) => {
+      const fields = [
+        `${user.firstName} ${user.lastName}`,
+        user.username,
+        user.email ?? "",
+        user.phone ?? "",
+        formatRoleLabel(user.role),
+      ];
+
+      return fields.some((field) =>
+        field.toLowerCase().includes(normalizedQuery),
+      );
+    });
+  }, [searchQuery, users]);
 
   useEffect(() => {
     async function load() {
@@ -1127,9 +1150,19 @@ export function UsersManagement() {
           </div>
           <div className="flex flex-col gap-3 sm:items-end">
             <Badge variant="neutral">
-              {isLoading ? "Loading users..." : `${users.length} records`}
+              {isLoading
+                ? "Loading users..."
+                : `${filteredUsers.length} of ${users.length} records`}
             </Badge>
             <div className="grid w-full max-w-sm gap-2">
+              <Field htmlFor="user-filter-search" label="Search">
+                <Input
+                  id="user-filter-search"
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Name, username, email, or phone"
+                  value={searchQuery}
+                />
+              </Field>
               <div className="grid gap-2 sm:grid-cols-2">
                 <Field htmlFor="user-filter-role" label="Role">
                   <Select
@@ -1182,6 +1215,19 @@ export function UsersManagement() {
                 </Field>
               ) : null}
             </div>
+            <Button
+              onClick={() => {
+                setSearchQuery("");
+                setRoleFilter("ALL");
+                setSortOption("name");
+                setGradeLevelFilter("");
+                setShowRemoved(false);
+              }}
+              type="button"
+              variant="ghost"
+            >
+              Clear filters
+            </Button>
             <CheckboxField
               checked={showRemoved}
               className="rounded-xl border border-slate-200 px-3 py-2"
@@ -1192,6 +1238,10 @@ export function UsersManagement() {
           </div>
         </CardHeader>
         <CardContent>
+          <p className="mb-3 text-xs text-slate-500">
+            Showing {filteredUsers.length} of {users.length} users. Scroll
+            horizontally on smaller screens to view all columns.
+          </p>
           <div className="overflow-hidden rounded-xl border border-slate-200">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
@@ -1215,7 +1265,7 @@ export function UsersManagement() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
-                  {users.map((user) => (
+                  {filteredUsers.map((user) => (
                     <tr className="align-top hover:bg-slate-50" key={user.id}>
                       <td className="px-4 py-4">
                         <p className="font-medium text-slate-900">
@@ -1278,7 +1328,7 @@ export function UsersManagement() {
                       </td>
                     </tr>
                   ))}
-                  {!isLoading && users.length === 0 ? (
+                  {!isLoading && filteredUsers.length === 0 ? (
                     <tr>
                       <td className="px-4 py-8" colSpan={5}>
                         <EmptyState

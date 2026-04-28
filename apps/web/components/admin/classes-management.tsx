@@ -74,6 +74,7 @@ export function ClassesManagement({
   const [selectedGradeLevelFilterId, setSelectedGradeLevelFilterId] =
     useState("");
   const [selectedSubjectFilterId, setSelectedSubjectFilterId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [showRemoved, setShowRemoved] = useState(false);
   const [createForm, setCreateForm] =
     useState<CreateClassFormState>(emptyCreateForm);
@@ -251,27 +252,58 @@ export function ClassesManagement({
     }
   }
 
-  const filteredClasses = classes.filter((schoolClass) => {
-    if (selectedSchoolId && schoolClass.schoolId !== selectedSchoolId) {
-      return false;
-    }
+  const filteredClasses = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
 
-    if (
-      selectedGradeLevelFilterId &&
-      schoolClass.gradeLevelId !== selectedGradeLevelFilterId
-    ) {
-      return false;
-    }
+    return classes.filter((schoolClass) => {
+      if (selectedSchoolId && schoolClass.schoolId !== selectedSchoolId) {
+        return false;
+      }
 
-    if (
-      selectedSubjectFilterId &&
-      schoolClass.subjectOptionId !== selectedSubjectFilterId
-    ) {
-      return false;
-    }
+      if (
+        selectedGradeLevelFilterId &&
+        schoolClass.gradeLevelId !== selectedGradeLevelFilterId
+      ) {
+        return false;
+      }
 
-    return true;
-  });
+      if (
+        selectedSubjectFilterId &&
+        schoolClass.subjectOptionId !== selectedSubjectFilterId
+      ) {
+        return false;
+      }
+
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      const teacherNames = schoolClass.teachers
+        .map(
+          (assignment) =>
+            `${assignment.teacher.firstName} ${assignment.teacher.lastName}`,
+        )
+        .join(" ");
+      const searchFields = [
+        schoolClass.name,
+        schoolClass.school.name,
+        schoolClass.schoolYear.name,
+        schoolClass.gradeLevel?.name ?? "",
+        schoolClass.subjectOption?.name ?? schoolClass.subject ?? "",
+        teacherNames,
+      ];
+
+      return searchFields.some((field) =>
+        field.toLowerCase().includes(normalizedQuery),
+      );
+    });
+  }, [
+    classes,
+    searchQuery,
+    selectedGradeLevelFilterId,
+    selectedSchoolId,
+    selectedSubjectFilterId,
+  ]);
 
   const activeClassesCount = useMemo(
     () => classes.filter((schoolClass) => schoolClass.isActive).length,
@@ -526,6 +558,16 @@ export function ClassesManagement({
               onChange={(event) => setShowRemoved(event.target.checked)}
             />
             <div className="w-full max-w-sm">
+              <Field htmlFor="classes-filter-search" label="Search classes">
+                <Input
+                  id="classes-filter-search"
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Class, teacher, school, or subject"
+                  value={searchQuery}
+                />
+              </Field>
+            </div>
+            <div className="w-full max-w-sm">
               <Field htmlFor="classes-filter-school" label="Filter by school">
                 <Select
                   id="classes-filter-school"
@@ -584,9 +626,26 @@ export function ClassesManagement({
                 </Select>
               </Field>
             </div>
+            <Button
+              onClick={() => {
+                setSearchQuery("");
+                setSelectedSchoolId("");
+                setSelectedGradeLevelFilterId("");
+                setSelectedSubjectFilterId("");
+                setShowRemoved(false);
+              }}
+              type="button"
+              variant="ghost"
+            >
+              Clear filters
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
+          <p className="mb-3 text-xs text-slate-500">
+            Showing {filteredClasses.length} of {classes.length} classes.
+            Scroll horizontally on smaller screens to view all columns.
+          </p>
           <div className="overflow-hidden rounded-xl border border-slate-200">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200 text-left text-sm">

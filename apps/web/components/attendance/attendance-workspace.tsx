@@ -254,6 +254,7 @@ export function AttendanceWorkspace({ mode }: { mode: "teacher" | "admin" }) {
   const [selectedDate, setSelectedDate] = useState(getLocalDateInputValue());
   const [rangeStartDate, setRangeStartDate] = useState(getDateWithOffset(-6));
   const [rangeEndDate, setRangeEndDate] = useState(getLocalDateInputValue());
+  const [studentSearchQuery, setStudentSearchQuery] = useState("");
   const [students, setStudents] = useState<AttendanceStudent[]>([]);
   const [schoolSessions, setSchoolSessions] = useState<AttendanceSession[]>([]);
   const [recordRange, setRecordRange] =
@@ -408,6 +409,23 @@ export function AttendanceWorkspace({ mode }: { mode: "teacher" | "admin" }) {
   }, [customStatuses]);
 
   const hasExistingSession = Boolean(selectedSession);
+
+  const filteredRosterStudents = useMemo(() => {
+    const normalizedQuery = studentSearchQuery.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return students;
+    }
+
+    return students.filter((student) => {
+      const fullName = `${getDisplayText(student.firstName, "")} ${getDisplayText(student.lastName, "")}`.trim();
+      const fields = [fullName, getDisplayText(student.username, "")];
+
+      return fields.some((field) =>
+        field.toLowerCase().includes(normalizedQuery),
+      );
+    });
+  }, [studentSearchQuery, students]);
 
   const rosterSummary = useMemo(() => {
     return students.reduce(
@@ -1504,6 +1522,38 @@ export function AttendanceWorkspace({ mode }: { mode: "teacher" | "admin" }) {
                 id="attendance-form"
                 onSubmit={handleSubmit}
               >
+                <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-end sm:justify-between">
+                  <Field
+                    className="w-full sm:max-w-sm"
+                    htmlFor="attendance-student-search"
+                    label="Find student"
+                  >
+                    <Input
+                      id="attendance-student-search"
+                      onChange={(event) =>
+                        setStudentSearchQuery(event.target.value)
+                      }
+                      placeholder="Search by name or username"
+                      value={studentSearchQuery}
+                    />
+                  </Field>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                    <span>
+                      Showing {filteredRosterStudents.length} of{" "}
+                      {students.length} students
+                    </span>
+                    {studentSearchQuery ? (
+                      <Button
+                        onClick={() => setStudentSearchQuery("")}
+                        type="button"
+                        variant="ghost"
+                      >
+                        Clear search
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+
                 {students.length === 0 ? (
                   <EmptyState
                     compact
@@ -1520,6 +1570,10 @@ export function AttendanceWorkspace({ mode }: { mode: "teacher" | "admin" }) {
                   />
                 ) : (
                   <div className="overflow-hidden rounded-xl border border-slate-200">
+                    <p className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">
+                      Scroll horizontally on smaller screens to view all
+                      columns.
+                    </p>
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                         <thead className="bg-slate-50/80">
@@ -1536,7 +1590,7 @@ export function AttendanceWorkspace({ mode }: { mode: "teacher" | "admin" }) {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 bg-white">
-                          {students.map((student) => {
+                          {filteredRosterStudents.map((student) => {
                             const status =
                               statusByStudentId[student.id] ??
                               defaultAttendanceStatus;

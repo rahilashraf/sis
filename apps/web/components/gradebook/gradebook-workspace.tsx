@@ -172,6 +172,7 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
   const [draftGridScores, setDraftGridScores] = useState<
     Record<string, string>
   >({});
+  const [gridStudentSearchQuery, setGridStudentSearchQuery] = useState("");
   const [selectedGridReportingPeriodId, setSelectedGridReportingPeriodId] =
     useState<string>("all");
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
@@ -516,6 +517,27 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
 
     return count;
   }, [draftGridScores, gridResultsByAssessmentId]);
+
+  const visibleGridStudents = useMemo(() => {
+    if (!grid) {
+      return [];
+    }
+
+    const normalizedQuery = gridStudentSearchQuery.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return grid.students;
+    }
+
+    return grid.students.filter((student) => {
+      const fullName = `${getDisplayText(student.firstName, "")} ${getDisplayText(student.lastName, "")}`.trim();
+      const fields = [fullName, getDisplayText(student.username, "")];
+
+      return fields.some((field) =>
+        field.toLowerCase().includes(normalizedQuery),
+      );
+    });
+  }, [grid, gridStudentSearchQuery]);
 
   useEffect(() => {
     async function loadInitial() {
@@ -1880,6 +1902,34 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
           </div>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-end sm:justify-between">
+            <Field
+              className="w-full sm:max-w-sm"
+              htmlFor="scoresheet-student-search"
+              label="Find student"
+            >
+              <Input
+                id="scoresheet-student-search"
+                onChange={(event) => setGridStudentSearchQuery(event.target.value)}
+                placeholder="Search by name or username"
+                value={gridStudentSearchQuery}
+              />
+            </Field>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+              <span>
+                Showing {visibleGridStudents.length} of {grid?.students.length ?? 0} students
+              </span>
+              {gridStudentSearchQuery ? (
+                <Button
+                  onClick={() => setGridStudentSearchQuery("")}
+                  type="button"
+                  variant="ghost"
+                >
+                  Clear search
+                </Button>
+              ) : null}
+            </div>
+          </div>
           {gridError ? <Notice tone="danger">{gridError}</Notice> : null}
           {gridSaveError ? (
             <Notice tone="danger">{gridSaveError}</Notice>
@@ -1893,6 +1943,11 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
             <EmptyState
               title="No students enrolled"
               description="Enroll students in this class to begin entering grades."
+            />
+          ) : visibleGridStudents.length === 0 ? (
+            <EmptyState
+              title="No matching students"
+              description="Try a different search or clear the student filter."
             />
           ) : visibleGridAssessments.length === 0 ? (
             <EmptyState
@@ -2022,7 +2077,7 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
                     )}
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
-                    {grid.students.map((student) => {
+                    {visibleGridStudents.map((student) => {
                       const summaryEntry = summaryByStudentId.get(student.id);
 
                       return (
@@ -2169,6 +2224,26 @@ export function GradebookWorkspace({ mode }: { mode: Mode }) {
           )}
         </CardContent>
       </Card>
+
+      {pendingGridChangeCount > 0 ? (
+        <div className="sticky bottom-3 z-30 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-slate-700">
+              {pendingGridChangeCount} unsaved score
+              {pendingGridChangeCount === 1 ? "" : "s"}.
+            </p>
+            <Button
+              disabled={isSavingGrid || isLoadingGrid || !selectedClassId}
+              onClick={() => {
+                void handleSaveGridEdits();
+              }}
+              type="button"
+            >
+              {isSavingGrid ? "Saving..." : `Save (${pendingGridChangeCount})`}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {selectedStudentId ? (
         <Card>
