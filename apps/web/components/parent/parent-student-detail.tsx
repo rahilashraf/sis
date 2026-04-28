@@ -34,6 +34,9 @@ export function ParentStudentDetail({ studentId }: { studentId: string }) {
   const [documentsError, setDocumentsError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const attendancePercentage = attendanceSummary?.attendancePercentage ?? null;
+  const hasAttendanceRisk =
+    typeof attendancePercentage === "number" && attendancePercentage < 90;
 
   useEffect(() => {
     async function load() {
@@ -139,6 +142,12 @@ export function ParentStudentDetail({ studentId }: { studentId: string }) {
         <Notice tone="danger">{attendanceError}</Notice>
       ) : null}
       {documentsError ? <Notice tone="danger">{documentsError}</Notice> : null}
+      {hasAttendanceRisk ? (
+        <Notice tone="warning">
+          Attendance is currently {attendancePercentage}% over the last 30
+          days. Contact the school if attendance support is needed.
+        </Notice>
+      ) : null}
 
       {isLoading ? (
         <Card>
@@ -164,39 +173,57 @@ export function ParentStudentDetail({ studentId }: { studentId: string }) {
           <CardHeader>
             <CardTitle>Parent Portal Actions</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-3">
+          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Link
-              className={buttonClassName({ variant: "secondary" })}
+              className={buttonClassName({
+                className: "w-full",
+                variant: "secondary",
+              })}
               href={`/parent/students/${encodeURIComponent(studentId)}/academics`}
             >
               View academics
             </Link>
             <Link
-              className={buttonClassName({ variant: "secondary" })}
+              className={buttonClassName({
+                className: "w-full",
+                variant: "secondary",
+              })}
               href={`/parent/students/${encodeURIComponent(studentId)}/billing`}
             >
               Billing
             </Link>
             <Link
-              className={buttonClassName({ variant: "secondary" })}
+              className={buttonClassName({
+                className: "w-full",
+                variant: "secondary",
+              })}
               href={`/parent/students/${encodeURIComponent(studentId)}/library`}
             >
               Library
             </Link>
             <Link
-              className={buttonClassName({ variant: "secondary" })}
+              className={buttonClassName({
+                className: "w-full",
+                variant: "secondary",
+              })}
               href={`/parent/students/${encodeURIComponent(studentId)}/timetable`}
             >
               View timetable
             </Link>
             <Link
-              className={buttonClassName({ variant: "secondary" })}
+              className={buttonClassName({
+                className: "w-full",
+                variant: "secondary",
+              })}
               href={`/parent/forms?studentId=${encodeURIComponent(studentId)}`}
             >
               Forms
             </Link>
             <Link
-              className={buttonClassName({ variant: "secondary" })}
+              className={buttonClassName({
+                className: "w-full",
+                variant: "secondary",
+              })}
               href={`/parent/students/${encodeURIComponent(studentId)}/re-registration`}
             >
               Re-registration
@@ -210,6 +237,51 @@ export function ParentStudentDetail({ studentId }: { studentId: string }) {
                 {attendanceSummary?.lateCount ?? "—"} • Absent:{" "}
                 {attendanceSummary?.absentCount ?? "—"}
               </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {student ? (
+        <Card className="border-slate-200 bg-slate-50/70">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">
+              Incident and School Communication
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-slate-700">
+              Incident follow-up updates are shared directly by school staff.
+              Use interviews or the school office for urgent clarification.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <Link
+                className={buttonClassName({
+                  className: "w-full",
+                  variant: "secondary",
+                })}
+                href={`/parent/interviews?studentId=${encodeURIComponent(studentId)}`}
+              >
+                Request interview
+              </Link>
+              <Link
+                className={buttonClassName({
+                  className: "w-full",
+                  variant: "secondary",
+                })}
+                href="/parent/account"
+              >
+                Verify contact info
+              </Link>
+              <Link
+                className={buttonClassName({
+                  className: "w-full",
+                  variant: "secondary",
+                })}
+                href={`/parent/students/${encodeURIComponent(studentId)}/academics`}
+              >
+                Review academics
+              </Link>
             </div>
           </CardContent>
         </Card>

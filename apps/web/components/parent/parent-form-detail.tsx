@@ -61,6 +61,20 @@ export function ParentFormDetail({ formId }: { formId: string }) {
     [form?.fields],
   );
 
+  const requiredFields = useMemo(
+    () => activeFields.filter((field) => field.isRequired),
+    [activeFields],
+  );
+
+  const completedRequiredCount = useMemo(
+    () =>
+      requiredFields.filter((field) => {
+        const value = valueByFieldId[field.id];
+        return typeof value === "string" && value.trim().length > 0;
+      }).length,
+    [requiredFields, valueByFieldId],
+  );
+
   useEffect(() => {
     async function loadForm() {
       setIsLoading(true);
@@ -113,6 +127,22 @@ export function ParentFormDetail({ formId }: { formId: string }) {
 
     if (form.requiresStudentContext && !selectedStudentId) {
       setError("Select a student before submitting this form.");
+      return;
+    }
+
+    const missingRequiredFields = requiredFields.filter((field) => {
+      const value = valueByFieldId[field.id];
+      return !(typeof value === "string" && value.trim().length > 0);
+    });
+
+    if (missingRequiredFields.length > 0) {
+      const preview = missingRequiredFields
+        .slice(0, 3)
+        .map((field) => field.label)
+        .join(", ");
+      setError(
+        `Please complete required fields: ${preview}${missingRequiredFields.length > 3 ? ", ..." : ""}.`,
+      );
       return;
     }
 
@@ -245,6 +275,10 @@ export function ParentFormDetail({ formId }: { formId: string }) {
             <Card>
               <CardHeader>
                 <CardTitle>Form Fields</CardTitle>
+                <CardDescription>
+                  Required progress: {completedRequiredCount}/
+                  {requiredFields.length}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <form className="space-y-4" onSubmit={handleSubmit}>
@@ -269,6 +303,7 @@ export function ParentFormDetail({ formId }: { formId: string }) {
                                 [field.id]: event.target.value,
                               }))
                             }
+                            required={field.isRequired}
                             value={value}
                           />
                         </Field>
@@ -290,6 +325,7 @@ export function ParentFormDetail({ formId }: { formId: string }) {
                                 [field.id]: event.target.value,
                               }))
                             }
+                            required={field.isRequired}
                             rows={4}
                             value={value}
                           />
@@ -314,6 +350,7 @@ export function ParentFormDetail({ formId }: { formId: string }) {
                                 [field.id]: event.target.value,
                               }))
                             }
+                            required={field.isRequired}
                             value={value}
                           >
                             <option value="">Select option</option>
@@ -342,6 +379,7 @@ export function ParentFormDetail({ formId }: { formId: string }) {
                                 [field.id]: event.target.value,
                               }))
                             }
+                            required={field.isRequired}
                             value={value}
                           >
                             <option value="">Select</option>
@@ -366,6 +404,7 @@ export function ParentFormDetail({ formId }: { formId: string }) {
                               [field.id]: event.target.value,
                             }))
                           }
+                          required={field.isRequired}
                           type="date"
                           value={value}
                         />

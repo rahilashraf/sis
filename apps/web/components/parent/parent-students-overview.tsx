@@ -98,6 +98,31 @@ export function ParentStudentsOverview() {
     [links, selectedStudentId],
   );
 
+  const openFormsCount = useMemo(
+    () => parentForms.filter((form) => form.state === "OPEN").length,
+    [parentForms],
+  );
+
+  const submittedFormsCount = useMemo(
+    () => parentForms.filter((form) => form.state === "SUBMITTED").length,
+    [parentForms],
+  );
+
+  const lowProgressCourseCount = useMemo(() => {
+    if (!academicOverview) {
+      return 0;
+    }
+
+    return academicOverview.classes.filter(
+      (entry) =>
+        typeof entry.averagePercent === "number" && entry.averagePercent < 65,
+    ).length;
+  }, [academicOverview]);
+
+  const attendancePercentage = attendanceSummary?.attendancePercentage ?? null;
+  const hasAttendanceRisk =
+    typeof attendancePercentage === "number" && attendancePercentage < 90;
+
   useEffect(() => {
     async function loadStudentDashboard() {
       if (!selectedStudentId) {
@@ -236,69 +261,125 @@ export function ParentStudentsOverview() {
                 </Select>
               </Field>
 
+              {links.length > 1 ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Quick switch child
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {links.map((link) => {
+                      const isActive = link.studentId === selectedStudentId;
+                      return (
+                        <button
+                          className={buttonClassName({
+                            className: "w-full justify-start",
+                            variant: isActive ? "primary" : "secondary",
+                          })}
+                          key={`quick-child-${link.studentId}`}
+                          onClick={() => setSelectedStudentId(link.studentId)}
+                          type="button"
+                        >
+                          {link.student.firstName} {link.student.lastName}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
               {selectedStudentId ? (
                 <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                     <Link
-                      className={buttonClassName({ variant: "secondary" })}
+                      className={buttonClassName({
+                        className: "w-full",
+                        variant: "secondary",
+                      })}
                       href={`/parent/students/${selectedStudentId}`}
                     >
                       Student profile
                     </Link>
                     <Link
-                      className={buttonClassName({ variant: "secondary" })}
+                      className={buttonClassName({
+                        className: "w-full",
+                        variant: "secondary",
+                      })}
                       href={`/parent/students/${selectedStudentId}/academics`}
                     >
                       Academics
                     </Link>
                     <Link
-                      className={buttonClassName({ variant: "secondary" })}
+                      className={buttonClassName({
+                        className: "w-full",
+                        variant: "secondary",
+                      })}
                       href={`/parent/students/${selectedStudentId}/billing`}
                     >
                       Billing
                     </Link>
                     <Link
-                      className={buttonClassName({ variant: "secondary" })}
+                      className={buttonClassName({
+                        className: "w-full",
+                        variant: "secondary",
+                      })}
                       href={`/parent/uniform`}
                     >
                       Uniform
                     </Link>
                     <Link
-                      className={buttonClassName({ variant: "secondary" })}
+                      className={buttonClassName({
+                        className: "w-full",
+                        variant: "secondary",
+                      })}
                       href={`/parent/interviews?studentId=${encodeURIComponent(selectedStudentId)}`}
                     >
                       Interviews
                     </Link>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                     <Link
-                      className={buttonClassName({ variant: "secondary" })}
+                      className={buttonClassName({
+                        className: "w-full",
+                        variant: "secondary",
+                      })}
                       href="/parent/account"
                     >
                       My account
                     </Link>
                     <Link
-                      className={buttonClassName({ variant: "secondary" })}
+                      className={buttonClassName({
+                        className: "w-full",
+                        variant: "secondary",
+                      })}
                       href={`/parent/students/${selectedStudentId}/library`}
                     >
                       Library
                     </Link>
                     <Link
-                      className={buttonClassName({ variant: "secondary" })}
+                      className={buttonClassName({
+                        className: "w-full",
+                        variant: "secondary",
+                      })}
                       href={`/parent/students/${selectedStudentId}/timetable`}
                     >
                       Timetable
                     </Link>
                     <Link
-                      className={buttonClassName({ variant: "secondary" })}
+                      className={buttonClassName({
+                        className: "w-full",
+                        variant: "secondary",
+                      })}
                       href={`/parent/forms?studentId=${encodeURIComponent(selectedStudentId)}`}
                     >
                       Forms
                     </Link>
                     {reRegistrationStatus?.isOpen ? (
                       <Link
-                        className={buttonClassName({ variant: "secondary" })}
+                        className={buttonClassName({
+                          className: "w-full",
+                          variant: "secondary",
+                        })}
                         href={`/parent/students/${selectedStudentId}/re-registration`}
                       >
                         Re-registration
@@ -394,6 +475,43 @@ export function ParentStudentsOverview() {
             <Notice tone="info">This re-registration window has closed.</Notice>
           ) : null}
 
+          {selectedStudentId && openFormsCount > 0 ? (
+            <Notice tone="warning">
+              {openFormsCount} form{openFormsCount === 1 ? "" : "s"} need
+              attention.{" "}
+              <Link
+                className="font-semibold underline"
+                href={`/parent/forms?studentId=${encodeURIComponent(selectedStudentId)}`}
+              >
+                Open forms now
+              </Link>
+              .
+            </Notice>
+          ) : null}
+
+          {selectedStudentId && hasAttendanceRisk ? (
+            <Notice tone="warning">
+              Attendance is currently {attendancePercentage}% in the last 30
+              days. Review attendance details with the school if support is
+              needed.
+            </Notice>
+          ) : null}
+
+          {selectedStudentId && lowProgressCourseCount > 0 ? (
+            <Notice tone="info">
+              {lowProgressCourseCount} course
+              {lowProgressCourseCount === 1 ? "" : "s"} currently show below
+              65%.{" "}
+              <Link
+                className="font-semibold underline"
+                href={`/parent/students/${selectedStudentId}/academics`}
+              >
+                Review progress
+              </Link>
+              .
+            </Notice>
+          ) : null}
+
           {selectedLink ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
               <Card>
@@ -445,19 +563,13 @@ export function ParentStudentsOverview() {
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">Open</span>
                     <span className="font-medium text-slate-900">
-                      {
-                        parentForms.filter((form) => form.state === "OPEN")
-                          .length
-                      }
+                      {openFormsCount}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">Submitted</span>
                     <span className="font-medium text-slate-900">
-                      {
-                        parentForms.filter((form) => form.state === "SUBMITTED")
-                          .length
-                      }
+                      {submittedFormsCount}
                     </span>
                   </div>
                   <div className="pt-1">
@@ -474,6 +586,54 @@ export function ParentStudentsOverview() {
                 </CardContent>
               </Card>
             </div>
+          ) : null}
+
+          {selectedStudentId ? (
+            <Card className="border-slate-200 bg-slate-50/70">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Help and Notifications</CardTitle>
+                <CardDescription>
+                  Incident follow-up and urgent student updates are coordinated
+                  by school staff.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-slate-700">
+                  If you need clarification on attendance, grade progress, or a
+                  behavior/incident update, contact the school office or request
+                  a parent interview from the links below.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  <Link
+                    className={buttonClassName({
+                      className: "w-full",
+                      variant: "secondary",
+                    })}
+                    href={`/parent/interviews?studentId=${encodeURIComponent(selectedStudentId)}`}
+                  >
+                    Request interview
+                  </Link>
+                  <Link
+                    className={buttonClassName({
+                      className: "w-full",
+                      variant: "secondary",
+                    })}
+                    href={`/parent/students/${selectedStudentId}`}
+                  >
+                    View student details
+                  </Link>
+                  <Link
+                    className={buttonClassName({
+                      className: "w-full",
+                      variant: "secondary",
+                    })}
+                    href="/parent/account"
+                  >
+                    Verify my contact info
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
           ) : null}
 
           <Card>
@@ -498,6 +658,10 @@ export function ParentStudentsOverview() {
                 />
               ) : (
                 <div className="overflow-hidden rounded-xl border border-slate-200">
+                  <p className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">
+                    Scroll horizontally on smaller screens to view all course
+                    columns.
+                  </p>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                       <thead className="bg-slate-50/80">

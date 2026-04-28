@@ -35,6 +35,13 @@ export function ParentStudentAcademics({ studentId }: { studentId: string }) {
   const [gradeError, setGradeError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const lowAssessmentCount =
+    classDetail?.groups
+      .flatMap((group) => group.assessments)
+      .filter(
+        (assessment) =>
+          typeof assessment.percent === "number" && assessment.percent < 65,
+      ).length ?? 0;
 
   useEffect(() => {
     async function load() {
@@ -154,6 +161,13 @@ export function ParentStudentAcademics({ studentId }: { studentId: string }) {
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {gradeError ? <Notice tone="danger">{gradeError}</Notice> : null}
+      {lowAssessmentCount > 0 ? (
+        <Notice tone="warning">
+          {lowAssessmentCount} published assessment
+          {lowAssessmentCount === 1 ? "" : "s"} currently show below 65%.
+          Consider contacting the school for support planning.
+        </Notice>
+      ) : null}
 
       {isLoading ? (
         <Card>
@@ -198,6 +212,41 @@ export function ParentStudentAcademics({ studentId }: { studentId: string }) {
                 Overall averages may include assessments that are hidden from
                 the published breakdown.
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200 bg-slate-50/70">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Need Help?</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <Link
+                className={buttonClassName({
+                  className: "w-full",
+                  variant: "secondary",
+                })}
+                href={`/parent/interviews?studentId=${encodeURIComponent(studentId)}`}
+              >
+                Request interview
+              </Link>
+              <Link
+                className={buttonClassName({
+                  className: "w-full",
+                  variant: "secondary",
+                })}
+                href={`/parent/forms?studentId=${encodeURIComponent(studentId)}`}
+              >
+                Review forms
+              </Link>
+              <Link
+                className={buttonClassName({
+                  className: "w-full",
+                  variant: "secondary",
+                })}
+                href={`/parent/students/${encodeURIComponent(studentId)}`}
+              >
+                Back to student profile
+              </Link>
             </CardContent>
           </Card>
 
@@ -278,6 +327,10 @@ export function ParentStudentAcademics({ studentId }: { studentId: string }) {
                             ) : null}
                           </div>
                           <div className="overflow-hidden rounded-xl border border-slate-200">
+                            <p className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">
+                              Scroll horizontally on smaller screens to view
+                              all assessment columns.
+                            </p>
                             <div className="overflow-x-auto">
                               <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                                 <thead className="bg-slate-50/80">
