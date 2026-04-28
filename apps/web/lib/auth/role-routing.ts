@@ -90,6 +90,7 @@ function buildAdminBaseItems(): NavigationItem[] {
       href: "/admin/schools",
       label: "Schools",
       children: [
+        { href: "/admin/schools/rollover", label: "School Year Rollover" },
         { href: "/admin/reporting-periods", label: "Reporting Periods" },
         { href: "/admin/grade-scales", label: "Grade Scales" },
         { href: "/admin/assessment-types", label: "Assessment Types" },

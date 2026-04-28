@@ -8,13 +8,28 @@ describe('SchoolYearsService', () => {
   let prisma: {
     schoolYear: {
       findMany: jest.Mock;
+      findFirst: jest.Mock;
       findUnique: jest.Mock;
+      create: jest.Mock;
       updateMany: jest.Mock;
       update: jest.Mock;
       delete: jest.Mock;
     };
-    class: {
+    gradeLevel: {
+      findMany: jest.Mock;
       updateMany: jest.Mock;
+    };
+    class: {
+      findMany: jest.Mock;
+      create: jest.Mock;
+      updateMany: jest.Mock;
+    };
+    user: {
+      findMany: jest.Mock;
+      updateMany: jest.Mock;
+    };
+    enrollmentHistory: {
+      upsert: jest.Mock;
     };
     $transaction: jest.Mock;
   };
@@ -27,25 +42,51 @@ describe('SchoolYearsService', () => {
     prisma = {
       schoolYear: {
         findMany: jest.fn(),
+        findFirst: jest.fn(),
         findUnique: jest.fn(),
+        create: jest.fn(),
         updateMany: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
       },
-      class: {
+      gradeLevel: {
+        findMany: jest.fn(),
         updateMany: jest.fn(),
+      },
+      class: {
+        findMany: jest.fn(),
+        create: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      user: {
+        findMany: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      enrollmentHistory: {
+        upsert: jest.fn(),
       },
       $transaction: jest.fn().mockImplementation(async (arg: unknown) => {
         if (typeof arg === 'function') {
           return arg({
             schoolYear: {
               findUnique: prisma.schoolYear.findUnique,
+              create: prisma.schoolYear.create,
               update: prisma.schoolYear.update,
               updateMany: prisma.schoolYear.updateMany,
               delete: prisma.schoolYear.delete,
             },
+            gradeLevel: {
+              updateMany: prisma.gradeLevel.updateMany,
+            },
             class: {
+              create: prisma.class.create,
               updateMany: prisma.class.updateMany,
+            },
+            user: {
+              updateMany: prisma.user.updateMany,
+            },
+            enrollmentHistory: {
+              upsert: prisma.enrollmentHistory.upsert,
             },
           });
         }
@@ -245,5 +286,130 @@ describe('SchoolYearsService', () => {
     expect(prisma.schoolYear.delete).toHaveBeenCalledWith({
       where: { id: 'year-1' },
     });
+  });
+
+  it('builds a rollover preview with promotion, graduation, and class template counts', async () => {
+    prisma.schoolYear.findUnique
+      .mockResolvedValueOnce({
+        id: 'source-year',
+        schoolId: 'school-1',
+        name: '2025-2026',
+        startDate: new Date('2025-09-01T00:00:00.000Z'),
+        endDate: new Date('2026-06-30T00:00:00.000Z'),
+        isActive: true,
+      })
+      .mockResolvedValueOnce(null);
+    prisma.gradeLevel.findMany.mockResolvedValue([
+      { id: 'g1', name: 'Grade 1', sortOrder: 1, isActive: true },
+      { id: 'g2', name: 'Grade 2', sortOrder: 2, isActive: true },
+      { id: 'g3', name: 'Grade 3', sortOrder: 3, isActive: true },
+    ]);
+    prisma.class.findMany.mockResolvedValue([
+      {
+        id: 'class-1',
+        name: 'Math A',
+        isActive: true,
+        gradeLevelId: 'g1',
+        subjectOptionId: null,
+        subject: 'Math',
+        isHomeroom: false,
+        takesAttendance: true,
+        gradebookWeightingMode: 'UNWEIGHTED',
+      },
+    ]);
+    prisma.user.findMany.mockResolvedValue([
+      { id: 'student-1', gradeLevelId: 'g1' },
+      { id: 'student-2', gradeLevelId: 'g3' },
+      { id: 'student-3', gradeLevelId: null },
+    ]);
+
+    const preview = await service.previewRollover(
+      {
+        id: 'owner-1',
+        role: UserRole.OWNER,
+        memberships: [{ schoolId: 'school-1', isActive: true }],
+      } as never,
+      {
+        schoolId: 'school-1',
+        sourceSchoolYearId: 'source-year',
+        targetSchoolYearName: '2026-2027',
+        targetStartDate: '2026-09-01',
+        targetEndDate: '2027-06-30',
+        copyClassTemplates: true,
+      },
+    );
+
+    expect(preview.summary.classTemplatesToCreate).toBe(1);
+    expect(preview.summary.promotableStudents).toBe(1);
+    expect(preview.summary.graduatingStudents).toBe(1);
+    expect(preview.summary.studentsWithoutGradeLevel).toBe(1);
+  });
+
+  it('executes rollover and writes all selected transitions', async () => {
+    prisma.schoolYear.findUnique
+      .mockResolvedValueOnce({
+        id: 'source-year',
+        schoolId: 'school-1',
+        name: '2025-2026',
+        startDate: new Date('2025-09-01T00:00:00.000Z'),
+        endDate: new Date('2026-06-30T00:00:00.000Z'),
+        isActive: true,
+      })
+      .mockResolvedValueOnce(null);
+    prisma.gradeLevel.findMany.mockResolvedValue([
+      { id: 'g1', name: 'Grade 1', sortOrder: 1, isActive: true },
+      { id: 'g2', name: 'Grade 2', sortOrder: 2, isActive: true },
+      { id: 'g3', name: 'Grade 3', sortOrder: 3, isActive: true },
+    ]);
+    prisma.class.findMany.mockResolvedValue([
+      {
+        id: 'class-1',
+        name: 'Math A',
+        isActive: true,
+        gradeLevelId: 'g1',
+        subjectOptionId: null,
+        subject: 'Math',
+        isHomeroom: false,
+        takesAttendance: true,
+        gradebookWeightingMode: 'UNWEIGHTED',
+      },
+    ]);
+    prisma.user.findMany.mockResolvedValue([
+      { id: 'student-1', gradeLevelId: 'g1' },
+      { id: 'student-2', gradeLevelId: 'g3' },
+    ]);
+    prisma.schoolYear.create.mockResolvedValue({
+      id: 'target-year',
+      name: '2026-2027',
+      startDate: new Date('2026-09-01T00:00:00.000Z'),
+      endDate: new Date('2027-06-30T00:00:00.000Z'),
+      isActive: false,
+    });
+    prisma.class.create.mockResolvedValue({ id: 'new-class-1' });
+    prisma.user.updateMany.mockResolvedValue({ count: 1 });
+    prisma.class.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.executeRollover(
+      {
+        id: 'owner-1',
+        role: UserRole.OWNER,
+        memberships: [{ schoolId: 'school-1', isActive: true }],
+      } as never,
+      {
+        schoolId: 'school-1',
+        sourceSchoolYearId: 'source-year',
+        targetSchoolYearName: '2026-2027',
+        targetStartDate: '2026-09-01',
+        targetEndDate: '2027-06-30',
+        copyClassTemplates: true,
+      },
+    );
+
+    expect(result.success).toBe(true);
+    expect(prisma.schoolYear.create).toHaveBeenCalled();
+    expect(prisma.class.create).toHaveBeenCalledTimes(1);
+    expect(prisma.user.updateMany).toHaveBeenCalled();
+    expect(prisma.enrollmentHistory.upsert).toHaveBeenCalledTimes(1);
+    expect(prisma.schoolYear.updateMany).toHaveBeenCalled();
   });
 });

@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClassName } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -1151,21 +1152,29 @@ export function SchoolsManagement() {
                 : `${schoolYears.length} records`}
             </Badge>
             {canManageSchools ? (
-              <Button
-                disabled={!selectedSchoolId}
-                onClick={() => {
-                  setIsCreateSchoolYearOpen((current) => !current);
-                  setCreateSchoolYearForm(
-                    buildCreateSchoolYearForm(selectedSchoolId),
-                  );
-                  setError(null);
-                  setSuccessMessage(null);
-                }}
-                type="button"
-                variant={isCreateSchoolYearOpen ? "secondary" : "primary"}
-              >
-                {isCreateSchoolYearOpen ? "Close" : "Create School Year"}
-              </Button>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Link
+                  className={buttonClassName({ variant: "secondary" })}
+                  href={`/admin/schools/rollover${selectedSchoolId ? `?schoolId=${encodeURIComponent(selectedSchoolId)}` : ""}`}
+                >
+                  Open Rollover Wizard
+                </Link>
+                <Button
+                  disabled={!selectedSchoolId}
+                  onClick={() => {
+                    setIsCreateSchoolYearOpen((current) => !current);
+                    setCreateSchoolYearForm(
+                      buildCreateSchoolYearForm(selectedSchoolId),
+                    );
+                    setError(null);
+                    setSuccessMessage(null);
+                  }}
+                  type="button"
+                  variant={isCreateSchoolYearOpen ? "secondary" : "primary"}
+                >
+                  {isCreateSchoolYearOpen ? "Close" : "Create School Year"}
+                </Button>
+              </div>
             ) : null}
           </div>
         </CardHeader>

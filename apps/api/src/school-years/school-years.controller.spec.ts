@@ -56,13 +56,27 @@ describe('SchoolYearsController (HTTP)', () => {
     schoolYear: {
       create: jest.Mock;
       findMany: jest.Mock;
+      findFirst: jest.Mock;
       findUnique: jest.Mock;
       delete: jest.Mock;
       updateMany: jest.Mock;
       update: jest.Mock;
     };
-    class: {
+    gradeLevel: {
+      findMany: jest.Mock;
       updateMany: jest.Mock;
+    };
+    class: {
+      findMany: jest.Mock;
+      create: jest.Mock;
+      updateMany: jest.Mock;
+    };
+    user: {
+      findMany: jest.Mock;
+      updateMany: jest.Mock;
+    };
+    enrollmentHistory: {
+      upsert: jest.Mock;
     };
     $transaction: jest.Mock;
   };
@@ -75,13 +89,27 @@ describe('SchoolYearsController (HTTP)', () => {
       schoolYear: {
         create: jest.fn(),
         findMany: jest.fn(),
+        findFirst: jest.fn(),
         findUnique: jest.fn(),
         delete: jest.fn(),
         updateMany: jest.fn(),
         update: jest.fn(),
       },
-      class: {
+      gradeLevel: {
+        findMany: jest.fn(),
         updateMany: jest.fn(),
+      },
+      class: {
+        findMany: jest.fn(),
+        create: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      user: {
+        findMany: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      enrollmentHistory: {
+        upsert: jest.fn(),
       },
       $transaction: jest.fn(async (callback: (tx: typeof prisma) => unknown) =>
         callback(prisma),
@@ -454,5 +482,41 @@ describe('SchoolYearsController (HTTP)', () => {
 
     expect(prisma.schoolYear.findUnique).not.toHaveBeenCalled();
     expect(prisma.schoolYear.delete).not.toHaveBeenCalled();
+  });
+
+  it('provides rollover preview for owner role', async () => {
+    prisma.schoolYear.findUnique
+      .mockResolvedValueOnce({
+        id: 'source-year',
+        schoolId: 'school-1',
+        name: '2025-2026',
+        startDate: new Date('2025-09-01T00:00:00.000Z'),
+        endDate: new Date('2026-06-30T00:00:00.000Z'),
+        isActive: true,
+      })
+      .mockResolvedValueOnce(null);
+    prisma.gradeLevel.findMany.mockResolvedValue([
+      { id: 'g1', name: 'Grade 1', sortOrder: 1, isActive: true },
+      { id: 'g2', name: 'Grade 2', sortOrder: 2, isActive: true },
+    ]);
+    prisma.class.findMany.mockResolvedValue([]);
+    prisma.user.findMany.mockResolvedValue([]);
+
+    await request(app.getHttpServer())
+      .post('/school-years/rollover/preview')
+      .set('x-test-user-id', 'owner-1')
+      .set('x-test-role', UserRole.OWNER)
+      .send({
+        schoolId: 'school-1',
+        sourceSchoolYearId: 'source-year',
+        targetSchoolYearName: '2026-2027',
+        targetStartDate: '2026-09-01',
+        targetEndDate: '2027-06-30',
+      })
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body.sourceSchoolYear.name).toBe('2025-2026');
+        expect(body.targetSchoolYear.mode).toBe('create');
+      });
   });
 });

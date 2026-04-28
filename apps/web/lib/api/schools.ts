@@ -46,6 +46,80 @@ export type CreateSchoolYearInput = {
   endDate: string;
 };
 
+export type SchoolYearRolloverInput = {
+  schoolId: string;
+  sourceSchoolYearId: string;
+  targetSchoolYearName: string;
+  targetStartDate: string;
+  targetEndDate: string;
+  copyGradeLevels?: boolean;
+  copyClassTemplates?: boolean;
+  promoteStudents?: boolean;
+  graduateFinalGradeStudents?: boolean;
+  archivePriorYearLeftovers?: boolean;
+  activateTargetSchoolYear?: boolean;
+};
+
+export type SchoolYearRolloverPreview = {
+  sourceSchoolYear: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    isActive: boolean;
+  };
+  targetSchoolYear: {
+    mode: "create" | "reuse";
+    id: string | null;
+    name: string;
+    startDate: string;
+    endDate: string;
+    isActive: boolean;
+  };
+  options: Required<
+    Pick<
+      SchoolYearRolloverInput,
+      | "copyGradeLevels"
+      | "copyClassTemplates"
+      | "promoteStudents"
+      | "graduateFinalGradeStudents"
+      | "archivePriorYearLeftovers"
+      | "activateTargetSchoolYear"
+    >
+  >;
+  summary: {
+    gradeLevelsToReactivate: number;
+    classTemplatesToCreate: number;
+    classTemplatesAlreadyPresent: number;
+    promotableStudents: number;
+    graduatingStudents: number;
+    studentsWithoutGradeLevel: number;
+    studentsWithoutNextGradeLevel: number;
+    activeStudentsInSchool: number;
+    activeClassesToArchiveFromSource: number;
+  };
+  warnings: string[];
+  highestGradeLevelName: string | null;
+  reversibleNotes: string[];
+};
+
+export type SchoolYearRolloverExecuteResult = {
+  success: boolean;
+  sourceSchoolYearId: string;
+  targetSchoolYearId: string;
+  targetSchoolYearName: string;
+  summary: {
+    reactivatedGradeLevels: number;
+    createdClassTemplates: number;
+    skippedExistingClassTemplates: number;
+    promotedStudentCount: number;
+    graduatedStudentCount: number;
+    archivedSourceClassCount: number;
+  };
+  warnings: string[];
+  reversibleNotes: string[];
+};
+
 type RawSchoolYear = Omit<SchoolYear, "startDate" | "endDate"> & {
   endDate?: string | null;
   endsAt?: string | null;
@@ -173,6 +247,48 @@ export async function endSchoolYear(schoolYearId: string) {
 }
 
 export const archiveSchoolYear = endSchoolYear;
+
+function buildSchoolYearRolloverPayload(input: SchoolYearRolloverInput) {
+  return {
+    ...input,
+    targetStartDate: toDateOnly(input.targetStartDate),
+    targetEndDate: toDateOnly(input.targetEndDate),
+  };
+}
+
+export async function previewSchoolYearRollover(input: SchoolYearRolloverInput) {
+  const response = await apiFetch<SchoolYearRolloverPreview>(
+    "/school-years/rollover/preview",
+    {
+      method: "POST",
+      json: buildSchoolYearRolloverPayload(input),
+    },
+  );
+
+  return {
+    ...response,
+    sourceSchoolYear: {
+      ...response.sourceSchoolYear,
+      startDate: toDateOnly(response.sourceSchoolYear.startDate),
+      endDate: toDateOnly(response.sourceSchoolYear.endDate),
+    },
+    targetSchoolYear: {
+      ...response.targetSchoolYear,
+      startDate: toDateOnly(response.targetSchoolYear.startDate),
+      endDate: toDateOnly(response.targetSchoolYear.endDate),
+    },
+  };
+}
+
+export function executeSchoolYearRollover(input: SchoolYearRolloverInput) {
+  return apiFetch<SchoolYearRolloverExecuteResult>(
+    "/school-years/rollover/execute",
+    {
+      method: "POST",
+      json: buildSchoolYearRolloverPayload(input),
+    },
+  );
+}
 
 export async function activateSchoolYear(schoolYearId: string) {
   const response = await apiFetch<RawSchoolYear>(
