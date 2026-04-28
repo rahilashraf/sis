@@ -12,6 +12,7 @@ import request from 'supertest';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ROLES_KEY } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssessmentsController } from './assessments.controller';
 import { AssessmentsService } from './assessments.service';
@@ -91,7 +92,13 @@ describe('AssessmentsController (HTTP)', () => {
       createMany: jest.Mock;
     };
     studentClassEnrollment: { findMany: jest.Mock };
+    user: { findMany: jest.Mock };
+    studentParentLink: { findMany: jest.Mock };
+    notification: { findMany: jest.Mock };
     $transaction: jest.Mock;
+  };
+  let notificationsService: {
+    createMany: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -118,6 +125,9 @@ describe('AssessmentsController (HTTP)', () => {
         createMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       studentClassEnrollment: { findMany: jest.fn() },
+      user: { findMany: jest.fn() },
+      studentParentLink: { findMany: jest.fn() },
+      notification: { findMany: jest.fn() },
       $transaction: jest.fn().mockImplementation(async (arg: unknown) => {
         if (typeof arg === 'function') {
           return arg({
@@ -139,6 +149,9 @@ describe('AssessmentsController (HTTP)', () => {
         return arg;
       }),
     };
+    notificationsService = {
+      createMany: jest.fn().mockResolvedValue({ count: 0 }),
+    };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [AssessmentsController],
@@ -148,6 +161,10 @@ describe('AssessmentsController (HTTP)', () => {
         {
           provide: PrismaService,
           useValue: prisma,
+        },
+        {
+          provide: NotificationsService,
+          useValue: notificationsService,
         },
       ],
     })
@@ -285,6 +302,7 @@ describe('AssessmentsController (HTTP)', () => {
       { studentId: 'student-1' },
       { studentId: 'student-2' },
     ]);
+    prisma.assessmentResult.findMany.mockResolvedValue([]);
     prisma.assessmentResult.upsert
       .mockResolvedValueOnce({
         id: 'result-1',

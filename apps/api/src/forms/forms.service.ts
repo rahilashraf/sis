@@ -3,11 +3,13 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
   AuditLogSeverity,
   FormFieldType,
+  NotificationType,
   Prisma,
   UserRole,
 } from '@prisma/client';
@@ -22,10 +24,12 @@ import {
 import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
 import { formatDateOnly, parseDateOnlyOrThrow } from '../common/dates/date-only.util';
 import { safeUserSelect } from '../common/prisma/safe-user-response';
+import { NotificationsService } from '../notifications/notifications.service';
 import { AuditService } from '../audit/audit.service';
 import { buildAuditDiff } from '../audit/audit-diff.util';
 
 type AuthUser = AuthenticatedUser;
+const FORM_REMINDER_ENTITY_TYPE = 'Form';
 
 function isSchemaMissingError(error: unknown) {
   return (
@@ -36,9 +40,12 @@ function isSchemaMissingError(error: unknown) {
 
 @Injectable()
 export class FormsService {
+  private readonly logger = new Logger(FormsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private isManageRole(role: UserRole) {
@@ -340,6 +347,99 @@ export class FormsService {
     return link.student;
   }
 
+  private async notifyParentsForFormReminder(form: {
+    id: string;
+    schoolId: string;
+    title: string;
+    isActive: boolean;
+    opensAt: Date | null;
+    closesAt: Date | null;
+  }) {
+    if (!this.isFormOpenNow(form)) {
+      return;
+    }
+
+    const links = await this.prisma.studentParentLink.findMany({
+      where: {
+        parent: {
+          role: UserRole.PARENT,
+          isActive: true,
+        },
+        student: {
+          role: UserRole.STUDENT,
+          isActive: true,
+          OR: [
+            {
+              memberships: {
+                some: {
+                  schoolId: form.schoolId,
+                  isActive: true,
+                },
+              },
+            },
+            {
+              schoolId: form.schoolId,
+            },
+          ],
+        },
+      },
+      select: {
+        parentId: true,
+      },
+    });
+
+    const parentIds = [...new Set(links.map((link) => link.parentId))];
+    if (parentIds.length === 0) {
+      return;
+    }
+
+    const existing = await this.prisma.notification.findMany({
+      where: {
+        type: NotificationType.FORM_REMINDER,
+        entityType: FORM_REMINDER_ENTITY_TYPE,
+        entityId: form.id,
+        recipientUserId: { in: parentIds },
+      },
+      select: {
+        recipientUserId: true,
+      },
+    });
+
+    const existingRecipientIds = new Set(existing.map((entry) => entry.recipientUserId));
+    const title = `New form available: ${form.title}`;
+    const message = `${form.title} is now open for completion.`;
+
+    const inputs: Parameters<NotificationsService['createMany']>[0] = [];
+    for (const parentId of parentIds) {
+      if (existingRecipientIds.has(parentId)) {
+        continue;
+      }
+      inputs.push({
+        schoolId: form.schoolId,
+        recipientUserId: parentId,
+        type: NotificationType.FORM_REMINDER,
+        title,
+        message,
+        entityType: FORM_REMINDER_ENTITY_TYPE,
+        entityId: form.id,
+      });
+    }
+
+    if (inputs.length === 0) {
+      return;
+    }
+
+    await this.notificationsService.createMany(inputs);
+  }
+
+  private async safelyRunFormReminderTask(task: () => Promise<void>) {
+    try {
+      await task();
+    } catch (error) {
+      this.logger.warn(`Skipped form reminder notification(s): ${String(error)}`);
+    }
+  }
+
   async create(
     user: AuthUser,
     data: {
@@ -384,7 +484,7 @@ export class FormsService {
     const fields = this.normalizeFormFields(data.fields);
 
     try {
-      return await this.prisma.form.create({
+      const created = await this.prisma.form.create({
         data: {
           schoolId,
           createdByUserId: user.id,
@@ -404,6 +504,19 @@ export class FormsService {
           },
         },
       });
+
+      await this.safelyRunFormReminderTask(() =>
+        this.notifyParentsForFormReminder({
+          id: created.id,
+          schoolId: created.schoolId,
+          title: created.title,
+          isActive: created.isActive,
+          opensAt: created.opensAt,
+          closesAt: created.closesAt,
+        }),
+      );
+
+      return created;
     } catch (error) {
       if (isSchemaMissingError(error)) {
         throw new ConflictException(
@@ -707,7 +820,23 @@ export class FormsService {
         }
       });
 
-      return this.getFormOrThrow(id);
+      const updated = await this.getFormOrThrow(id);
+      const wasOpen = this.isFormOpenNow(existing);
+      const isOpenNow = this.isFormOpenNow(updated);
+      if (!wasOpen && isOpenNow) {
+        await this.safelyRunFormReminderTask(() =>
+          this.notifyParentsForFormReminder({
+            id: updated.id,
+            schoolId: updated.schoolId,
+            title: updated.title,
+            isActive: updated.isActive,
+            opensAt: updated.opensAt,
+            closesAt: updated.closesAt,
+          }),
+        );
+      }
+
+      return updated;
     } catch (error) {
       if (isSchemaMissingError(error)) {
         throw new ConflictException(

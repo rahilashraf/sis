@@ -3,9 +3,15 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, ResultCalculationBehavior, UserRole } from '@prisma/client';
+import {
+  NotificationType,
+  Prisma,
+  ResultCalculationBehavior,
+  UserRole,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedUser } from '../common/auth/auth-user';
 import {
@@ -15,6 +21,7 @@ import {
   isTeacherRole,
 } from '../common/access/school-access.util';
 import { safeUserSelect } from '../common/prisma/safe-user-response';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { UpdateAssessmentDto } from './dto/update-assessment.dto';
 import { UpsertAssessmentGradesDto } from './dto/upsert-assessment-grades.dto';
@@ -51,9 +58,220 @@ const assessmentResponseInclude = {
   },
 } satisfies Prisma.AssessmentInclude;
 
+const LOW_GRADE_THRESHOLD_PERCENT = 65;
+const GRADE_PUBLISHED_ENTITY_TYPE = 'AssessmentGradePublication';
+const LOW_GRADE_ENTITY_TYPE = 'AssessmentLowGrade';
+
 @Injectable()
 export class AssessmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(AssessmentsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
+
+  private calculatePercent(score: number | null | undefined, maxScore: number) {
+    if (score === null || score === undefined || maxScore <= 0) {
+      return null;
+    }
+    return (score / maxScore) * 100;
+  }
+
+  private async buildRecipientsByStudentId(studentIds: string[]) {
+    if (studentIds.length === 0) {
+      return new Map<string, Set<string>>();
+    }
+
+    const students = await this.prisma.user.findMany({
+      where: {
+        id: { in: studentIds },
+        role: UserRole.STUDENT,
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (students.length === 0) {
+      return new Map<string, Set<string>>();
+    }
+
+    const activeStudentIds = students.map((student) => student.id);
+    const recipientsByStudentId = new Map<string, Set<string>>();
+    for (const studentId of activeStudentIds) {
+      recipientsByStudentId.set(studentId, new Set([studentId]));
+    }
+
+    const parentLinks = await this.prisma.studentParentLink.findMany({
+      where: {
+        studentId: { in: activeStudentIds },
+        parent: {
+          role: UserRole.PARENT,
+          isActive: true,
+        },
+      },
+      select: {
+        studentId: true,
+        parentId: true,
+      },
+    });
+
+    for (const link of parentLinks) {
+      const recipients = recipientsByStudentId.get(link.studentId);
+      if (recipients) {
+        recipients.add(link.parentId);
+      }
+    }
+
+    return recipientsByStudentId;
+  }
+
+  private async notifyPublishedGrades(input: {
+    schoolId: string;
+    assessmentId: string;
+    assessmentTitle: string;
+    studentIds: string[];
+  }) {
+    const uniqueStudentIds = [...new Set(input.studentIds.filter(Boolean))];
+    if (uniqueStudentIds.length === 0) {
+      return;
+    }
+
+    const recipientsByStudentId = await this.buildRecipientsByStudentId(uniqueStudentIds);
+    if (recipientsByStudentId.size === 0) {
+      return;
+    }
+
+    const entityIds = Array.from(recipientsByStudentId.keys()).map(
+      (studentId) => `${input.assessmentId}:${studentId}`,
+    );
+    const recipientUserIds = Array.from(
+      new Set(
+        Array.from(recipientsByStudentId.values()).flatMap((recipients) =>
+          Array.from(recipients),
+        ),
+      ),
+    );
+
+    const existing = await this.prisma.notification.findMany({
+      where: {
+        type: NotificationType.NEW_PUBLISHED_GRADE,
+        entityType: GRADE_PUBLISHED_ENTITY_TYPE,
+        entityId: { in: entityIds },
+        recipientUserId: { in: recipientUserIds },
+      },
+      select: {
+        recipientUserId: true,
+        entityId: true,
+      },
+    });
+
+    const existingKeys = new Set(
+      existing.map((entry) => `${entry.entityId}:${entry.recipientUserId}`),
+    );
+
+    const title = `New grade published: ${input.assessmentTitle}`;
+    const message = `${input.assessmentTitle} is now visible in the gradebook.`;
+    const notifications: Parameters<NotificationsService['createMany']>[0] = [];
+
+    for (const [studentId, recipients] of recipientsByStudentId.entries()) {
+      const entityId = `${input.assessmentId}:${studentId}`;
+      for (const recipientUserId of recipients) {
+        const dedupeKey = `${entityId}:${recipientUserId}`;
+        if (existingKeys.has(dedupeKey)) {
+          continue;
+        }
+
+        notifications.push({
+          schoolId: input.schoolId,
+          recipientUserId,
+          type: NotificationType.NEW_PUBLISHED_GRADE,
+          title,
+          message,
+          entityType: GRADE_PUBLISHED_ENTITY_TYPE,
+          entityId,
+        });
+      }
+    }
+
+    if (notifications.length === 0) {
+      return;
+    }
+
+    await this.notificationsService.createMany(notifications);
+  }
+
+  private async notifyLowGradeAlerts(input: {
+    schoolId: string;
+    assessmentId: string;
+    assessmentTitle: string;
+    maxScore: number;
+    transitions: Array<{
+      studentId: string;
+      previousScore: number | null;
+      nextScore: number | null;
+    }>;
+  }) {
+    const studentsNeedingAlert = input.transitions
+      .map((transition) => {
+        const previousPercent = this.calculatePercent(
+          transition.previousScore,
+          input.maxScore,
+        );
+        const nextPercent = this.calculatePercent(transition.nextScore, input.maxScore);
+        const crossedIntoLow =
+          nextPercent !== null &&
+          nextPercent < LOW_GRADE_THRESHOLD_PERCENT &&
+          (previousPercent === null ||
+            previousPercent >= LOW_GRADE_THRESHOLD_PERCENT);
+
+        return crossedIntoLow ? transition.studentId : null;
+      })
+      .filter((studentId): studentId is string => Boolean(studentId));
+
+    if (studentsNeedingAlert.length === 0) {
+      return;
+    }
+
+    const recipientsByStudentId = await this.buildRecipientsByStudentId(studentsNeedingAlert);
+    if (recipientsByStudentId.size === 0) {
+      return;
+    }
+
+    const title = `Low grade alert: ${input.assessmentTitle}`;
+    const message = `${input.assessmentTitle} is currently below ${LOW_GRADE_THRESHOLD_PERCENT}%.`;
+    const notifications: Parameters<NotificationsService['createMany']>[0] = [];
+
+    for (const [studentId, recipients] of recipientsByStudentId.entries()) {
+      for (const recipientUserId of recipients) {
+        notifications.push({
+          schoolId: input.schoolId,
+          recipientUserId,
+          type: NotificationType.LOW_GRADE_ALERT,
+          title,
+          message,
+          entityType: LOW_GRADE_ENTITY_TYPE,
+          entityId: `${input.assessmentId}:${studentId}`,
+        });
+      }
+    }
+
+    if (notifications.length === 0) {
+      return;
+    }
+
+    await this.notificationsService.createMany(notifications);
+  }
+
+  private async safelyRunNotificationTask(task: () => Promise<void>, context: string) {
+    try {
+      await task();
+    } catch (error) {
+      this.logger.warn(`Skipped ${context} notification(s): ${String(error)}`);
+    }
+  }
 
   private isAdminLike(role: UserRole) {
     return isBypassRole(role) || isSchoolAdminRole(role);
@@ -432,7 +650,7 @@ export class AssessmentsService {
             schoolYearId: classContext.schoolYearId,
           });
 
-    return this.prisma.assessment.update({
+    const updated = await this.prisma.assessment.update({
       where: { id: assessmentId },
       data: {
         title: data.title?.trim(),
@@ -451,6 +669,28 @@ export class AssessmentsService {
       },
       include: assessmentResponseInclude,
     });
+
+    const publishedNow =
+      updated.isPublishedToParents &&
+      !assessment.isPublishedToParents &&
+      updated.isActive;
+
+    if (publishedNow) {
+      await this.safelyRunNotificationTask(async () => {
+        const results = await this.prisma.assessmentResult.findMany({
+          where: { assessmentId: updated.id },
+          select: { studentId: true },
+        });
+        await this.notifyPublishedGrades({
+          schoolId: updated.schoolId,
+          assessmentId: updated.id,
+          assessmentTitle: updated.title,
+          studentIds: results.map((result) => result.studentId),
+        });
+      }, 'assessment publish');
+    }
+
+    return updated;
   }
 
   async archive(user: AuthUser, assessmentId: string) {
@@ -488,11 +728,28 @@ export class AssessmentsService {
       throw new BadRequestException('Assessment is archived');
     }
 
-    return this.prisma.assessment.update({
+    const updated = await this.prisma.assessment.update({
       where: { id: assessmentId },
       data: { isPublishedToParents: true },
       include: assessmentResponseInclude,
     });
+
+    if (!assessment.isPublishedToParents) {
+      await this.safelyRunNotificationTask(async () => {
+        const results = await this.prisma.assessmentResult.findMany({
+          where: { assessmentId: updated.id },
+          select: { studentId: true },
+        });
+        await this.notifyPublishedGrades({
+          schoolId: updated.schoolId,
+          assessmentId: updated.id,
+          assessmentTitle: updated.title,
+          studentIds: results.map((result) => result.studentId),
+        });
+      }, 'assessment publish');
+    }
+
+    return updated;
   }
 
   async unpublish(user: AuthUser, assessmentId: string) {
@@ -631,6 +888,19 @@ export class AssessmentsService {
 
     const statusLabelIds = new Set<string>();
     const statusLabelKeys = new Set<string>();
+    const existingResults = await this.prisma.assessmentResult.findMany({
+      where: {
+        assessmentId,
+        studentId: { in: studentIds },
+      },
+      select: {
+        studentId: true,
+        score: true,
+      },
+    });
+    const previousScoreByStudentId = new Map(
+      existingResults.map((result) => [result.studentId, result.score]),
+    );
 
     for (const grade of grades) {
       if (grade.statusLabelId && grade.statusLabelKey) {
@@ -789,6 +1059,41 @@ export class AssessmentsService {
 
         return updated;
       });
+
+      if (assessment.isPublishedToParents) {
+        const newlyPublishedStudentIds = results
+          .filter((result) => !previousScoreByStudentId.has(result.studentId))
+          .map((result) => result.studentId);
+
+        if (newlyPublishedStudentIds.length > 0) {
+          await this.safelyRunNotificationTask(
+            () =>
+              this.notifyPublishedGrades({
+                schoolId: assessment.schoolId,
+                assessmentId: assessment.id,
+                assessmentTitle: assessment.title,
+                studentIds: newlyPublishedStudentIds,
+              }),
+            'newly published grade',
+          );
+        }
+
+        await this.safelyRunNotificationTask(
+          () =>
+            this.notifyLowGradeAlerts({
+              schoolId: assessment.schoolId,
+              assessmentId: assessment.id,
+              assessmentTitle: assessment.title,
+              maxScore: assessment.maxScore,
+              transitions: results.map((result) => ({
+                studentId: result.studentId,
+                previousScore: previousScoreByStudentId.get(result.studentId) ?? null,
+                nextScore: result.score,
+              })),
+            }),
+          'low grade alert',
+        );
+      }
 
       return results;
     } catch (error) {
