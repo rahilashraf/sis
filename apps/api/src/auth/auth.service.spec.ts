@@ -21,6 +21,8 @@ describe('AuthService', () => {
   };
 
   beforeEach(() => {
+    jest.clearAllMocks();
+
     prisma = {
       user: {
         findUnique: jest.fn(),
@@ -82,5 +84,21 @@ describe('AuthService', () => {
     await expect(
       service.login('owner', 'wrong-password'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('returns generic invalid credentials when user is inactive', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      username: 'owner',
+      passwordHash: 'hash',
+      role: 'OWNER',
+      isActive: false,
+      memberships: [],
+    });
+
+    await expect(service.login('owner', 'secret')).rejects.toThrow(
+      'Invalid credentials',
+    );
+    expect(bcrypt.compare).not.toHaveBeenCalled();
   });
 });

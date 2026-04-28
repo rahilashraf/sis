@@ -4,11 +4,7 @@ import { AuthenticatedUser } from '../auth/auth-user';
 import { getAccessibleSchoolIdsWithLegacyFallback } from './school-membership.util';
 
 export function isBypassRole(role: UserRole) {
-  return (
-    role === UserRole.OWNER ||
-    role === UserRole.SUPER_ADMIN ||
-    role === UserRole.ADMIN
-  );
+  return role === UserRole.OWNER || role === UserRole.SUPER_ADMIN;
 }
 
 export function isHighPrivilegeRole(role: UserRole) {

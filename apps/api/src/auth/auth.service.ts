@@ -26,11 +26,6 @@ export class AuthService {
   ) {}
 
   async login(username: string, password: string) {
-    this.logger.log({
-      event: 'AUTH_LOGIN_ATTEMPT',
-      username,
-    });
-
     const user = await this.prisma.user.findUnique({
       where: { username },
       select: {
@@ -39,13 +34,11 @@ export class AuthService {
       },
     });
 
-    this.logger.log({
-      event: 'AUTH_LOGIN_USER_LOOKUP',
-      username,
-      userFound: Boolean(user),
-    });
-
     if (!user) {
+      this.logger.warn({
+        event: 'AUTH_LOGIN_REJECTED',
+        reason: 'INVALID_CREDENTIALS',
+      });
       await this.auditService.logCritical({
         entityType: 'Auth',
         action: 'LOGIN_FAILED',
@@ -58,14 +51,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    this.logger.log({
-      event: 'AUTH_LOGIN_USER_STATUS',
-      username,
-      userId: user.id,
-      isActive: user.isActive,
-    });
-
     if (!user.isActive) {
+      this.logger.warn({
+        event: 'AUTH_LOGIN_REJECTED',
+        reason: 'INACTIVE_USER',
+        userId: user.id,
+      });
       await this.auditService.logCritical({
         actor: {
           id: user.id,
@@ -82,19 +73,17 @@ export class AuthService {
           reason: 'INACTIVE_USER',
         },
       });
-      throw new UnauthorizedException('User account is inactive');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
 
-    this.logger.log({
-      event: 'AUTH_LOGIN_PASSWORD_CHECK',
-      username,
-      userId: user.id,
-      passwordMatch: isMatch,
-    });
-
     if (!isMatch) {
+      this.logger.warn({
+        event: 'AUTH_LOGIN_REJECTED',
+        reason: 'INVALID_CREDENTIALS',
+        userId: user.id,
+      });
       await this.auditService.logCritical({
         actor: {
           id: user.id,
@@ -123,10 +112,8 @@ export class AuthService {
     const accessToken = await this.jwtService.signAsync(payload);
 
     this.logger.log({
-      event: 'AUTH_LOGIN_TOKEN_CREATED',
-      username,
+      event: 'AUTH_LOGIN_SUCCESS',
       userId: user.id,
-      tokenCreated: Boolean(accessToken),
     });
 
     await this.auditService.logCritical({

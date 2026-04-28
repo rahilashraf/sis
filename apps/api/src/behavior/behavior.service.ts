@@ -1280,6 +1280,14 @@ export class BehaviorService {
     return fileName.endsWith('.pdf');
   }
 
+  private hasPdfSignature(buffer: Buffer) {
+    if (buffer.length < 5) {
+      return false;
+    }
+
+    return buffer.subarray(0, 5).toString('ascii') === '%PDF-';
+  }
+
   private buildAttachmentStorageKey(
     record: { id: string; schoolId: string },
     originalName: string,
@@ -1309,8 +1317,8 @@ export class BehaviorService {
       throw new BadRequestException('Attachment file is required');
     }
 
-    if (!this.isValidPdfFile(file)) {
-      throw new BadRequestException('Only PDF attachments are supported');
+    if (!this.isValidPdfFile(file) || !this.hasPdfSignature(file.buffer)) {
+      throw new BadRequestException('Only valid PDF attachments are supported');
     }
 
     if (file.size <= 0) {
@@ -1329,7 +1337,7 @@ export class BehaviorService {
     await this.getAttachmentStorage().store({
       key: storagePath,
       body: file.buffer,
-      contentType: file.mimetype || 'application/pdf',
+      contentType: 'application/pdf',
     });
 
     try {
@@ -1338,7 +1346,7 @@ export class BehaviorService {
           behaviorRecordId: record.id,
           uploadedById: actor.id,
           originalFileName: file.originalname,
-          mimeType: file.mimetype || 'application/pdf',
+          mimeType: 'application/pdf',
           fileSize: file.size,
           storagePath,
         },
