@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -30,11 +31,35 @@ import { LibraryModule } from './library/library.module';
 import { UniformModule } from './uniform/uniform.module';
 import { InterviewsModule } from './interviews/interviews.module';
 import { SettingsModule } from './settings/settings.module';
+import { DataImportModule } from './data-import/data-import.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        throttlers: [
+          {
+            name: 'default',
+            ttl: Number.parseInt(
+              configService.get<string>('THROTTLE_TTL_MS') ?? '60000',
+              10,
+            ),
+            limit: Number.parseInt(
+              configService.get<string>('THROTTLE_LIMIT') ?? '120',
+              10,
+            ),
+            blockDuration: Number.parseInt(
+              configService.get<string>('THROTTLE_BLOCK_DURATION_MS') ?? '60000',
+              10,
+            ),
+          },
+        ],
+      }),
     }),
     PrismaModule,
     SchoolsModule,
@@ -64,6 +89,7 @@ import { SettingsModule } from './settings/settings.module';
     UniformModule,
     InterviewsModule,
     SettingsModule,
+    DataImportModule,
   ],
   controllers: [AppController],
   providers: [AppService],

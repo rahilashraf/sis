@@ -43,6 +43,7 @@ function buildAdminBaseItems(): NavigationItem[] {
         { href: "/admin/users/student-profiles", label: "Student Profiles" },
       ],
     },
+    { href: "/admin/data-import", label: "Bulk Setup" },
     { href: "/admin/attendance", label: "Attendance" },
     {
       href: "/admin/classes",
