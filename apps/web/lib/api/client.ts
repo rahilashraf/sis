@@ -62,6 +62,7 @@ export async function apiFetch<T>(
 
   const response = await fetch(url, {
     ...options,
+    credentials: options.credentials ?? "include",
     headers,
     body:
       options.json !== undefined ? JSON.stringify(options.json) : options.body,

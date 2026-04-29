@@ -17,6 +17,13 @@ export function getCurrentUser() {
   return apiFetch<AuthenticatedUser>(apiConfig.endpoints.me);
 }
 
+export function logout() {
+  return apiFetch<{ success: true }>(apiConfig.endpoints.logout, {
+    method: "POST",
+    auth: false,
+  });
+}
+
 export type UpdateMyProfileInput = {
   firstName?: string;
   lastName?: string;

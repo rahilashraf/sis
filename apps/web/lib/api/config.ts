@@ -4,6 +4,7 @@ export const apiConfig = {
   baseUrl,
   endpoints: {
     login: "/auth/login",
+    logout: "/auth/logout",
     me: "/auth/me",
   },
 };

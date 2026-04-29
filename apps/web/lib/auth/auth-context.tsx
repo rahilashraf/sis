@@ -19,6 +19,7 @@ import {
 } from "./storage";
 import type { AuthenticatedUser, StoredSession } from "./types";
 import { normalizeSchoolContextId } from "./school-membership";
+import { logout as logoutRequest } from "../api/auth";
 
 type AuthContextValue = {
   session: StoredSession | null;
@@ -70,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    void logoutRequest().catch(() => undefined);
     clearStoredSession();
   }, []);
 

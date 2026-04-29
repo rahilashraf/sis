@@ -17,6 +17,8 @@ import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class AuthService {
+  private static readonly DUMMY_PASSWORD_HASH =
+    '$2b$10$CwTycUXWue0Thq9StjUM0uJ8iK88v8gY4xXHzkwmo7aX6ixSeKuu2';
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
@@ -35,6 +37,7 @@ export class AuthService {
     });
 
     if (!user) {
+      await this.consumeFailedLoginCost(password);
       this.logger.warn({
         event: 'AUTH_LOGIN_REJECTED',
         reason: 'INVALID_CREDENTIALS',
@@ -48,10 +51,12 @@ export class AuthService {
           reason: 'USER_NOT_FOUND',
         },
       });
+      await this.delayFailedLogin();
       throw new UnauthorizedException('Invalid credentials');
     }
 
     if (!user.isActive) {
+      await this.consumeFailedLoginCost(password, user.passwordHash);
       this.logger.warn({
         event: 'AUTH_LOGIN_REJECTED',
         reason: 'INACTIVE_USER',
@@ -73,6 +78,7 @@ export class AuthService {
           reason: 'INACTIVE_USER',
         },
       });
+      await this.delayFailedLogin();
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -100,6 +106,7 @@ export class AuthService {
           reason: 'INVALID_PASSWORD',
         },
       });
+      await this.delayFailedLogin();
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -296,5 +303,39 @@ export class AuthService {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
+  }
+
+  private async consumeFailedLoginCost(
+    password: string,
+    hash?: string,
+  ): Promise<void> {
+    const hashToCheck = hash ?? AuthService.DUMMY_PASSWORD_HASH;
+    try {
+      await bcrypt.compare(password, hashToCheck);
+    } catch {
+      // Ignore timing equalization failures to keep auth flow resilient.
+    }
+  }
+
+  private async delayFailedLogin(): Promise<void> {
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
+
+    const baseDelayMs = Number.parseInt(
+      process.env.LOGIN_FAILURE_DELAY_MS ?? '200',
+      10,
+    );
+    const jitterMs = Number.parseInt(
+      process.env.LOGIN_FAILURE_DELAY_JITTER_MS ?? '150',
+      10,
+    );
+    const safeBaseDelay = Number.isFinite(baseDelayMs)
+      ? Math.max(baseDelayMs, 0)
+      : 200;
+    const safeJitter = Number.isFinite(jitterMs) ? Math.max(jitterMs, 0) : 150;
+    const delayMs = safeBaseDelay + Math.floor(Math.random() * (safeJitter + 1));
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 }
