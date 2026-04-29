@@ -10,3 +10,4 @@ node_modules
 
 /generated/prisma
 infrastructure/postgres-data/apps/api/storage/
+apps/api/storage/
