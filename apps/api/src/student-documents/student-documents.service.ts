@@ -4,7 +4,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, StudentDocumentVisibility, UserRole } from '@prisma/client';
+import {
+  AuditLogSeverity,
+  Prisma,
+  StudentDocumentVisibility,
+  TeacherClassAssignmentType,
+  UserRole,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedUser } from '../common/auth/auth-user';
 import { getAccessibleSchoolIds, isBypassRole } from '../common/access/school-access.util';
@@ -12,6 +18,7 @@ import {
   getAccessibleSchoolIdsWithLegacyFallback,
   getPrimarySchoolIdWithLegacyFallback,
 } from '../common/access/school-membership.util';
+import { AuditService } from '../audit/audit.service';
 
 const staffDocumentSelect = Prisma.validator<Prisma.StudentDocumentSelect>()({
   id: true,
@@ -69,7 +76,56 @@ type PortalDocRecord = Prisma.StudentDocumentGetPayload<{ select: typeof portalD
 
 @Injectable()
 export class StudentDocumentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
+
+  private isTeacherLike(role: UserRole) {
+    return role === UserRole.TEACHER || role === UserRole.SUPPLY_TEACHER;
+  }
+
+  private buildActiveSupplyAssignmentWindowWhere(now: Date) {
+    return {
+      assignmentType: TeacherClassAssignmentType.SUPPLY,
+      startsAt: { lte: now },
+      OR: [{ endsAt: null }, { endsAt: { gte: now } }],
+    } satisfies Prisma.TeacherClassAssignmentWhereInput;
+  }
+
+  private async ensureTeacherCanAccessStudent(
+    actor: AuthenticatedUser,
+    studentId: string,
+  ) {
+    const now = new Date();
+    const assignment = await this.prisma.teacherClassAssignment.findFirst({
+      where: {
+        teacherId: actor.id,
+        class: {
+          students: {
+            some: {
+              studentId,
+            },
+          },
+        },
+        ...(actor.role === UserRole.SUPPLY_TEACHER
+          ? {
+              OR: [
+                { assignmentType: TeacherClassAssignmentType.REGULAR },
+                this.buildActiveSupplyAssignmentWindowWhere(now),
+              ],
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!assignment) {
+      throw new ForbiddenException('You do not have student access');
+    }
+  }
 
   private async getStudentOrThrow(studentId: string) {
     const student = await this.prisma.user.findUnique({
@@ -124,6 +180,11 @@ export class StudentDocumentsService {
         throw new ForbiddenException('You do not have student access');
       }
 
+      return;
+    }
+
+    if (this.isTeacherLike(actor.role)) {
+      await this.ensureTeacherCanAccessStudent(actor, studentId);
       return;
     }
 
@@ -255,6 +316,18 @@ export class StudentDocumentsService {
 
     const doc = await this.getDocumentOrThrow(studentId, docId);
     await this.prisma.studentDocument.delete({ where: { id: docId } });
+
+    await this.auditService.log({
+      actor,
+      schoolId: doc.schoolId,
+      entityType: 'StudentDocument',
+      entityId: doc.id,
+      action: 'DELETE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Deleted student document ${doc.fileName}`,
+      targetDisplay: doc.fileName,
+    });
+
     return { success: true as const, storagePath: doc.storagePath };
   }
 
@@ -277,9 +350,32 @@ export class StudentDocumentsService {
         throw new NotFoundException('Document not found');
       }
 
+      await this.auditService.log({
+        actor,
+        schoolId: doc.schoolId,
+        entityType: 'StudentDocument',
+        entityId: doc.id,
+        action: 'DOWNLOAD',
+        severity: AuditLogSeverity.INFO,
+        summary: `Downloaded student document ${doc.fileName}`,
+        targetDisplay: doc.fileName,
+      });
+
       return doc as PortalDocRecord;
     }
 
-    return await this.getDocumentOrThrow(studentId, docId);
+    const doc = await this.getDocumentOrThrow(studentId, docId);
+    await this.auditService.log({
+      actor,
+      schoolId: doc.schoolId,
+      entityType: 'StudentDocument',
+      entityId: doc.id,
+      action: 'DOWNLOAD',
+      severity: AuditLogSeverity.INFO,
+      summary: `Downloaded student document ${doc.fileName}`,
+      targetDisplay: doc.fileName,
+    });
+
+    return doc;
   }
 }

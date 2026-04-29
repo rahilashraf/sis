@@ -953,8 +953,13 @@ export class BehaviorService {
     return record;
   }
 
-  async listForStudent(actor: AuthenticatedUser, studentId: string) {
+  async listForStudent(
+    actor: AuthenticatedUser,
+    studentId: string,
+    query?: ListBehaviorRecordsQueryDto,
+  ) {
     this.ensureRoleCanManageRecords(actor);
+    const limit = Math.min(Math.max(query?.limit ?? 50, 1), 100);
 
     const student = await this.getStudentOrThrow(studentId);
     this.ensureActorCanAccessStudent(actor, student);
@@ -965,12 +970,14 @@ export class BehaviorService {
     return this.prisma.behaviorRecord.findMany({
       where: { studentId, type: BehaviorRecordType.INCIDENT },
       orderBy: [{ incidentAt: 'desc' }, { createdAt: 'desc' }],
+      take: limit,
       select: behaviorRecordSelect,
     });
   }
 
   async list(actor: AuthenticatedUser, filters?: ListBehaviorRecordsQueryDto) {
     this.ensureRoleCanManageRecords(actor);
+    const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
 
     if (filters?.studentId && actor.role === UserRole.SUPPLY_TEACHER) {
       await this.ensureSupplyTeacherCanAccessStudent(actor, filters.studentId);
@@ -979,6 +986,7 @@ export class BehaviorService {
     return this.prisma.behaviorRecord.findMany({
       where: this.buildBehaviorRecordWhereInput(actor, filters),
       orderBy: [{ incidentAt: 'desc' }, { createdAt: 'desc' }],
+      take: limit,
       select: behaviorRecordSelect,
     });
   }
@@ -1387,6 +1395,17 @@ export class BehaviorService {
       throw new NotFoundException('Behavior attachment file not found');
     }
 
+    await this.auditService.log({
+      actor,
+      schoolId: record.schoolId,
+      entityType: 'BehaviorRecordAttachment',
+      entityId: attachment.id,
+      action: 'DOWNLOAD',
+      severity: AuditLogSeverity.INFO,
+      summary: `Downloaded behavior attachment ${attachment.originalFileName}`,
+      targetDisplay: attachment.originalFileName,
+    });
+
     return {
       attachment,
       body: stored.body,
@@ -1411,6 +1430,17 @@ export class BehaviorService {
     });
 
     await this.getAttachmentStorage().remove(attachment.storagePath).catch(() => undefined);
+
+    await this.auditService.log({
+      actor,
+      schoolId: record.schoolId,
+      entityType: 'BehaviorRecordAttachment',
+      entityId: attachment.id,
+      action: 'DELETE',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Deleted behavior attachment ${attachment.originalFileName}`,
+      targetDisplay: attachment.originalFileName,
+    });
 
     return { success: true as const, id: attachment.id };
   }

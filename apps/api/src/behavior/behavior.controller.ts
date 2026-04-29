@@ -29,6 +29,11 @@ import { ListBehaviorCategoryOptionsQueryDto } from './dto/list-behavior-categor
 import { ListBehaviorStudentsQueryDto } from './dto/list-behavior-students-query.dto';
 import { BehaviorService } from './behavior.service';
 
+function sanitizeContentDispositionFileName(value: string) {
+  const cleaned = value.replace(/[\r\n"]/g, '').trim();
+  return cleaned.length > 0 ? cleaned : 'attachment.pdf';
+}
+
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class BehaviorController {
@@ -49,8 +54,9 @@ export class BehaviorController {
   listForStudent(
     @Req() req: AuthenticatedRequest,
     @Param('studentId', NonEmptyStringPipe) studentId: string,
+    @Query() query: ListBehaviorRecordsQueryDto,
   ) {
-    return this.service.listForStudent(req.user, studentId);
+    return this.service.listForStudent(req.user, studentId, query);
   }
 
   @Get('behavior-records')
@@ -195,7 +201,7 @@ export class BehaviorController {
     res.setHeader('Content-Type', download.contentType ?? 'application/pdf');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${download.attachment.originalFileName.replace(/"/g, '\\"')}"`,
+      `attachment; filename="${sanitizeContentDispositionFileName(download.attachment.originalFileName)}"`,
     );
     if (download.contentLength !== null && download.contentLength !== undefined) {
       res.setHeader('Content-Length', `${download.contentLength}`);

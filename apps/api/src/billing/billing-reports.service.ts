@@ -34,6 +34,7 @@ function toCsvValue(value: unknown) {
 @Injectable()
 export class BillingReportsService {
   constructor(private readonly prisma: PrismaService) {}
+  private static readonly DEFAULT_MAX_REPORT_ROWS = 5000;
 
   private ensureCanRead(actor: AuthenticatedUser) {
     const allowed: UserRole[] = [
@@ -142,6 +143,29 @@ export class BillingReportsService {
     };
   }
 
+  private getMaxReportRows() {
+    const configured = Number.parseInt(
+      process.env.BILLING_REPORT_MAX_ROWS ??
+        `${BillingReportsService.DEFAULT_MAX_REPORT_ROWS}`,
+      10,
+    );
+
+    if (!Number.isFinite(configured) || configured < 1) {
+      return BillingReportsService.DEFAULT_MAX_REPORT_ROWS;
+    }
+
+    return configured;
+  }
+
+  private enforceReportRowLimit(rowCount: number, reportLabel: string) {
+    const maxRows = this.getMaxReportRows();
+    if (rowCount > maxRows) {
+      throw new BadRequestException(
+        `${reportLabel} exceeds max rows (${maxRows}). Narrow your filters.`,
+      );
+    }
+  }
+
   async getPaymentsReport(
     actor: AuthenticatedUser,
     query: GetBillingPaymentsReportQueryDto,
@@ -175,6 +199,7 @@ export class BillingReportsService {
     const rows = await this.prisma.billingPayment.findMany({
       where,
       orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
+      take: this.getMaxReportRows() + 1,
       select: {
         id: true,
         paymentDate: true,
@@ -193,6 +218,7 @@ export class BillingReportsService {
         },
       },
     });
+    this.enforceReportRowLimit(rows.length, 'Billing payments report');
 
     const items = rows.map((row) => ({
       paymentDate: row.paymentDate.toISOString(),
@@ -280,6 +306,7 @@ export class BillingReportsService {
     const rows = await this.prisma.billingCharge.findMany({
       where,
       orderBy: [{ issuedAt: 'desc' }, { createdAt: 'desc' }],
+      take: this.getMaxReportRows() + 1,
       select: {
         id: true,
         issuedAt: true,
@@ -304,6 +331,7 @@ export class BillingReportsService {
         },
       },
     });
+    this.enforceReportRowLimit(rows.length, 'Billing charges report');
 
     const items = rows.map((row) => ({
       issuedAt: row.issuedAt.toISOString(),
@@ -383,6 +411,7 @@ export class BillingReportsService {
         amountDue: { gt: new Prisma.Decimal(0) },
         ...(scopeSchoolIds ? { schoolId: { in: scopeSchoolIds } } : {}),
       },
+      take: this.getMaxReportRows() + 1,
       select: {
         schoolId: true,
         studentId: true,
@@ -398,6 +427,7 @@ export class BillingReportsService {
         },
       },
     });
+    this.enforceReportRowLimit(rows.length, 'Billing outstanding report');
 
     const grouped = new Map<
       string,
@@ -521,7 +551,7 @@ export class BillingReportsService {
         : {}),
     };
 
-    const [chargeAgg, paymentAgg, voidedAgg, currentOutstandingAgg, overdueCharges] =
+    const [chargeAgg, paymentAgg, voidedAgg, currentOutstandingAgg, overdueAgg] =
       await this.prisma.$transaction([
         this.prisma.billingCharge.aggregate({
           where: chargeWhere,
@@ -549,28 +579,23 @@ export class BillingReportsService {
           },
           _sum: { amountDue: true },
         }),
-        this.prisma.billingCharge.findMany({
+        this.prisma.billingCharge.aggregate({
           where: {
             ...(scopeSchoolIds ? { schoolId: { in: scopeSchoolIds } } : {}),
             status: { not: ChargeStatus.VOID },
             amountDue: { gt: new Prisma.Decimal(0) },
             dueDate: { lt: todayStart },
           },
-          select: { amountDue: true },
+          _sum: { amountDue: true },
         }),
       ]);
-
-    const currentOverdue = overdueCharges.reduce(
-      (sum, row) => sum.add(row.amountDue),
-      new Prisma.Decimal(0),
-    );
 
     return {
       totalChargesIssued: this.formatMoney(chargeAgg._sum.amount),
       totalPaymentsReceived: this.formatMoney(paymentAgg._sum.amount),
       totalVoidedPayments: this.formatMoney(voidedAgg._sum.amount),
       currentOutstanding: this.formatMoney(currentOutstandingAgg._sum.amountDue),
-      currentOverdue: this.formatMoney(currentOverdue),
+      currentOverdue: this.formatMoney(overdueAgg._sum.amountDue),
     };
   }
 

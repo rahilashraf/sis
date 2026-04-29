@@ -1,11 +1,19 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   BehaviorRecordStatus,
   BehaviorRecordType,
   BehaviorSeverity,
   IncidentLevel,
 } from '@prisma/client';
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 function toTrimmedString(value: unknown) {
   if (typeof value !== 'string') {
@@ -50,4 +58,11 @@ export class ListBehaviorRecordsQueryDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
 }

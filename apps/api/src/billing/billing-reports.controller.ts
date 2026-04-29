@@ -1,9 +1,11 @@
 import { Controller, Get, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { AuditLogSeverity } from '@prisma/client';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import type { AuthenticatedRequest } from '../common/auth/auth-user';
+import { AuditService } from '../audit/audit.service';
 import { BillingReportsService } from './billing-reports.service';
 import { GetBillingChargesReportQueryDto } from './dto/get-billing-charges-report-query.dto';
 import { GetBillingOutstandingReportQueryDto } from './dto/get-billing-outstanding-report-query.dto';
@@ -13,7 +15,28 @@ import { GetBillingSummaryReportQueryDto } from './dto/get-billing-summary-repor
 @Controller('billing/reports')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class BillingReportsController {
-  constructor(private readonly reportsService: BillingReportsService) {}
+  constructor(
+    private readonly reportsService: BillingReportsService,
+    private readonly auditService: AuditService,
+  ) {}
+
+  private async logExportAttempt(
+    req: AuthenticatedRequest,
+    reportType: string,
+    schoolId?: string,
+  ) {
+    await this.auditService.log({
+      actor: req.user,
+      schoolId: schoolId ?? req.user.schoolId ?? req.user.memberships[0]?.schoolId ?? null,
+      entityType: 'BillingReport',
+      action: 'EXPORT_ATTEMPT',
+      severity: AuditLogSeverity.INFO,
+      summary: `Billing ${reportType} report export requested`,
+      metadataJson: {
+        reportType,
+      },
+    });
+  }
 
   @Get('payments')
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
@@ -23,6 +46,7 @@ export class BillingReportsController {
     @Res() res: Response,
   ) {
     if (this.reportsService.getFormat(query.format) === 'csv') {
+      await this.logExportAttempt(req, 'payments', query.schoolId);
       const file = await this.reportsService.exportPaymentsReportCsv(req.user, query);
       res.setHeader('Content-Type', file.contentType);
       res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
@@ -41,6 +65,7 @@ export class BillingReportsController {
     @Res() res: Response,
   ) {
     if (this.reportsService.getFormat(query.format) === 'csv') {
+      await this.logExportAttempt(req, 'charges', query.schoolId);
       const file = await this.reportsService.exportChargesReportCsv(req.user, query);
       res.setHeader('Content-Type', file.contentType);
       res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
@@ -59,6 +84,7 @@ export class BillingReportsController {
     @Res() res: Response,
   ) {
     if (this.reportsService.getFormat(query.format) === 'csv') {
+      await this.logExportAttempt(req, 'outstanding', query.schoolId);
       const file = await this.reportsService.exportOutstandingReportCsv(req.user, query);
       res.setHeader('Content-Type', file.contentType);
       res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
@@ -77,6 +103,7 @@ export class BillingReportsController {
     @Res() res: Response,
   ) {
     if (this.reportsService.getFormat(query.format) === 'csv') {
+      await this.logExportAttempt(req, 'summary', query.schoolId);
       const file = await this.reportsService.exportSummaryReportCsv(req.user, query);
       res.setHeader('Content-Type', file.contentType);
       res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
