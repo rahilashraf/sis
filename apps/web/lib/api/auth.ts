@@ -27,6 +27,7 @@ export function logout() {
 export type UpdateMyProfileInput = {
   firstName?: string;
   lastName?: string;
+  email?: string;
   phone?: string;
 };
 

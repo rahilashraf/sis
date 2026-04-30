@@ -19,6 +19,7 @@ export function ParentAccountProfileForm() {
   const { session, updateUser } = useAuth();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -27,8 +28,14 @@ export function ParentAccountProfileForm() {
   useEffect(() => {
     setFirstName(session?.user.firstName ?? "");
     setLastName(session?.user.lastName ?? "");
+    setEmail(session?.user.email ?? "");
     setPhone(session?.user.phone ?? "");
-  }, [session?.user.firstName, session?.user.lastName, session?.user.phone]);
+  }, [
+    session?.user.firstName,
+    session?.user.lastName,
+    session?.user.email,
+    session?.user.phone,
+  ]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -37,6 +44,7 @@ export function ParentAccountProfileForm() {
 
     const nextFirstName = firstName.trim();
     const nextLastName = lastName.trim();
+    const nextEmail = email.trim();
     const nextPhone = phone.trim();
 
     if (!nextFirstName || !nextLastName) {
@@ -50,6 +58,7 @@ export function ParentAccountProfileForm() {
       const updated = await updateMyProfile({
         firstName: nextFirstName,
         lastName: nextLastName,
+        email: nextEmail || undefined,
         phone: nextPhone || undefined,
       });
 
@@ -71,8 +80,7 @@ export function ParentAccountProfileForm() {
       <CardHeader>
         <CardTitle>Profile</CardTitle>
         <CardDescription>
-          Update your name and phone details. Email and username are read-only
-          in v1.
+          Update your name, email, and phone details. Username is read-only.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -109,6 +117,16 @@ export function ParentAccountProfileForm() {
                 value={phone}
               />
             </Field>
+
+            <Field htmlFor="parent-account-email" label="Email">
+              <Input
+                id="parent-account-email"
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="Optional"
+                type="email"
+                value={email}
+              />
+            </Field>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -120,13 +138,6 @@ export function ParentAccountProfileForm() {
               />
             </Field>
 
-            <Field htmlFor="parent-account-email" label="Email">
-              <Input
-                disabled
-                id="parent-account-email"
-                value={session?.user.email ?? "No email on file"}
-              />
-            </Field>
           </div>
 
           <div className="flex justify-end">

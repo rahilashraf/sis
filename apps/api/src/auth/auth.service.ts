@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -163,10 +164,52 @@ export class AuthService {
     return user;
   }
 
+  private normalizeComparableValue(value: string | null | undefined) {
+    if (typeof value !== 'string') {
+      return '';
+    }
+
+    const trimmed = value.trim().toLowerCase();
+    return trimmed;
+  }
+
+  private normalizeComparablePhone(value: string | null | undefined) {
+    if (typeof value !== 'string') {
+      return '';
+    }
+
+    return value.replace(/\D+/g, '');
+  }
+
+  private buildFullName(firstName: string, lastName: string) {
+    return `${firstName} ${lastName}`.trim();
+  }
+
+  private valuesMatchText(
+    left: string | null | undefined,
+    right: string | null | undefined,
+  ) {
+    const leftValue = this.normalizeComparableValue(left);
+    const rightValue = this.normalizeComparableValue(right);
+
+    return leftValue.length > 0 && rightValue.length > 0 && leftValue === rightValue;
+  }
+
+  private valuesMatchPhone(
+    left: string | null | undefined,
+    right: string | null | undefined,
+  ) {
+    const leftValue = this.normalizeComparablePhone(left);
+    const rightValue = this.normalizeComparablePhone(right);
+
+    return leftValue.length > 0 && rightValue.length > 0 && leftValue === rightValue;
+  }
+
   async updateMyProfile(userId: string, data: UpdateMyProfileDto) {
     const updateData: {
       firstName?: string;
       lastName?: string;
+      email?: string | null;
       phone?: string;
     } = {};
 
@@ -178,6 +221,10 @@ export class AuthService {
       updateData.lastName = data.lastName;
     }
 
+    if (data.email !== undefined) {
+      updateData.email = data.email;
+    }
+
     if (data.phone !== undefined) {
       updateData.phone = data.phone;
     }
@@ -186,10 +233,167 @@ export class AuthService {
       throw new BadRequestException('No valid profile fields provided');
     }
 
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: updateData,
-      select: safeUserSelect,
+    return this.prisma.$transaction(async (tx) => {
+      const existingParent = await tx.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          role: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+        },
+      });
+
+      if (!existingParent) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      if (existingParent.role !== 'PARENT') {
+        throw new UnauthorizedException('User is not authorized');
+      }
+
+      if (updateData.email !== undefined) {
+        const conflictingUser = await tx.user.findFirst({
+          where: {
+            id: { not: userId },
+            email: {
+              equals: updateData.email,
+              mode: 'insensitive',
+            },
+          },
+          select: { id: true },
+        });
+
+        if (conflictingUser) {
+          throw new ConflictException('Email is already in use by another user');
+        }
+      }
+
+      const updatedParent = await tx.user.update({
+        where: { id: userId },
+        data: updateData,
+        select: safeUserSelect,
+      });
+
+      const previousFullName = this.buildFullName(
+        existingParent.firstName,
+        existingParent.lastName,
+      );
+      const updatedFullName = this.buildFullName(
+        updatedParent.firstName,
+        updatedParent.lastName,
+      );
+      const fullNameChanged =
+        this.normalizeComparableValue(previousFullName) !==
+        this.normalizeComparableValue(updatedFullName);
+      const emailChanged =
+        this.normalizeComparableValue(existingParent.email) !==
+        this.normalizeComparableValue(updatedParent.email);
+      const phoneChanged =
+        this.normalizeComparablePhone(existingParent.phone) !==
+        this.normalizeComparablePhone(updatedParent.phone);
+
+      if (!fullNameChanged && !emailChanged && !phoneChanged) {
+        return updatedParent;
+      }
+
+      const linkedStudents = await tx.studentParentLink.findMany({
+        where: { parentId: existingParent.id },
+        select: {
+          student: {
+            select: {
+              id: true,
+              guardian1Name: true,
+              guardian1Email: true,
+              guardian1Phone: true,
+              guardian2Name: true,
+              guardian2Email: true,
+              guardian2Phone: true,
+            },
+          },
+        },
+      });
+
+      for (const link of linkedStudents) {
+        const student = link.student;
+        const studentUpdateData: {
+          guardian1Name?: string | null;
+          guardian1Email?: string | null;
+          guardian1Phone?: string | null;
+          guardian2Name?: string | null;
+          guardian2Email?: string | null;
+          guardian2Phone?: string | null;
+        } = {};
+
+        const guardian1MatchesParent =
+          this.valuesMatchText(student.guardian1Email, existingParent.email) ||
+          this.valuesMatchText(student.guardian1Name, previousFullName) ||
+          this.valuesMatchPhone(student.guardian1Phone, existingParent.phone);
+        const guardian2MatchesParent =
+          this.valuesMatchText(student.guardian2Email, existingParent.email) ||
+          this.valuesMatchText(student.guardian2Name, previousFullName) ||
+          this.valuesMatchPhone(student.guardian2Phone, existingParent.phone);
+
+        if (guardian1MatchesParent) {
+          if (
+            fullNameChanged &&
+            this.valuesMatchText(student.guardian1Name, previousFullName)
+          ) {
+            studentUpdateData.guardian1Name = updatedFullName;
+          }
+
+          if (
+            emailChanged &&
+            this.valuesMatchText(student.guardian1Email, existingParent.email)
+          ) {
+            studentUpdateData.guardian1Email = updatedParent.email;
+          }
+
+          if (
+            phoneChanged &&
+            this.valuesMatchPhone(student.guardian1Phone, existingParent.phone)
+          ) {
+            studentUpdateData.guardian1Phone = updatedParent.phone;
+          }
+        }
+
+        if (guardian2MatchesParent) {
+          if (
+            fullNameChanged &&
+            this.valuesMatchText(student.guardian2Name, previousFullName)
+          ) {
+            studentUpdateData.guardian2Name = updatedFullName;
+          }
+
+          if (
+            emailChanged &&
+            this.valuesMatchText(student.guardian2Email, existingParent.email)
+          ) {
+            studentUpdateData.guardian2Email = updatedParent.email;
+          }
+
+          if (
+            phoneChanged &&
+            this.valuesMatchPhone(student.guardian2Phone, existingParent.phone)
+          ) {
+            studentUpdateData.guardian2Phone = updatedParent.phone;
+          }
+        }
+
+        if (Object.keys(studentUpdateData).length === 0) {
+          continue;
+        }
+
+        await tx.user.update({
+          where: { id: student.id },
+          data: studentUpdateData,
+          select: { id: true },
+        });
+      }
+
+      return updatedParent;
     });
   }
 
