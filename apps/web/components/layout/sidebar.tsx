@@ -11,6 +11,11 @@ import { listSchoolYears } from "@/lib/api/schools";
 import { useAuth } from "@/lib/auth/auth-context";
 import { getDefaultSchoolContextId } from "@/lib/auth/school-membership";
 import type { UserRole } from "@/lib/auth/types";
+import {
+  isSchoolFeatureEnabled,
+  type SchoolFeatureToggles,
+} from "@/lib/features/school-features";
+import type { AccessVisibilitySnapshot } from "@/lib/governance/access-visibility";
 import { parseDateOnly } from "@/lib/date";
 import { cn, formatRoleLabel } from "@/lib/utils";
 
@@ -18,6 +23,8 @@ type SidebarProps = {
   role: UserRole;
   collapsed: boolean;
   mobileOpen: boolean;
+  enabledFeatures: SchoolFeatureToggles | null;
+  accessVisibility: AccessVisibilitySnapshot | null;
   onNavigate: () => void;
   onToggleCollapsed: () => void;
 };
@@ -150,17 +157,27 @@ export function Sidebar({
   role,
   collapsed,
   mobileOpen,
+  enabledFeatures,
+  accessVisibility,
   onNavigate,
   onToggleCollapsed,
 }: SidebarProps) {
   const { session } = useAuth();
   const pathname = usePathname();
-  const baseNavigationItems = getNavigationItems(role);
+  const baseNavigationItems = useMemo(
+    () => getNavigationItems(role, { enabledFeatures, accessVisibility }),
+    [accessVisibility, enabledFeatures, role],
+  );
   const parentUserId = role === "PARENT" ? (session?.user.id ?? null) : null;
   const [parentReRegistrationItem, setParentReRegistrationItem] =
     useState<NavigationItem | null>(null);
 
   useEffect(() => {
+    if (!isSchoolFeatureEnabled(enabledFeatures, "RE_REGISTRATION")) {
+      setParentReRegistrationItem(null);
+      return;
+    }
+
     if (!parentUserId) {
       return;
     }
@@ -245,7 +262,7 @@ export function Sidebar({
     return () => {
       cancelled = true;
     };
-  }, [parentUserId]);
+  }, [enabledFeatures, parentUserId]);
 
   const navigationItems = useMemo(() => {
     if (role !== "PARENT" || !parentUserId || !parentReRegistrationItem) {

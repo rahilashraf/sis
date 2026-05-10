@@ -36,6 +36,12 @@ import type { BehaviorAttachmentStorage } from './storage/behavior-attachment-st
 import { createBehaviorAttachmentStorageFromEnv } from './storage/behavior-attachment-storage.factory';
 import { AuditService } from '../audit/audit.service';
 import { buildAuditDiff } from '../audit/audit-diff.util';
+import { FeatureTogglesService } from '../feature-toggles/feature-toggles.service';
+import {
+  type PermissionActionKey,
+} from '../role-permissions/role-permissions.constants';
+import { assertRolePermissionForSchool } from '../role-permissions/role-permissions.helper';
+import { RolePermissionsService } from '../role-permissions/role-permissions.service';
 
 const behaviorRecordSelect = Prisma.validator<Prisma.BehaviorRecordSelect>()({
   id: true,
@@ -166,6 +172,8 @@ export class BehaviorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly featureTogglesService: FeatureTogglesService,
+    private readonly rolePermissionsService: RolePermissionsService,
   ) {}
 
   private getAttachmentStorage() {
@@ -427,22 +435,40 @@ export class BehaviorService {
     return safe.length > 0 ? safe : 'attachment.pdf';
   }
 
-  private ensureRoleCanManageRecords(actor: AuthenticatedUser) {
-    if (!this.canManageBehaviorRecord(actor.role)) {
-      throw new ForbiddenException('You do not have behavior access');
+  private getIncidentReportsFallbackAllowed(
+    role: UserRole,
+    action: PermissionActionKey,
+  ) {
+    if (action === 'MANAGE') {
+      return this.canManageBehaviorCategories(role);
     }
+
+    if (action === 'DELETE') {
+      return this.canDeleteAttachment(role);
+    }
+
+    return this.canManageBehaviorRecord(role);
   }
 
-  private ensureRoleCanManageCategories(actor: AuthenticatedUser) {
-    if (!this.canManageBehaviorCategories(actor.role)) {
-      throw new ForbiddenException('You do not have behavior category access');
-    }
-  }
-
-  private ensureRoleCanDeleteAttachment(actor: AuthenticatedUser) {
-    if (!this.canDeleteAttachment(actor.role)) {
-      throw new ForbiddenException('You do not have behavior attachment delete access');
-    }
+  private async assertIncidentReportsPermission(options: {
+    actor: AuthenticatedUser;
+    schoolId: string;
+    action: PermissionActionKey;
+    errorMessage: string;
+  }) {
+    await assertRolePermissionForSchool({
+      rolePermissionsService: this.rolePermissionsService,
+      user: options.actor,
+      schoolId: options.schoolId,
+      role: options.actor.role,
+      resource: 'INCIDENT_REPORTS',
+      action: options.action,
+      fallbackAllowed: this.getIncidentReportsFallbackAllowed(
+        options.actor.role,
+        options.action,
+      ),
+      errorMessage: options.errorMessage,
+    });
   }
 
   private async getStudentOrThrow(studentId: string) {
@@ -512,6 +538,13 @@ export class BehaviorService {
     if (!hasOverlap) {
       throw new ForbiddenException('You do not have student access');
     }
+  }
+
+  private async ensureIncidentReportsEnabledForSchool(schoolId: string) {
+    await this.featureTogglesService.assertFeatureEnabledForSchool(
+      schoolId,
+      'INCIDENT_REPORTS',
+    );
   }
 
   private buildTeacherAccessFilter(actor: AuthenticatedUser, now = new Date()) {
@@ -701,11 +734,18 @@ export class BehaviorService {
   }
 
   async listStudents(actor: AuthenticatedUser, query?: ListBehaviorStudentsQueryDto) {
-    this.ensureRoleCanManageRecords(actor);
-
     const requestedSchoolId = query?.schoolId?.trim() || null;
     if (requestedSchoolId && !isBypassRole(actor.role)) {
       this.ensureActorCanAccessSchool(actor, requestedSchoolId);
+    }
+    if (requestedSchoolId) {
+      await this.ensureIncidentReportsEnabledForSchool(requestedSchoolId);
+      await this.assertIncidentReportsPermission({
+        actor,
+        schoolId: requestedSchoolId,
+        action: 'VIEW',
+        errorMessage: 'You do not have incident reports access',
+      });
     }
 
     const limit = Math.min(Math.max(query?.limit ?? 50, 1), 100);
@@ -778,26 +818,68 @@ export class BehaviorService {
       },
     });
 
-    return students.map((student) => ({
-      id: student.id,
-      firstName: student.firstName,
-      lastName: student.lastName,
-      fullName: `${student.firstName} ${student.lastName}`.trim(),
-      dateOfBirth: student.dateOfBirth,
-      gradeLevel: student.gradeLevel,
-      schools: student.memberships.map((membership) => ({
-        id: membership.school.id,
-        name: membership.school.name,
-        shortName: membership.school.shortName,
-      })),
-    }));
+    const schoolIdsInResult = [
+      ...new Set(
+        students.flatMap((student) =>
+          student.memberships.map((membership) => membership.schoolId),
+        ),
+      ),
+    ];
+    const disabledSchoolIds =
+      schoolIdsInResult.length > 0
+        ? await this.featureTogglesService.getDisabledSchoolIdsForFeature(
+            'INCIDENT_REPORTS',
+            schoolIdsInResult,
+          )
+        : [];
+    const deniedSchoolIds =
+      schoolIdsInResult.length > 0
+        ? await this.rolePermissionsService.getDeniedSchoolIdsForPermission({
+            role: actor.role,
+            resource: 'INCIDENT_REPORTS',
+            action: 'VIEW',
+            schoolIds: schoolIdsInResult,
+          })
+        : [];
+    const disabledSchoolIdsSet = new Set(disabledSchoolIds);
+    const deniedSchoolIdsSet = new Set(deniedSchoolIds);
+
+    return students
+      .map((student) => {
+        const schools = student.memberships
+          .filter((membership) => !disabledSchoolIdsSet.has(membership.schoolId))
+          .filter((membership) => !deniedSchoolIdsSet.has(membership.schoolId))
+          .map((membership) => ({
+            id: membership.school.id,
+            name: membership.school.name,
+            shortName: membership.school.shortName,
+          }));
+
+        return {
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          fullName: `${student.firstName} ${student.lastName}`.trim(),
+          dateOfBirth: student.dateOfBirth,
+          gradeLevel: student.gradeLevel,
+          schools,
+        };
+      })
+      .filter((student) => student.schools.length > 0);
   }
 
   async getStudentPrefill(actor: AuthenticatedUser, studentId: string) {
-    this.ensureRoleCanManageRecords(actor);
     const student = await this.getStudentOrThrow(studentId);
     this.ensureActorCanAccessStudent(actor, student);
     await this.ensureSupplyTeacherCanAccessStudent(actor, studentId);
+    const schoolId = this.getPrimarySchoolIdOrThrow(student);
+    await this.ensureIncidentReportsEnabledForSchool(schoolId);
+    await this.assertIncidentReportsPermission({
+      actor,
+      schoolId,
+      action: 'VIEW',
+      errorMessage: 'You do not have incident reports access',
+    });
 
     const studentProfile = await this.prisma.user.findUniqueOrThrow({
       where: { id: studentId },
@@ -880,7 +962,6 @@ export class BehaviorService {
     studentId: string,
     data: CreateBehaviorRecordDto,
   ) {
-    this.ensureRoleCanManageRecords(actor);
     this.ensureIncidentOnlyType(data.type);
 
     const student = await this.getStudentOrThrow(studentId);
@@ -889,6 +970,13 @@ export class BehaviorService {
 
     const schoolId = this.getPrimarySchoolIdOrThrow(student);
     this.ensureActorCanAccessSchool(actor, schoolId);
+    await this.ensureIncidentReportsEnabledForSchool(schoolId);
+    await this.assertIncidentReportsPermission({
+      actor,
+      schoolId,
+      action: 'CREATE',
+      errorMessage: 'You do not have incident report create access',
+    });
 
     const categoryOption = await this.getCategoryOptionOrThrow(
       data.categoryOptionId,
@@ -958,7 +1046,6 @@ export class BehaviorService {
     studentId: string,
     query?: ListBehaviorRecordsQueryDto,
   ) {
-    this.ensureRoleCanManageRecords(actor);
     const limit = Math.min(Math.max(query?.limit ?? 50, 1), 100);
 
     const student = await this.getStudentOrThrow(studentId);
@@ -966,6 +1053,13 @@ export class BehaviorService {
     await this.ensureSupplyTeacherCanAccessStudent(actor, studentId);
     const schoolId = this.getPrimarySchoolIdOrThrow(student);
     this.ensureActorCanAccessSchool(actor, schoolId);
+    await this.ensureIncidentReportsEnabledForSchool(schoolId);
+    await this.assertIncidentReportsPermission({
+      actor,
+      schoolId,
+      action: 'VIEW',
+      errorMessage: 'You do not have incident reports access',
+    });
 
     return this.prisma.behaviorRecord.findMany({
       where: { studentId, type: BehaviorRecordType.INCIDENT },
@@ -976,26 +1070,69 @@ export class BehaviorService {
   }
 
   async list(actor: AuthenticatedUser, filters?: ListBehaviorRecordsQueryDto) {
-    this.ensureRoleCanManageRecords(actor);
     const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
 
     if (filters?.studentId && actor.role === UserRole.SUPPLY_TEACHER) {
       await this.ensureSupplyTeacherCanAccessStudent(actor, filters.studentId);
     }
+    if (filters?.studentId) {
+      const student = await this.getStudentOrThrow(filters.studentId);
+      this.ensureActorCanAccessStudent(actor, student);
+      const schoolId = this.getPrimarySchoolIdOrThrow(student);
+      await this.ensureIncidentReportsEnabledForSchool(schoolId);
+      await this.assertIncidentReportsPermission({
+        actor,
+        schoolId,
+        action: 'VIEW',
+        errorMessage: 'You do not have incident reports access',
+      });
+    }
 
-    return this.prisma.behaviorRecord.findMany({
+    const records = await this.prisma.behaviorRecord.findMany({
       where: this.buildBehaviorRecordWhereInput(actor, filters),
       orderBy: [{ incidentAt: 'desc' }, { createdAt: 'desc' }],
       take: limit,
       select: behaviorRecordSelect,
     });
+
+    if (records.length === 0) {
+      return records;
+    }
+
+    const schoolIds = [...new Set(records.map((record) => record.schoolId))];
+    const [disabledSchoolIds, deniedSchoolIds] = await Promise.all([
+      this.featureTogglesService.getDisabledSchoolIdsForFeature(
+        'INCIDENT_REPORTS',
+        schoolIds,
+      ),
+      this.rolePermissionsService.getDeniedSchoolIdsForPermission({
+        role: actor.role,
+        resource: 'INCIDENT_REPORTS',
+        action: 'VIEW',
+        schoolIds,
+      }),
+    ]);
+    if (disabledSchoolIds.length === 0 && deniedSchoolIds.length === 0) {
+      return records;
+    }
+
+    const disabledSet = new Set(disabledSchoolIds);
+    const deniedSet = new Set(deniedSchoolIds);
+    return records
+      .filter((record) => !disabledSet.has(record.schoolId))
+      .filter((record) => !deniedSet.has(record.schoolId));
   }
 
   async findOne(actor: AuthenticatedUser, id: string) {
-    this.ensureRoleCanManageRecords(actor);
-
     const record = await this.getBehaviorRecordOrThrow(id);
     this.ensureActorCanAccessSchool(actor, record.schoolId);
+    await this.ensureIncidentReportsEnabledForSchool(record.schoolId);
+    await this.assertIncidentReportsPermission({
+      actor,
+      schoolId: record.schoolId,
+      action: 'VIEW',
+      errorMessage: 'You do not have incident reports access',
+    });
     await this.ensureSupplyTeacherCanAccessStudent(actor, record.studentId);
 
     return this.prisma.behaviorRecord.findUniqueOrThrow({
@@ -1005,10 +1142,15 @@ export class BehaviorService {
   }
 
   async update(actor: AuthenticatedUser, id: string, data: UpdateBehaviorRecordDto) {
-    this.ensureRoleCanManageRecords(actor);
     this.ensureIncidentOnlyType(data.type);
 
     const existing = await this.findOne(actor, id);
+    await this.assertIncidentReportsPermission({
+      actor,
+      schoolId: existing.schoolId,
+      action: 'UPDATE',
+      errorMessage: 'You do not have incident report update access',
+    });
 
     let categoryOptionId = existing.categoryOptionId;
     let categoryName = existing.categoryName;
@@ -1125,12 +1267,6 @@ export class BehaviorService {
     const includeInactive = options?.includeInactive ?? false;
     const requestedSchoolId = options?.schoolId?.trim() || null;
 
-    if (includeInactive) {
-      this.ensureRoleCanManageCategories(actor);
-    } else {
-      this.ensureRoleCanManageRecords(actor);
-    }
-
     const where: Prisma.BehaviorCategoryOptionWhereInput = {
       ...(includeInactive ? {} : { isActive: true }),
     };
@@ -1139,6 +1275,15 @@ export class BehaviorService {
       if (!isBypassRole(actor.role)) {
         this.ensureActorCanAccessSchool(actor, requestedSchoolId);
       }
+      await this.ensureIncidentReportsEnabledForSchool(requestedSchoolId);
+      await this.assertIncidentReportsPermission({
+        actor,
+        schoolId: requestedSchoolId,
+        action: includeInactive ? 'MANAGE' : 'VIEW',
+        errorMessage: includeInactive
+          ? 'You do not have incident report management access'
+          : 'You do not have incident reports access',
+      });
       where.schoolId = requestedSchoolId;
     } else if (!isBypassRole(actor.role)) {
       const accessibleSchoolIds = getAccessibleSchoolIds(actor);
@@ -1155,11 +1300,18 @@ export class BehaviorService {
   }
 
   async createCategory(actor: AuthenticatedUser, data: CreateBehaviorCategoryOptionDto) {
-    this.ensureRoleCanManageCategories(actor);
-
     const schoolId = data.schoolId?.trim() || null;
     if (schoolId && !isBypassRole(actor.role)) {
       this.ensureActorCanAccessSchool(actor, schoolId);
+    }
+    if (schoolId) {
+      await this.ensureIncidentReportsEnabledForSchool(schoolId);
+      await this.assertIncidentReportsPermission({
+        actor,
+        schoolId,
+        action: 'MANAGE',
+        errorMessage: 'You do not have incident report management access',
+      });
     }
 
     try {
@@ -1213,17 +1365,27 @@ export class BehaviorService {
     id: string,
     data: UpdateBehaviorCategoryOptionDto,
   ) {
-    this.ensureRoleCanManageCategories(actor);
-
     const existing = await this.getCategoryOrThrow(id);
     if (existing.schoolId && !isBypassRole(actor.role)) {
       this.ensureActorCanAccessSchool(actor, existing.schoolId);
+    }
+    if (existing.schoolId) {
+      await this.ensureIncidentReportsEnabledForSchool(existing.schoolId);
+      await this.assertIncidentReportsPermission({
+        actor,
+        schoolId: existing.schoolId,
+        action: 'MANAGE',
+        errorMessage: 'You do not have incident report management access',
+      });
     }
 
     const nextSchoolId =
       data.schoolId === undefined ? existing.schoolId : data.schoolId?.trim() || null;
     if (nextSchoolId && !isBypassRole(actor.role)) {
       this.ensureActorCanAccessSchool(actor, nextSchoolId);
+    }
+    if (nextSchoolId) {
+      await this.ensureIncidentReportsEnabledForSchool(nextSchoolId);
     }
 
     try {
@@ -1315,10 +1477,15 @@ export class BehaviorService {
       buffer: Buffer;
     } | null,
   ) {
-    this.ensureRoleCanManageRecords(actor);
-
     const record = await this.getBehaviorRecordOrThrow(behaviorRecordId);
     this.ensureActorCanAccessSchool(actor, record.schoolId);
+    await this.ensureIncidentReportsEnabledForSchool(record.schoolId);
+    await this.assertIncidentReportsPermission({
+      actor,
+      schoolId: record.schoolId,
+      action: 'CREATE',
+      errorMessage: 'You do not have incident report create access',
+    });
     await this.ensureSupplyTeacherCanAccessStudent(actor, record.studentId);
 
     if (!file) {
@@ -1367,10 +1534,15 @@ export class BehaviorService {
   }
 
   async listAttachments(actor: AuthenticatedUser, behaviorRecordId: string) {
-    this.ensureRoleCanManageRecords(actor);
-
     const record = await this.getBehaviorRecordOrThrow(behaviorRecordId);
     this.ensureActorCanAccessSchool(actor, record.schoolId);
+    await this.ensureIncidentReportsEnabledForSchool(record.schoolId);
+    await this.assertIncidentReportsPermission({
+      actor,
+      schoolId: record.schoolId,
+      action: 'VIEW',
+      errorMessage: 'You do not have incident reports access',
+    });
     await this.ensureSupplyTeacherCanAccessStudent(actor, record.studentId);
 
     return this.prisma.behaviorRecordAttachment.findMany({
@@ -1381,10 +1553,15 @@ export class BehaviorService {
   }
 
   async getAttachmentDownload(actor: AuthenticatedUser, behaviorRecordId: string, attachmentId: string) {
-    this.ensureRoleCanManageRecords(actor);
-
     const record = await this.getBehaviorRecordOrThrow(behaviorRecordId);
     this.ensureActorCanAccessSchool(actor, record.schoolId);
+    await this.ensureIncidentReportsEnabledForSchool(record.schoolId);
+    await this.assertIncidentReportsPermission({
+      actor,
+      schoolId: record.schoolId,
+      action: 'EXPORT',
+      errorMessage: 'You do not have incident report export access',
+    });
     await this.ensureSupplyTeacherCanAccessStudent(actor, record.studentId);
 
     const attachment = await this.getBehaviorAttachmentOrThrow(record.id, attachmentId);
@@ -1419,10 +1596,15 @@ export class BehaviorService {
     behaviorRecordId: string,
     attachmentId: string,
   ) {
-    this.ensureRoleCanDeleteAttachment(actor);
-
     const record = await this.getBehaviorRecordOrThrow(behaviorRecordId);
     this.ensureActorCanAccessSchool(actor, record.schoolId);
+    await this.ensureIncidentReportsEnabledForSchool(record.schoolId);
+    await this.assertIncidentReportsPermission({
+      actor,
+      schoolId: record.schoolId,
+      action: 'DELETE',
+      errorMessage: 'You do not have incident report delete access',
+    });
 
     const attachment = await this.getBehaviorAttachmentOrThrow(record.id, attachmentId);
     await this.prisma.behaviorRecordAttachment.delete({

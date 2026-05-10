@@ -2,13 +2,13 @@ import { Module } from '@nestjs/common';
 import { FeatureTogglesModule } from '../feature-toggles/feature-toggles.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
-import { BehaviorController } from './behavior.controller';
-import { BehaviorService } from './behavior.service';
+import { GovernanceController } from './governance.controller';
+import { GovernanceService } from './governance.service';
 
 @Module({
   imports: [PrismaModule, FeatureTogglesModule, RolePermissionsModule],
-  controllers: [BehaviorController],
-  providers: [BehaviorService],
-  exports: [BehaviorService],
+  controllers: [GovernanceController],
+  providers: [GovernanceService],
+  exports: [GovernanceService],
 })
-export class BehaviorModule {}
+export class GovernanceModule {}

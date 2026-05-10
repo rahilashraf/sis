@@ -232,6 +232,51 @@ enum InterviewSlotStatus {
   CANCELLED
 }
 
+enum FeatureModule {
+  INCIDENT_REPORTS
+  ATTENDANCE
+  GRADEBOOK
+  FORMS
+  RE_REGISTRATION
+  BILLING
+  LIBRARY
+  UNIFORM_ORDERS
+  NOTIFICATIONS
+}
+
+enum PermissionAction {
+  VIEW
+  CREATE
+  UPDATE
+  DELETE
+  EXPORT
+  APPROVE
+  MANAGE
+}
+
+enum PermissionResource {
+  INCIDENT_REPORTS
+  ATTENDANCE
+  GRADEBOOK
+  FORMS
+  RE_REGISTRATION
+  BILLING
+  LIBRARY
+  UNIFORM_ORDERS
+  NOTIFICATIONS
+  USERS
+  CLASSES
+  SCHOOLS
+  REPORTING_PERIODS
+}
+
+enum GovernanceSettingKey {
+  PARENT_CAN_VIEW_GRADES
+  PARENT_CAN_VIEW_ATTENDANCE
+  STUDENT_CAN_VIEW_GRADES
+  STUDENT_CAN_VIEW_ATTENDANCE
+}
+
 model User {
   id           String   @id @default(cuid())
   schoolId     String?
@@ -329,6 +374,8 @@ model User {
   interviewSlotsAsTeacher  InterviewSlot[] @relation("InterviewSlotTeacher")
   bookedInterviewSlotsAsParent InterviewSlot[] @relation("InterviewSlotBookedParent")
   bookedInterviewSlotsAsStudent InterviewSlot[] @relation("InterviewSlotBookedStudent")
+  temporaryPermissionGrants TemporaryPermissionGrant[] @relation("TemporaryPermissionGrantUser")
+  temporaryPermissionGrantsCreated TemporaryPermissionGrant[] @relation("TemporaryPermissionGrantCreatedBy")
 
   @@unique([schoolId, studentNumber])
 }
@@ -375,6 +422,10 @@ model School {
   uniformOrders          UniformOrder[]
   interviewEvents        InterviewEvent[]
   interviewSlots         InterviewSlot[]
+  featureToggles         SchoolFeatureToggle[]
+  rolePermissionSettings RolePermissionSetting[]
+  governanceSettings     SchoolGovernanceSetting[]
+  temporaryPermissionGrants TemporaryPermissionGrant[]
 }
 
 model GradeScale {
@@ -1327,6 +1378,75 @@ model SystemSetting {
   updatedAt DateTime @updatedAt
 
   @@index([key])
+}
+
+model SchoolFeatureToggle {
+  id        String        @id @default(cuid())
+  schoolId  String
+  module    FeatureModule
+  enabled   Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, module])
+  @@index([schoolId, module, enabled])
+}
+
+model RolePermissionSetting {
+  id        String             @id @default(cuid())
+  schoolId  String
+  role      UserRole
+  resource  PermissionResource
+  action    PermissionAction
+  allowed   Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, role, resource, action])
+  @@index([schoolId, role])
+  @@index([schoolId, resource, action])
+}
+
+model SchoolGovernanceSetting {
+  id        String               @id @default(cuid())
+  schoolId  String
+  key       GovernanceSettingKey
+  valueJson Json
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, key])
+  @@index([schoolId, key])
+}
+
+model TemporaryPermissionGrant {
+  id          String           @id @default(cuid())
+  schoolId    String
+  role        UserRole?
+  userId      String?
+  resource    PermissionResource
+  action      PermissionAction
+  allowed     Boolean          @default(true)
+  startsAt    DateTime
+  endsAt      DateTime
+  reason      String?
+  createdById String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  school    School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user      User?  @relation("TemporaryPermissionGrantUser", fields: [userId], references: [id], onDelete: SetNull)
+  createdBy User?  @relation("TemporaryPermissionGrantCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, resource, action])
+  @@index([schoolId, role, startsAt, endsAt])
+  @@index([schoolId, userId, startsAt, endsAt])
 }
 
 enum ChargeStatus {

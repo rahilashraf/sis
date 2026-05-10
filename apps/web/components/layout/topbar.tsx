@@ -9,6 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import type { AuthenticatedUser } from "@/lib/auth/types";
 import {
+  isSchoolFeatureEnabled,
+  type SchoolFeatureToggles,
+} from "@/lib/features/school-features";
+import {
+  isModuleVisible,
+  type AccessVisibilitySnapshot,
+} from "@/lib/governance/access-visibility";
+import {
   getActiveSchoolMemberships,
   getPrimarySchoolName,
 } from "@/lib/auth/school-membership";
@@ -24,6 +32,8 @@ import {
 type TopbarProps = {
   user: AuthenticatedUser;
   selectedSchoolId: string | null;
+  enabledFeatures: SchoolFeatureToggles | null;
+  accessVisibility: AccessVisibilitySnapshot | null;
   onSchoolChange: (schoolId: string | null) => void;
   onLogout: () => void;
   onToggleSidebar: () => void;
@@ -32,6 +42,8 @@ type TopbarProps = {
 export function Topbar({
   user,
   selectedSchoolId,
+  enabledFeatures,
+  accessVisibility,
   onSchoolChange,
   onLogout,
   onToggleSidebar,
@@ -42,6 +54,9 @@ export function Topbar({
       (membership) => membership.schoolId === selectedSchoolId,
     )?.school.name ?? getPrimarySchoolName(user);
   const hasMultipleSchools = schoolMemberships.length > 1;
+  const notificationsEnabled =
+    isModuleVisible(accessVisibility, "NOTIFICATIONS") &&
+    isSchoolFeatureEnabled(enabledFeatures, "NOTIFICATIONS");
 
   const [unreadCount, setUnreadCount] = useState(0);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -78,6 +93,13 @@ export function Topbar({
   }
 
   useEffect(() => {
+    if (!notificationsEnabled) {
+      setUnreadCount(0);
+      setIsNotificationsOpen(false);
+      setRecentNotifications([]);
+      return;
+    }
+
     let cancelled = false;
 
     function fetchCount() {
@@ -96,19 +118,20 @@ export function Topbar({
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [notificationsEnabled]);
 
   useEffect(() => {
-    if (!isNotificationsOpen) {
+    if (!notificationsEnabled || !isNotificationsOpen) {
       return;
     }
 
     void refreshRecentNotifications();
-  }, [isNotificationsOpen]);
+  }, [isNotificationsOpen, notificationsEnabled]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
+        notificationsEnabled &&
         isNotificationsOpen &&
         notificationPanelRef.current &&
         !notificationPanelRef.current.contains(event.target as Node)
@@ -121,7 +144,7 @@ export function Topbar({
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isNotificationsOpen]);
+  }, [isNotificationsOpen, notificationsEnabled]);
 
   async function handleNotificationClick(notification: Notification) {
     if (!notification.isRead) {
@@ -222,7 +245,8 @@ export function Topbar({
             ) : null}
           </div>
 
-          <div className="relative" ref={notificationPanelRef}>
+          {notificationsEnabled ? (
+            <div className="relative" ref={notificationPanelRef}>
             <button
               aria-expanded={isNotificationsOpen}
               aria-label="Notifications"
@@ -316,7 +340,8 @@ export function Topbar({
                 </div>
               </div>
             ) : null}
-          </div>
+            </div>
+          ) : null}
 
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-sm font-semibold text-white">
             {getInitials(user.firstName, user.lastName)}

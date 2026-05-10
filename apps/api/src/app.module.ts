@@ -32,6 +32,9 @@ import { UniformModule } from './uniform/uniform.module';
 import { InterviewsModule } from './interviews/interviews.module';
 import { SettingsModule } from './settings/settings.module';
 import { DataImportModule } from './data-import/data-import.module';
+import { FeatureTogglesModule } from './feature-toggles/feature-toggles.module';
+import { RolePermissionsModule } from './role-permissions/role-permissions.module';
+import { GovernanceModule } from './governance/governance.module';
 
 @Module({
   imports: [
@@ -90,6 +93,9 @@ import { DataImportModule } from './data-import/data-import.module';
     InterviewsModule,
     SettingsModule,
     DataImportModule,
+    FeatureTogglesModule,
+    RolePermissionsModule,
+    GovernanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

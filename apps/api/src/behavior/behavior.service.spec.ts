@@ -1,5 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { FeatureTogglesService } from '../feature-toggles/feature-toggles.service';
+import { RolePermissionsService } from '../role-permissions/role-permissions.service';
 import { BehaviorService } from './behavior.service';
 
 describe('BehaviorService upload security', () => {
@@ -19,7 +21,12 @@ describe('BehaviorService upload security', () => {
 
     service = new BehaviorService(prisma as never, {
       log: jest.fn().mockResolvedValue(undefined),
-    } as never);
+    } as never, {
+      assertFeatureEnabledForSchool: jest.fn().mockResolvedValue(undefined),
+    } as unknown as FeatureTogglesService, {
+      assertAllowed: jest.fn().mockResolvedValue(undefined),
+      getDeniedSchoolIdsForPermission: jest.fn().mockResolvedValue([]),
+    } as unknown as RolePermissionsService);
   });
 
   it('rejects files that are labeled PDF but do not contain a PDF signature', async () => {

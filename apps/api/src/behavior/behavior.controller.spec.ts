@@ -13,6 +13,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ROLES_KEY } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { AuditService } from '../audit/audit.service';
+import { FeatureTogglesService } from '../feature-toggles/feature-toggles.service';
+import { RolePermissionsService } from '../role-permissions/role-permissions.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BehaviorController } from './behavior.controller';
 import { BehaviorService } from './behavior.service';
@@ -127,6 +129,20 @@ describe('BehaviorController (HTTP)', () => {
         {
           provide: AuditService,
           useValue: { log: jest.fn(), logCritical: jest.fn() },
+        },
+        {
+          provide: FeatureTogglesService,
+          useValue: {
+            assertFeatureEnabledForSchool: jest.fn().mockResolvedValue(undefined),
+            getDisabledSchoolIdsForFeature: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: RolePermissionsService,
+          useValue: {
+            assertAllowed: jest.fn().mockResolvedValue(undefined),
+            getDeniedSchoolIdsForPermission: jest.fn().mockResolvedValue([]),
+          },
         },
       ],
     })

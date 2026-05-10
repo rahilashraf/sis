@@ -5,16 +5,25 @@ import { useRouter } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { useAuth } from "@/lib/auth/auth-context";
+import type { SchoolFeatureToggles } from "@/lib/features/school-features";
 import type { AuthenticatedUser } from "@/lib/auth/types";
+import type { AccessVisibilitySnapshot } from "@/lib/governance/access-visibility";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "sis.sidebarCollapsed";
 
 type AppShellProps = {
   user: AuthenticatedUser;
+  enabledFeatures: SchoolFeatureToggles | null;
+  accessVisibility: AccessVisibilitySnapshot | null;
   children: React.ReactNode;
 };
 
-export function AppShell({ user, children }: AppShellProps) {
+export function AppShell({
+  user,
+  enabledFeatures,
+  accessVisibility,
+  children,
+}: AppShellProps) {
   const router = useRouter();
   const { logout, selectedSchoolId, setSelectedSchoolId } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -55,6 +64,8 @@ export function AppShell({ user, children }: AppShellProps) {
         role={user.role}
         collapsed={sidebarCollapsed}
         mobileOpen={mobileOpen}
+        enabledFeatures={enabledFeatures}
+        accessVisibility={accessVisibility}
         onNavigate={closeSidebar}
         onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
       />
@@ -63,6 +74,8 @@ export function AppShell({ user, children }: AppShellProps) {
         <Topbar
           user={user}
           selectedSchoolId={selectedSchoolId}
+          enabledFeatures={enabledFeatures}
+          accessVisibility={accessVisibility}
           onSchoolChange={setSelectedSchoolId}
           onLogout={handleLogout}
           onToggleSidebar={() => setMobileOpen((current) => !current)}

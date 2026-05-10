@@ -1,4 +1,12 @@
 import type { UserRole } from "./types";
+import {
+  isSchoolFeatureEnabled,
+  type SchoolFeatureToggles,
+} from "@/lib/features/school-features";
+import {
+  isModuleVisible,
+  type AccessVisibilitySnapshot,
+} from "@/lib/governance/access-visibility";
 
 const adminRoles: UserRole[] = ["OWNER", "SUPER_ADMIN", "ADMIN", "STAFF"];
 
@@ -9,6 +17,11 @@ export type NavigationItem = {
     href: string;
     label: string;
   }>;
+};
+
+type NavigationOptions = {
+  enabledFeatures?: SchoolFeatureToggles | null;
+  accessVisibility?: AccessVisibilitySnapshot | null;
 };
 
 const chargesNavigationChildren: NavigationItem["children"] = [
@@ -32,6 +45,82 @@ const uniformNavigationChildren: NavigationItem["children"] = [
 const interviewNavigationChildren: NavigationItem["children"] = [
   { href: "/admin/interviews", label: "Events" },
 ];
+
+function pathMatches(pathname: string, prefix: string) {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+function isFeatureEnabled(
+  enabledFeatures: SchoolFeatureToggles | null | undefined,
+  accessVisibility: AccessVisibilitySnapshot | null | undefined,
+  feature: keyof SchoolFeatureToggles,
+) {
+  if (accessVisibility) {
+    return isModuleVisible(accessVisibility, feature);
+  }
+
+  return isSchoolFeatureEnabled(enabledFeatures, feature);
+}
+
+function isFeatureEnabledForPath(
+  pathname: string,
+  enabledFeatures: SchoolFeatureToggles | null | undefined,
+  accessVisibility: AccessVisibilitySnapshot | null | undefined,
+) {
+  if (pathMatches(pathname, "/notifications")) {
+    return isFeatureEnabled(enabledFeatures, accessVisibility, "NOTIFICATIONS");
+  }
+
+  if (pathMatches(pathname, "/admin/behavior") || pathMatches(pathname, "/teacher/behavior")) {
+    return isFeatureEnabled(enabledFeatures, accessVisibility, "INCIDENT_REPORTS");
+  }
+
+  if (pathMatches(pathname, "/admin/attendance") || pathMatches(pathname, "/teacher/attendance")) {
+    return isFeatureEnabled(enabledFeatures, accessVisibility, "ATTENDANCE");
+  }
+
+  if (
+    pathMatches(pathname, "/admin/gradebook") ||
+    pathMatches(pathname, "/teacher/gradebook") ||
+    /^\/admin\/classes\/[^/]+\/gradebook(\/|$)/.test(pathname) ||
+    /^\/teacher\/classes\/[^/]+\/gradebook(\/|$)/.test(pathname) ||
+    /^\/parent\/students\/[^/]+\/(academic|academics|grades)(\/|$)/.test(pathname)
+  ) {
+    return isFeatureEnabled(enabledFeatures, accessVisibility, "GRADEBOOK");
+  }
+
+  if (pathMatches(pathname, "/admin/forms") || pathMatches(pathname, "/parent/forms")) {
+    return isFeatureEnabled(enabledFeatures, accessVisibility, "FORMS");
+  }
+
+  if (
+    pathMatches(pathname, "/admin/re-registration") ||
+    /^\/parent\/students\/[^/]+\/re-registration(\/|$)/.test(pathname)
+  ) {
+    return isFeatureEnabled(enabledFeatures, accessVisibility, "RE_REGISTRATION");
+  }
+
+  if (
+    pathMatches(pathname, "/admin/billing") ||
+    /^\/parent\/students\/[^/]+\/billing(\/|$)/.test(pathname)
+  ) {
+    return isFeatureEnabled(enabledFeatures, accessVisibility, "BILLING");
+  }
+
+  if (
+    pathMatches(pathname, "/admin/library") ||
+    pathMatches(pathname, "/student/library") ||
+    /^\/parent\/students\/[^/]+\/library(\/|$)/.test(pathname)
+  ) {
+    return isFeatureEnabled(enabledFeatures, accessVisibility, "LIBRARY");
+  }
+
+  if (pathMatches(pathname, "/admin/uniform") || pathMatches(pathname, "/parent/uniform")) {
+    return isFeatureEnabled(enabledFeatures, accessVisibility, "UNIFORM_ORDERS");
+  }
+
+  return true;
+}
 
 function buildAdminBaseItems(): NavigationItem[] {
   return [
@@ -92,6 +181,9 @@ function buildAdminBaseItems(): NavigationItem[] {
       label: "Schools",
       children: [
         { href: "/admin/schools/rollover", label: "School Year Rollover" },
+        { href: "/admin/schools/features", label: "Feature Toggles" },
+        { href: "/admin/schools/permissions", label: "Role Permissions" },
+        { href: "/admin/schools/governance", label: "Governance" },
         { href: "/admin/reporting-periods", label: "Reporting Periods" },
         { href: "/admin/grade-scales", label: "Grade Scales" },
         { href: "/admin/assessment-types", label: "Assessment Types" },
@@ -114,6 +206,9 @@ function buildAdminItems(options: {
   includeIncidentCategories: boolean;
   includeSchools: boolean;
   includeSchoolChildren: boolean;
+  includeFeatureToggles: boolean;
+  includeRolePermissions: boolean;
+  includeGovernance: boolean;
 }) {
   return buildAdminBaseItems()
     .filter((item) => {
@@ -145,9 +240,22 @@ function buildAdminItems(options: {
       }
 
       if (item.href === "/admin/schools") {
+        const schoolChildren =
+          options.includeSchoolChildren && item.children
+            ? item.children.filter((child) =>
+                child.href === "/admin/schools/features"
+                  ? options.includeFeatureToggles
+                  : child.href === "/admin/schools/permissions"
+                    ? options.includeRolePermissions
+                  : child.href === "/admin/schools/governance"
+                    ? options.includeGovernance
+                  : true,
+              )
+            : undefined;
+
         return {
           ...item,
-          children: options.includeSchoolChildren ? item.children : undefined,
+          children: schoolChildren,
         };
       }
 
@@ -155,7 +263,13 @@ function buildAdminItems(options: {
     });
 }
 
-export function getDefaultRouteForRole(role: UserRole) {
+export function getDefaultRouteForRole(
+  role: UserRole,
+  options?: NavigationOptions,
+) {
+  const enabledFeatures = options?.enabledFeatures;
+  const accessVisibility = options?.accessVisibility;
+
   if (adminRoles.includes(role)) {
     return "/admin";
   }
@@ -165,6 +279,9 @@ export function getDefaultRouteForRole(role: UserRole) {
   }
 
   if (role === "SUPPLY_TEACHER") {
+    if (!isFeatureEnabled(enabledFeatures, accessVisibility, "ATTENDANCE")) {
+      return "/teacher/interviews";
+    }
     return "/teacher/attendance";
   }
 
@@ -175,88 +292,213 @@ export function getDefaultRouteForRole(role: UserRole) {
   return "/student";
 }
 
-export function getNavigationItems(role: UserRole) {
-  const primaryRoute = getDefaultRouteForRole(role);
+export function getNavigationItems(role: UserRole, options?: NavigationOptions) {
+  const enabledFeatures = options?.enabledFeatures;
+  const accessVisibility = options?.accessVisibility;
+  const primaryRoute = getDefaultRouteForRole(role, options);
   const items: NavigationItem[] = [{ href: primaryRoute, label: "Dashboard" }];
 
   if (role === "OWNER") {
-    items.push(
-      ...buildAdminItems({
-        includeUsers: true,
-        includeReRegistration: true,
-        includeIncidentCategories: true,
-        includeSchools: true,
-        includeSchoolChildren: true,
-      }),
-      { href: "/notifications", label: "Notifications" },
-      { href: "/admin/audit", label: "Audit Logs" },
-    );
+    const adminItems = buildAdminItems({
+      includeUsers: true,
+      includeReRegistration: true,
+      includeIncidentCategories: true,
+      includeSchools: true,
+      includeSchoolChildren: true,
+      includeFeatureToggles: true,
+      includeRolePermissions: true,
+      includeGovernance: true,
+    }).filter((item) => {
+      if (item.href === "/admin/attendance") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "ATTENDANCE");
+      }
+      if (item.href === "/admin/gradebook") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "GRADEBOOK");
+      }
+      if (item.href === "/admin/forms") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "FORMS");
+      }
+      if (item.href === "/admin/library/items") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "LIBRARY");
+      }
+      if (item.href === "/admin/uniform/items") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "UNIFORM_ORDERS");
+      }
+      if (item.href === "/admin/billing/charges") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "BILLING");
+      }
+      if (item.href === "/admin/behavior") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "INCIDENT_REPORTS");
+      }
+      return true;
+    });
+
+    items.push(...adminItems);
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "NOTIFICATIONS")) {
+      items.push({ href: "/notifications", label: "Notifications" });
+    }
+    items.push({ href: "/admin/audit", label: "Audit Logs" });
 
     return items;
   }
 
   if (role === "SUPER_ADMIN") {
-    items.push(
-      ...buildAdminItems({
-        includeUsers: true,
-        includeReRegistration: true,
-        includeIncidentCategories: true,
-        includeSchools: true,
-        includeSchoolChildren: true,
-      }),
-      { href: "/notifications", label: "Notifications" },
-      { href: "/admin/audit", label: "Audit Logs" },
-    );
+    const adminItems = buildAdminItems({
+      includeUsers: true,
+      includeReRegistration: true,
+      includeIncidentCategories: true,
+      includeSchools: true,
+      includeSchoolChildren: true,
+      includeFeatureToggles: false,
+      includeRolePermissions: true,
+      includeGovernance: true,
+    }).filter((item) => {
+      if (item.href === "/admin/attendance") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "ATTENDANCE");
+      }
+      if (item.href === "/admin/gradebook") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "GRADEBOOK");
+      }
+      if (item.href === "/admin/forms") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "FORMS");
+      }
+      if (item.href === "/admin/library/items") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "LIBRARY");
+      }
+      if (item.href === "/admin/uniform/items") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "UNIFORM_ORDERS");
+      }
+      if (item.href === "/admin/billing/charges") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "BILLING");
+      }
+      if (item.href === "/admin/behavior") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "INCIDENT_REPORTS");
+      }
+      return true;
+    });
+
+    items.push(...adminItems);
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "NOTIFICATIONS")) {
+      items.push({ href: "/notifications", label: "Notifications" });
+    }
+    items.push({ href: "/admin/audit", label: "Audit Logs" });
 
     return items;
   }
 
   if (role === "ADMIN") {
-    items.push(
-      ...buildAdminItems({
-        includeUsers: true,
-        includeReRegistration: true,
-        includeIncidentCategories: false,
-        includeSchools: true,
-        includeSchoolChildren: false,
-      }),
-      { href: "/notifications", label: "Notifications" },
-    );
+    const adminItems = buildAdminItems({
+      includeUsers: true,
+      includeReRegistration: true,
+      includeIncidentCategories: false,
+      includeSchools: true,
+      includeSchoolChildren: false,
+      includeFeatureToggles: false,
+      includeRolePermissions: true,
+      includeGovernance: false,
+    }).filter((item) => {
+      if (item.href === "/admin/attendance") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "ATTENDANCE");
+      }
+      if (item.href === "/admin/gradebook") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "GRADEBOOK");
+      }
+      if (item.href === "/admin/forms") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "FORMS");
+      }
+      if (item.href === "/admin/library/items") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "LIBRARY");
+      }
+      if (item.href === "/admin/uniform/items") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "UNIFORM_ORDERS");
+      }
+      if (item.href === "/admin/billing/charges") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "BILLING");
+      }
+      if (item.href === "/admin/behavior") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "INCIDENT_REPORTS");
+      }
+      return true;
+    });
+
+    items.push(...adminItems);
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "NOTIFICATIONS")) {
+      items.push({ href: "/notifications", label: "Notifications" });
+    }
+    items.push({ href: "/admin/schools/permissions", label: "Role Permissions" });
 
     return items;
   }
 
   if (role === "STAFF") {
-    items.push(
-      ...buildAdminItems({
-        includeUsers: false,
-        includeReRegistration: false,
-        includeIncidentCategories: false,
-        includeSchools: false,
-        includeSchoolChildren: false,
-      }),
-      { href: "/notifications", label: "Notifications" },
-    );
+    const adminItems = buildAdminItems({
+      includeUsers: false,
+      includeReRegistration: false,
+      includeIncidentCategories: false,
+      includeSchools: false,
+      includeSchoolChildren: false,
+      includeFeatureToggles: false,
+      includeRolePermissions: false,
+      includeGovernance: false,
+    }).filter((item) => {
+      if (item.href === "/admin/attendance") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "ATTENDANCE");
+      }
+      if (item.href === "/admin/gradebook") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "GRADEBOOK");
+      }
+      if (item.href === "/admin/forms") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "FORMS");
+      }
+      if (item.href === "/admin/library/items") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "LIBRARY");
+      }
+      if (item.href === "/admin/uniform/items") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "UNIFORM_ORDERS");
+      }
+      if (item.href === "/admin/billing/charges") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "BILLING");
+      }
+      if (item.href === "/admin/behavior") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "INCIDENT_REPORTS");
+      }
+      return true;
+    });
+
+    items.push(...adminItems);
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "NOTIFICATIONS")) {
+      items.push({ href: "/notifications", label: "Notifications" });
+    }
 
     return items;
   }
 
   if (role === "TEACHER") {
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "ATTENDANCE")) {
+      items.push({ href: "/teacher/attendance", label: "Attendance" });
+    }
     items.push(
-      { href: "/teacher/attendance", label: "Attendance" },
       { href: "/teacher/timetable", label: "Timetable" },
       { href: "/teacher/classes", label: "Classes" },
       { href: "/teacher/interviews", label: "Interviews" },
-      { href: "/teacher/gradebook", label: "Gradebook" },
-      { href: "/teacher/behavior", label: "Incident Reports" },
     );
-
-    items.push({ href: "/notifications", label: "Notifications" });
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "GRADEBOOK")) {
+      items.push({ href: "/teacher/gradebook", label: "Gradebook" });
+    }
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "INCIDENT_REPORTS")) {
+      items.push({ href: "/teacher/behavior", label: "Incident Reports" });
+    }
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "NOTIFICATIONS")) {
+      items.push({ href: "/notifications", label: "Notifications" });
+    }
     return items;
   }
 
   if (role === "SUPPLY_TEACHER") {
-    if (!items.some((item) => item.href === "/teacher/attendance")) {
+    if (
+      isFeatureEnabled(enabledFeatures, accessVisibility, "ATTENDANCE") &&
+      !items.some((item) => item.href === "/teacher/attendance")
+    ) {
       items.push({ href: "/teacher/attendance", label: "Attendance" });
     }
 
@@ -264,7 +506,9 @@ export function getNavigationItems(role: UserRole) {
       items.push({ href: "/teacher/interviews", label: "Interviews" });
     }
 
-    items.push({ href: "/notifications", label: "Notifications" });
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "NOTIFICATIONS")) {
+      items.push({ href: "/notifications", label: "Notifications" });
+    }
     return items;
   }
 
@@ -272,26 +516,48 @@ export function getNavigationItems(role: UserRole) {
     items.push(
       { href: "/parent/account", label: "My Account" },
       { href: "/parent/interviews", label: "Interviews" },
-      { href: "/parent/uniform", label: "Uniform" },
-      { href: "/parent/forms", label: "Forms" },
-      { href: "/notifications", label: "Notifications" },
     );
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "UNIFORM_ORDERS")) {
+      items.push({ href: "/parent/uniform", label: "Uniform" });
+    }
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "FORMS")) {
+      items.push({ href: "/parent/forms", label: "Forms" });
+    }
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "NOTIFICATIONS")) {
+      items.push({ href: "/notifications", label: "Notifications" });
+    }
 
     return items;
   }
 
   if (role === "STUDENT") {
-    items.push(
-      { href: "/student/timetable", label: "Timetable" },
-      { href: "/student/library", label: "Library" },
-      { href: "/notifications", label: "Notifications" },
-    );
+    items.push({ href: "/student/timetable", label: "Timetable" });
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "LIBRARY")) {
+      items.push({ href: "/student/library", label: "Library" });
+    }
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "NOTIFICATIONS")) {
+      items.push({ href: "/notifications", label: "Notifications" });
+    }
   }
 
   return items;
 }
 
-export function isPathAllowedForRole(role: UserRole, pathname: string) {
+export function isPathAllowedForRole(
+  role: UserRole,
+  pathname: string,
+  options?: NavigationOptions,
+) {
+  if (
+    !isFeatureEnabledForPath(
+      pathname,
+      options?.enabledFeatures,
+      options?.accessVisibility,
+    )
+  ) {
+    return false;
+  }
+
   if (pathname.startsWith("/notifications")) {
     return true;
   }

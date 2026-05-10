@@ -12,6 +12,9 @@ describe('SettingsService', () => {
       upsert: jest.Mock;
     };
   };
+  let auditService: {
+    log: jest.Mock;
+  };
 
   const ownerUser = {
     id: 'owner-1',
@@ -38,7 +41,11 @@ describe('SettingsService', () => {
       },
     };
 
-    service = new SettingsService(prisma as never);
+    auditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+    };
+
+    service = new SettingsService(prisma as never, auditService as never);
   });
 
   afterEach(() => {
@@ -65,6 +72,9 @@ describe('SettingsService', () => {
   });
 
   it('updates audit setting through upsert', async () => {
+    prisma.systemSetting.findUnique.mockResolvedValue({
+      value: 'true',
+    });
     prisma.systemSetting.upsert.mockResolvedValue({});
 
     await expect(
@@ -85,6 +95,7 @@ describe('SettingsService', () => {
         value: 'false',
       },
     });
+    expect(auditService.log).toHaveBeenCalled();
   });
 
   it('denies non-high-privilege users', async () => {

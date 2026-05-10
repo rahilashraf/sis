@@ -1,5 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { AuditLogSeverity, Prisma, UserRole } from '@prisma/client';
+import { buildAuditDiff } from '../audit/audit-diff.util';
+import { AuditService } from '../audit/audit.service';
 import { resolveAuditLogsEnabled } from '../audit/audit.constants';
 import type { AuthenticatedUser } from '../common/auth/auth-user';
 import { PrismaService } from '../prisma/prisma.service';
@@ -21,7 +23,10 @@ function parseBooleanSettingValue(value: string) {
 
 @Injectable()
 export class SettingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   private ensureAuditSettingAccess(user: AuthenticatedUser) {
     if (
@@ -57,6 +62,19 @@ export class SettingsService {
   async updateAuditSettings(user: AuthenticatedUser, enabled: boolean) {
     this.ensureAuditSettingAccess(user);
 
+    const existing = await this.prisma.systemSetting.findUnique({
+      where: {
+        key: SYSTEM_SETTING_KEY_AUDIT_LOGS_ENABLED,
+      },
+      select: {
+        value: true,
+      },
+    });
+
+    const beforeEnabled = existing
+      ? parseBooleanSettingValue(existing.value)
+      : resolveAuditLogsEnabled();
+
     await this.prisma.systemSetting.upsert({
       where: {
         key: SYSTEM_SETTING_KEY_AUDIT_LOGS_ENABLED,
@@ -68,6 +86,29 @@ export class SettingsService {
       update: {
         value: enabled ? 'true' : 'false',
       },
+    });
+
+    await this.auditService.log({
+      actor: user,
+      entityType: 'SystemSetting',
+      entityId: SYSTEM_SETTING_KEY_AUDIT_LOGS_ENABLED,
+      action: 'UPDATE_AUDIT_SETTING',
+      severity: AuditLogSeverity.WARNING,
+      summary: `Audit logging has been ${enabled ? 'enabled' : 'disabled'}`,
+      changesJson:
+        buildAuditDiff({
+          before: {
+            AUDIT_LOGS_ENABLED: beforeEnabled,
+          },
+          after: {
+            AUDIT_LOGS_ENABLED: enabled,
+          },
+        }) ?? undefined,
+      metadataJson: {
+        key: SYSTEM_SETTING_KEY_AUDIT_LOGS_ENABLED,
+        before: beforeEnabled,
+        after: enabled,
+      } as Prisma.InputJsonValue,
     });
 
     return {
