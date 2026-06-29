@@ -142,6 +142,7 @@ function buildAdminBaseItems(): NavigationItem[] {
         { href: "/admin/classes/bulk-enrollment", label: "Bulk Enrollment" },
       ],
     },
+    { href: "/admin/announcements", label: "Announcements" },
     { href: "/admin/gradebook", label: "Gradebook" },
     { href: "/admin/timetable", label: "Timetable" },
     {
@@ -480,6 +481,7 @@ export function getNavigationItems(role: UserRole, options?: NavigationOptions) 
     items.push(
       { href: "/teacher/timetable", label: "Timetable" },
       { href: "/teacher/classes", label: "Classes" },
+      { href: "/teacher/announcements", label: "Announcements" },
       { href: "/teacher/interviews", label: "Interviews" },
     );
     if (isFeatureEnabled(enabledFeatures, accessVisibility, "GRADEBOOK")) {
@@ -515,6 +517,7 @@ export function getNavigationItems(role: UserRole, options?: NavigationOptions) 
   if (role === "PARENT") {
     items.push(
       { href: "/parent/account", label: "My Account" },
+      { href: "/parent/announcements", label: "Announcements" },
       { href: "/parent/interviews", label: "Interviews" },
     );
     if (isFeatureEnabled(enabledFeatures, accessVisibility, "UNIFORM_ORDERS")) {
@@ -532,6 +535,7 @@ export function getNavigationItems(role: UserRole, options?: NavigationOptions) 
 
   if (role === "STUDENT") {
     items.push({ href: "/student/timetable", label: "Timetable" });
+    items.push({ href: "/student/announcements", label: "Announcements" });
     if (isFeatureEnabled(enabledFeatures, accessVisibility, "LIBRARY")) {
       items.push({ href: "/student/library", label: "Library" });
     }

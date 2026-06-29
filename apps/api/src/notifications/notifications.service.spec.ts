@@ -3,11 +3,19 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { NotificationType, UserRole } from '@prisma/client';
+import {
+  AnnouncementAudience,
+  AnnouncementTargetType,
+  NotificationType,
+  UserRole,
+} from '@prisma/client';
 import { NotificationsService } from './notifications.service';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
+  let emailService: {
+    sendAnnouncementEmails: jest.Mock;
+  };
   let prisma: {
     notification: {
       create: jest.Mock;
@@ -26,9 +34,16 @@ describe('NotificationsService', () => {
     studentParentLink: {
       findMany: jest.Mock;
     };
+    studentClassEnrollment: {
+      findMany: jest.Mock;
+    };
   };
 
   beforeEach(() => {
+    emailService = {
+      sendAnnouncementEmails: jest.fn().mockResolvedValue({ sent: 0, skipped: 0 }),
+    };
+
     prisma = {
       notification: {
         create: jest.fn(),
@@ -47,9 +62,149 @@ describe('NotificationsService', () => {
       studentParentLink: {
         findMany: jest.fn(),
       },
+      studentClassEnrollment: {
+        findMany: jest.fn(),
+      },
     };
 
-    service = new NotificationsService(prisma as never);
+    service = new NotificationsService(prisma as never, emailService as never);
+  });
+
+  describe('createAnnouncementNotifications', () => {
+    it('resolves recipients, deduplicates users, excludes author, and triggers async email', async () => {
+      prisma.user.findMany.mockImplementation(
+        async (args: {
+          where: {
+            id?: { in?: string[] };
+            role?: UserRole;
+            gradeLevelId?: { in?: string[] };
+          };
+        }) => {
+          if (args.where.role === UserRole.STUDENT && args.where.id?.in?.length) {
+            return [{ id: 'student-explicit-1' }];
+          }
+
+          if (args.where.id?.in) {
+            return [
+              {
+                id: 'student-school-1',
+                email: 'student1@example.com',
+                firstName: 'Stu',
+                lastName: 'One',
+              },
+              {
+                id: 'parent-school-1',
+                email: 'parent1@example.com',
+                firstName: 'Pat',
+                lastName: 'One',
+              },
+              {
+                id: 'parent-link-1',
+                email: 'parentlink@example.com',
+                firstName: 'Lee',
+                lastName: 'Guardian',
+              },
+            ];
+          }
+
+          if (
+            args.where.role === UserRole.STUDENT &&
+            args.where.gradeLevelId?.in?.length
+          ) {
+            return [{ id: 'student-grade-1' }];
+          }
+
+          if (args.where.role === UserRole.STUDENT) {
+            return [{ id: 'student-school-1' }];
+          }
+
+          if (args.where.role === UserRole.PARENT) {
+            return [{ id: 'parent-school-1' }];
+          }
+
+          return [];
+        },
+      );
+      prisma.studentClassEnrollment.findMany.mockResolvedValue([
+        { studentId: 'student-class-1' },
+      ]);
+      prisma.studentParentLink.findMany.mockResolvedValue([
+        { parentId: 'parent-link-1' },
+      ]);
+      prisma.notification.findMany.mockResolvedValue([]);
+      prisma.notification.createMany.mockResolvedValue({ count: 4 });
+
+      const result = await service.createAnnouncementNotifications({
+        announcementId: 'announcement-1',
+        schoolId: 'school-1',
+        authorId: 'student-class-1',
+        title: 'Title',
+        body: 'Body',
+        audience: AnnouncementAudience.PARENTS_AND_STUDENTS,
+        targets: [
+          {
+            targetType: AnnouncementTargetType.SCHOOL,
+            gradeLevelId: null,
+            classId: null,
+            studentId: null,
+          },
+          {
+            targetType: AnnouncementTargetType.GRADE_LEVEL,
+            gradeLevelId: 'grade-1',
+            classId: null,
+            studentId: null,
+          },
+          {
+            targetType: AnnouncementTargetType.CLASS,
+            gradeLevelId: null,
+            classId: 'class-1',
+            studentId: null,
+          },
+          {
+            targetType: AnnouncementTargetType.STUDENT,
+            gradeLevelId: null,
+            classId: null,
+            studentId: 'student-explicit-1',
+          },
+        ],
+      });
+
+      expect(prisma.notification.createMany).toHaveBeenCalledTimes(1);
+      const createManyInput = prisma.notification.createMany.mock.calls[0][0];
+      const recipientIds = createManyInput.data.map(
+        (entry: { recipientUserId: string }) => entry.recipientUserId,
+      );
+      expect(recipientIds).toEqual(
+        expect.arrayContaining([
+          'student-school-1',
+          'parent-school-1',
+          'student-grade-1',
+          'student-explicit-1',
+          'parent-link-1',
+        ]),
+      );
+      expect(recipientIds).not.toContain('student-class-1');
+      expect(new Set(recipientIds).size).toBe(recipientIds.length);
+      expect(emailService.sendAnnouncementEmails).toHaveBeenCalledWith(
+        expect.objectContaining({
+          announcementId: 'announcement-1',
+          title: 'Title',
+          body: 'Body',
+          recipients: expect.arrayContaining([
+            expect.objectContaining({ userId: 'student-school-1' }),
+            expect.objectContaining({ userId: 'parent-school-1' }),
+            expect.objectContaining({ userId: 'parent-link-1' }),
+          ]),
+        }),
+      );
+      expect(result).toEqual(
+        expect.objectContaining({
+          count: 4,
+          type: NotificationType.ANNOUNCEMENT,
+          announcementId: 'announcement-1',
+        }),
+      );
+    });
   });
 
   describe('createBroadcast', () => {

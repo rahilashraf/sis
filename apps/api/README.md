@@ -49,6 +49,11 @@ AUTH_COOKIE_SAME_SITE=lax
 AUTH_COOKIE_SECURE=true
 AUTH_COOKIE_MAX_AGE_MS=86400000
 API_SLOW_REQUEST_THRESHOLD_MS=1200
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=smtp-user
+SMTP_PASS=smtp-pass
+SMTP_FROM=no-reply@example.com
 # AUTH_COOKIE_DOMAIN=.yourdomain.com
 SHADOW_DATABASE_URL=postgresql://... # only needed for prisma migrate dev
 ```

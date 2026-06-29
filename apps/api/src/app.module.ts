@@ -35,6 +35,7 @@ import { DataImportModule } from './data-import/data-import.module';
 import { FeatureTogglesModule } from './feature-toggles/feature-toggles.module';
 import { RolePermissionsModule } from './role-permissions/role-permissions.module';
 import { GovernanceModule } from './governance/governance.module';
+import { AnnouncementsModule } from './announcements/announcements.module';
 
 @Module({
   imports: [
@@ -96,6 +97,7 @@ import { GovernanceModule } from './governance/governance.module';
     FeatureTogglesModule,
     RolePermissionsModule,
     GovernanceModule,
+    AnnouncementsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

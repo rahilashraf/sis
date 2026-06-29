@@ -2,6 +2,7 @@ import { apiFetch } from "./client";
 import type { UserRole } from "../auth/types";
 
 export type NotificationType =
+  | "ANNOUNCEMENT"
   | "BILLING_CHARGE_CREATED"
   | "BILLING_PAYMENT_RECORDED"
   | "BILLING_PAYMENT_VOIDED"
@@ -55,13 +56,13 @@ export function getUnreadNotificationsCount() {
 
 export function markNotificationAsRead(id: string) {
   return apiFetch<Notification>(`/notifications/${id}/read`, {
-    method: "POST",
+    method: "PATCH",
   });
 }
 
 export function markAllNotificationsAsRead() {
   return apiFetch<{ count: number }>("/notifications/read-all", {
-    method: "POST",
+    method: "PATCH",
   });
 }
 
@@ -110,12 +111,26 @@ export function createNotificationBroadcast(input: {
   });
 }
 
+function getAnnouncementsRouteForRole(role?: UserRole | null) {
+  if (role === "TEACHER") {
+    return "/teacher/announcements";
+  }
+  if (role === "PARENT") {
+    return "/parent/announcements";
+  }
+  if (role === "STUDENT") {
+    return "/student/announcements";
+  }
+  return "/admin/announcements";
+}
+
 /**
  * Resolve a best-effort deep link for a notification based on its entityType.
  * Returns null when no specific route is known.
  */
 export function resolveNotificationHref(
   notification: Notification,
+  role?: UserRole | null,
 ): string | null {
   const { entityType, entityId } = notification;
 
@@ -139,6 +154,16 @@ export function resolveNotificationHref(
 
   if (entityType === "Broadcast") {
     return `/notifications`;
+  }
+
+  if (
+    entityType === "ANNOUNCEMENT" ||
+    entityType === "Announcement"
+  ) {
+    const baseRoute = getAnnouncementsRouteForRole(role);
+    return entityId
+      ? `${baseRoute}?announcementId=${encodeURIComponent(entityId)}`
+      : baseRoute;
   }
 
   return null;

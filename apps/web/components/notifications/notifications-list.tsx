@@ -47,6 +47,7 @@ function getTypeLabel(type: string): string {
     INCIDENT_CREATED: "Incidents",
     ADMIN_BROADCAST: "Broadcast",
     SYSTEM_ANNOUNCEMENT: "Announcement",
+    ANNOUNCEMENT: "Announcement",
   };
   return labels[type] ?? "Notification";
 }
@@ -68,15 +69,17 @@ type NotificationRowProps = {
   notification: Notification;
   onMarkRead: (id: string) => void;
   isMarkingRead: boolean;
+  role: UserRole | undefined;
 };
 
 function NotificationRow({
   notification,
   onMarkRead,
   isMarkingRead,
+  role,
 }: NotificationRowProps) {
   const router = useRouter();
-  const href = resolveNotificationHref(notification);
+  const href = resolveNotificationHref(notification, role);
 
   function handleClick() {
     if (!notification.isRead) {
@@ -471,6 +474,7 @@ export function NotificationsList() {
                   isMarkingRead={markingReadId === notification.id}
                   notification={notification}
                   onMarkRead={handleMarkRead}
+                  role={role}
                 />
               ))}
             </div>

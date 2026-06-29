@@ -302,3 +302,7 @@ export function listClassesForStudent(studentId: string) {
     enrollments.map((enrollment) => enrollment.class),
   );
 }
+
+export function listClassStudents(classId: string) {
+  return apiFetch<StudentEnrollment[]>(`/classes/${classId}/students`);
+}

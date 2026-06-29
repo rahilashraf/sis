@@ -359,6 +359,7 @@ model User {
   billingPaymentsAsStudent BillingPayment[]  @relation("BillingPaymentStudent")
   recordedBillingPayments  BillingPayment[]  @relation("BillingPaymentRecordedBy")
   notifications            Notification[]
+  authoredAnnouncements    Announcement[]    @relation("AnnouncementAuthor")
   reRegistrationSubmissionsAsStudent ReRegistrationSubmission[] @relation("ReRegistrationSubmissionStudent")
   reRegistrationSubmissionsSubmitted ReRegistrationSubmission[] @relation("ReRegistrationSubmissionSubmittedBy")
   libraryLoansAsStudent    LibraryLoan[] @relation("LibraryLoanStudent")
@@ -413,6 +414,7 @@ model School {
   billingCharges         BillingCharge[]
   billingPayments        BillingPayment[]
   notifications          Notification[]
+  announcements          Announcement[]
   libraryItems           LibraryItem[]
   libraryLoans           LibraryLoan[]
   libraryHolds           LibraryHold[]
@@ -1526,6 +1528,7 @@ enum PaymentMethod {
 }
 
 enum NotificationType {
+  ANNOUNCEMENT
   BILLING_CHARGE_CREATED
   BILLING_PAYMENT_RECORDED
   BILLING_PAYMENT_VOIDED
@@ -1540,6 +1543,19 @@ enum NotificationType {
   INCIDENT_CREATED
   ADMIN_BROADCAST
   SYSTEM_ANNOUNCEMENT
+}
+
+enum AnnouncementTargetType {
+  SCHOOL
+  GRADE_LEVEL
+  CLASS
+  STUDENT
+}
+
+enum AnnouncementAudience {
+  PARENTS
+  STUDENTS
+  PARENTS_AND_STUDENTS
 }
 
 model Notification {
@@ -1561,6 +1577,46 @@ model Notification {
   @@index([recipientUserId, createdAt(sort: Desc)])
   @@index([recipientUserId, isRead])
   @@index([schoolId, createdAt(sort: Desc)])
+}
+
+model Announcement {
+  id          String               @id @default(cuid())
+  schoolId    String
+  authorId    String
+  title       String
+  body        String
+  audience    AnnouncementAudience
+  isPinned    Boolean              @default(false)
+  publishedAt DateTime             @default(now())
+  expiresAt   DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  school  School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  author  User   @relation("AnnouncementAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  targets AnnouncementTarget[]
+
+  @@index([schoolId, publishedAt(sort: Desc)])
+  @@index([authorId, createdAt(sort: Desc)])
+  @@index([schoolId, audience, isPinned, publishedAt(sort: Desc)])
+  @@index([expiresAt])
+}
+
+model AnnouncementTarget {
+  id             String                 @id @default(cuid())
+  announcementId String
+  targetType     AnnouncementTargetType
+  gradeLevelId   String?
+  classId        String?
+  studentId      String?
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@index([announcementId])
+  @@index([targetType])
+  @@index([gradeLevelId])
+  @@index([classId])
+  @@index([studentId])
 }
 
 model BillingPayment {

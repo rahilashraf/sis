@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Param,
   Post,
   Query,
@@ -33,11 +34,13 @@ export class NotificationsController {
     return this.notificationsService.getUnreadCount(req.user);
   }
 
+  @Patch('read-all')
   @Post('read-all')
   markAllRead(@Req() req: AuthenticatedRequest) {
     return this.notificationsService.markAllAsRead(req.user);
   }
 
+  @Patch(':id/read')
   @Post(':id/read')
   markAsRead(
     @Req() req: AuthenticatedRequest,

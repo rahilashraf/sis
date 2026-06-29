@@ -26,7 +26,7 @@ import {
   listNotifications,
   markNotificationAsRead,
   resolveNotificationHref,
-  type Notification,
+  type Notification as AppNotification,
 } from "@/lib/api/notifications";
 
 type TopbarProps = {
@@ -61,11 +61,17 @@ export function Topbar({
   const [unreadCount, setUnreadCount] = useState(0);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
-  const [recentNotifications, setRecentNotifications] = useState<Notification[]>(
+  const [recentNotifications, setRecentNotifications] = useState<
+    AppNotification[]
+  >(
     [],
   );
+  const [desktopPermission, setDesktopPermission] = useState<
+    NotificationPermission | "unsupported"
+  >("unsupported");
 
   const notificationPanelRef = useRef<HTMLDivElement | null>(null);
+  const seenDesktopNotificationIds = useRef<Set<string>>(new Set());
 
   async function refreshUnreadCount() {
     try {
@@ -93,10 +99,20 @@ export function Topbar({
   }
 
   useEffect(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      setDesktopPermission("unsupported");
+      return;
+    }
+
+    setDesktopPermission(window.Notification.permission);
+  }, []);
+
+  useEffect(() => {
     if (!notificationsEnabled) {
       setUnreadCount(0);
       setIsNotificationsOpen(false);
       setRecentNotifications([]);
+      seenDesktopNotificationIds.current.clear();
       return;
     }
 
@@ -129,6 +145,76 @@ export function Topbar({
   }, [isNotificationsOpen, notificationsEnabled]);
 
   useEffect(() => {
+    if (
+      !notificationsEnabled ||
+      desktopPermission !== "granted" ||
+      typeof window === "undefined" ||
+      !("Notification" in window)
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    let initialized = false;
+
+    async function pollUnreadNotifications() {
+      try {
+        const unreadNotifications = await listNotifications({
+          unreadOnly: true,
+          limit: 25,
+        });
+        if (cancelled) {
+          return;
+        }
+
+        if (!initialized) {
+          for (const notification of unreadNotifications) {
+            seenDesktopNotificationIds.current.add(notification.id);
+          }
+          initialized = true;
+          return;
+        }
+
+        for (const notification of unreadNotifications) {
+          if (notification.isRead) {
+            continue;
+          }
+          if (seenDesktopNotificationIds.current.has(notification.id)) {
+            continue;
+          }
+
+          seenDesktopNotificationIds.current.add(notification.id);
+
+          const href =
+            resolveNotificationHref(notification, user.role) ?? "/notifications";
+          const desktopNotification = new window.Notification(
+            notification.title,
+            {
+              body: notification.message,
+            },
+          );
+          desktopNotification.onclick = () => {
+            window.focus();
+            window.location.assign(href);
+          };
+        }
+      } catch {
+        // ignore desktop polling errors
+      }
+    }
+
+    void pollUnreadNotifications();
+    const interval = setInterval(() => {
+      void pollUnreadNotifications();
+    }, 30_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [desktopPermission, notificationsEnabled, user.role]);
+
+  useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
         notificationsEnabled &&
@@ -146,7 +232,24 @@ export function Topbar({
     };
   }, [isNotificationsOpen, notificationsEnabled]);
 
-  async function handleNotificationClick(notification: Notification) {
+  async function enableDesktopNotifications() {
+    if (
+      typeof window === "undefined" ||
+      !("Notification" in window) ||
+      desktopPermission === "granted"
+    ) {
+      return;
+    }
+
+    try {
+      const permission = await window.Notification.requestPermission();
+      setDesktopPermission(permission);
+    } catch {
+      setDesktopPermission("denied");
+    }
+  }
+
+  async function handleNotificationClick(notification: AppNotification) {
     if (!notification.isRead) {
       try {
         await markNotificationAsRead(notification.id);
@@ -289,6 +392,18 @@ export function Topbar({
                     View all
                   </Link>
                 </div>
+                {desktopPermission !== "unsupported" &&
+                desktopPermission !== "granted" ? (
+                  <div className="border-b border-slate-200 px-3 py-2">
+                    <button
+                      className="text-xs font-medium text-slate-700 underline-offset-2 hover:underline"
+                      onClick={() => void enableDesktopNotifications()}
+                      type="button"
+                    >
+                      Enable desktop notifications
+                    </button>
+                  </div>
+                ) : null}
                 <div className="max-h-96 overflow-y-auto">
                   {isLoadingNotifications ? (
                     <p className="px-3 py-6 text-center text-sm text-slate-500">
@@ -301,7 +416,7 @@ export function Topbar({
                   ) : (
                     recentNotifications.map((notification) => {
                       const href =
-                        resolveNotificationHref(notification) ??
+                        resolveNotificationHref(notification, user.role) ??
                         "/notifications";
                       return (
                         <Link
