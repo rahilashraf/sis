@@ -20,6 +20,7 @@ export const PERMISSION_RESOURCES = [
   'LIBRARY',
   'UNIFORM_ORDERS',
   'NOTIFICATIONS',
+  'ANNOUNCEMENTS',
   'USERS',
   'CLASSES',
   'SCHOOLS',
@@ -203,6 +204,22 @@ export function getFallbackRolePermission(options: {
     }
 
     return isAdminLike || isStaffLike;
+  }
+
+  if (resource === 'ANNOUNCEMENTS') {
+    if (action === 'VIEW') {
+      return true;
+    }
+
+    if (action === 'CREATE' || action === 'UPDATE') {
+      return isAdminLike || isStaffLike || role === UserRole.TEACHER;
+    }
+
+    if (action === 'DELETE' || action === 'MANAGE') {
+      return isAdminLike || isStaffLike || role === UserRole.TEACHER;
+    }
+
+    return isAdminLike || isStaffLike || role === UserRole.TEACHER;
   }
 
   if (resource === 'USERS') {

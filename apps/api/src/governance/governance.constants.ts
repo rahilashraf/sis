@@ -49,6 +49,7 @@ export const FEATURE_MODULE_RESOURCE_MAP: Record<FeatureModuleKey, PermissionRes
   LIBRARY: 'LIBRARY',
   UNIFORM_ORDERS: 'UNIFORM_ORDERS',
   NOTIFICATIONS: 'NOTIFICATIONS',
+  ANNOUNCEMENTS: 'ANNOUNCEMENTS',
 };
 
 export const RESOURCE_FEATURE_MODULE_MAP: Partial<Record<PermissionResourceKey, FeatureModuleKey>> =

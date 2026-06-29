@@ -23,6 +23,7 @@ const FALLBACK_ALL_FEATURES_ENABLED: SchoolFeatureToggles = {
   LIBRARY: true,
   UNIFORM_ORDERS: true,
   NOTIFICATIONS: true,
+  ANNOUNCEMENTS: true,
 };
 
 export default function AuthenticatedLayout({

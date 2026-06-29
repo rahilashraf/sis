@@ -8,6 +8,7 @@ export const SCHOOL_FEATURE_MODULES = [
   'LIBRARY',
   'UNIFORM_ORDERS',
   'NOTIFICATIONS',
+  'ANNOUNCEMENTS',
 ] as const;
 
 export type FeatureModuleKey = (typeof SCHOOL_FEATURE_MODULES)[number];
@@ -24,5 +25,6 @@ export function buildDefaultSchoolFeatureToggles(): SchoolFeatureTogglesMap {
     LIBRARY: true,
     UNIFORM_ORDERS: true,
     NOTIFICATIONS: true,
+    ANNOUNCEMENTS: true,
   };
 }

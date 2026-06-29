@@ -232,6 +232,7 @@ export function AnnouncementsWorkspace({ mode }: { mode: AnnouncementWorkspaceMo
               limit: 120,
             }
           : {
+              schoolId: selectedSchoolId ?? undefined,
               limit: 120,
             },
       );

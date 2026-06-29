@@ -16,6 +16,9 @@ describe('NotificationsService', () => {
   let emailService: {
     sendAnnouncementEmails: jest.Mock;
   };
+  let featureTogglesService: {
+    isFeatureEnabledForSchool: jest.Mock;
+  };
   let prisma: {
     notification: {
       create: jest.Mock;
@@ -43,6 +46,9 @@ describe('NotificationsService', () => {
     emailService = {
       sendAnnouncementEmails: jest.fn().mockResolvedValue({ sent: 0, skipped: 0 }),
     };
+    featureTogglesService = {
+      isFeatureEnabledForSchool: jest.fn().mockResolvedValue(true),
+    };
 
     prisma = {
       notification: {
@@ -67,10 +73,51 @@ describe('NotificationsService', () => {
       },
     };
 
-    service = new NotificationsService(prisma as never, emailService as never);
+    service = new NotificationsService(
+      prisma as never,
+      emailService as never,
+      featureTogglesService as never,
+    );
   });
 
   describe('createAnnouncementNotifications', () => {
+    it('skips notification and email fanout when announcements are disabled', async () => {
+      featureTogglesService.isFeatureEnabledForSchool.mockResolvedValue(false);
+
+      const result = await service.createAnnouncementNotifications({
+        announcementId: 'announcement-1',
+        schoolId: 'school-1',
+        authorId: 'admin-1',
+        title: 'Title',
+        body: 'Body',
+        audience: AnnouncementAudience.PARENTS_AND_STUDENTS,
+        targets: [
+          {
+            targetType: AnnouncementTargetType.SCHOOL,
+            gradeLevelId: null,
+            classId: null,
+            studentId: null,
+          },
+        ],
+      });
+
+      expect(featureTogglesService.isFeatureEnabledForSchool).toHaveBeenCalledWith(
+        'school-1',
+        'ANNOUNCEMENTS',
+      );
+      expect(prisma.user.findMany).not.toHaveBeenCalled();
+      expect(prisma.notification.createMany).not.toHaveBeenCalled();
+      expect(emailService.sendAnnouncementEmails).not.toHaveBeenCalled();
+      expect(result).toEqual(
+        expect.objectContaining({
+          count: 0,
+          recipients: 0,
+          type: NotificationType.ANNOUNCEMENT,
+          announcementId: 'announcement-1',
+        }),
+      );
+    });
+
     it('resolves recipients, deduplicates users, excludes author, and triggers async email', async () => {
       prisma.user.findMany.mockImplementation(
         async (args: {

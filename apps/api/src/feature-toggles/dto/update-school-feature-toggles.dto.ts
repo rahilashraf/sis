@@ -36,4 +36,8 @@ export class UpdateSchoolFeatureTogglesDto {
   @IsOptional()
   @IsBoolean()
   NOTIFICATIONS?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  ANNOUNCEMENTS?: boolean;
 }

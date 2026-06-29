@@ -7,6 +7,10 @@ describe('AnnouncementsService', () => {
   let notificationsService: {
     createAnnouncementNotifications: jest.Mock;
   };
+  let featureTogglesService: {
+    assertFeatureEnabledForSchool: jest.Mock;
+    getDisabledSchoolIdsForFeature: jest.Mock;
+  };
   let prisma: {
     announcement: {
       create: jest.Mock;
@@ -43,6 +47,10 @@ describe('AnnouncementsService', () => {
   beforeEach(() => {
     notificationsService = {
       createAnnouncementNotifications: jest.fn().mockResolvedValue({ count: 0 }),
+    };
+    featureTogglesService = {
+      assertFeatureEnabledForSchool: jest.fn().mockResolvedValue(undefined),
+      getDisabledSchoolIdsForFeature: jest.fn().mockResolvedValue([]),
     };
 
     prisma = {
@@ -81,7 +89,39 @@ describe('AnnouncementsService', () => {
     service = new AnnouncementsService(
       prisma as never,
       notificationsService as never,
+      featureTogglesService as never,
     );
+  });
+
+  it('blocks creates when announcements are disabled for the school', async () => {
+    featureTogglesService.assertFeatureEnabledForSchool.mockRejectedValue(
+      new ForbiddenException('ANNOUNCEMENTS is disabled for this school'),
+    );
+
+    await expect(
+      service.create(
+        {
+          id: 'admin-1',
+          role: UserRole.ADMIN,
+          schoolId: 'school-1',
+          memberships: [{ schoolId: 'school-1', isActive: true }],
+        } as never,
+        {
+          schoolId: 'school-1',
+          title: 'Disabled',
+          body: 'Body',
+          audience: AnnouncementAudience.PARENTS_AND_STUDENTS,
+          includeWholeSchool: true,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(featureTogglesService.assertFeatureEnabledForSchool).toHaveBeenCalledWith(
+      'school-1',
+      'ANNOUNCEMENTS',
+    );
+    expect(prisma.announcement.create).not.toHaveBeenCalled();
+    expect(notificationsService.createAnnouncementNotifications).not.toHaveBeenCalled();
   });
 
   it('requires at least one target on create', async () => {
@@ -149,5 +189,49 @@ describe('AnnouncementsService', () => {
     );
     expect(result).toEqual([]);
     expect(prisma.announcement.findMany).not.toHaveBeenCalled();
+  });
+
+  it('filters parent feeds away from schools with announcements disabled', async () => {
+    featureTogglesService.getDisabledSchoolIdsForFeature.mockResolvedValue([
+      'school-2',
+    ]);
+    prisma.studentParentLink.findMany.mockResolvedValue([
+      {
+        studentId: 'student-1',
+        student: {
+          id: 'student-1',
+          gradeLevelId: null,
+          schoolId: null,
+          memberships: [
+            { schoolId: 'school-1' },
+            { schoolId: 'school-2' },
+          ],
+          studentClasses: [],
+        },
+      },
+    ]);
+    prisma.announcement.findMany.mockResolvedValue([]);
+
+    await service.list(
+      {
+        id: 'parent-1',
+        role: UserRole.PARENT,
+        schoolId: null,
+        memberships: [],
+      } as never,
+      {},
+    );
+
+    expect(featureTogglesService.getDisabledSchoolIdsForFeature).toHaveBeenCalledWith(
+      'ANNOUNCEMENTS',
+      ['school-1', 'school-2'],
+    );
+    expect(prisma.announcement.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          schoolId: { in: ['school-1'] },
+        }),
+      }),
+    );
   });
 });

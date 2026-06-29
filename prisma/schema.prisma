@@ -242,6 +242,7 @@ enum FeatureModule {
   LIBRARY
   UNIFORM_ORDERS
   NOTIFICATIONS
+  ANNOUNCEMENTS
 }
 
 enum PermissionAction {
@@ -264,6 +265,7 @@ enum PermissionResource {
   LIBRARY
   UNIFORM_ORDERS
   NOTIFICATIONS
+  ANNOUNCEMENTS
   USERS
   CLASSES
   SCHOOLS

@@ -186,7 +186,9 @@ export function Topbar({
           seenDesktopNotificationIds.current.add(notification.id);
 
           const href =
-            resolveNotificationHref(notification, user.role) ?? "/notifications";
+            resolveNotificationHref(notification, user.role, {
+              enabledFeatures,
+            }) ?? "/notifications";
           const desktopNotification = new window.Notification(
             notification.title,
             {
@@ -416,8 +418,9 @@ export function Topbar({
                   ) : (
                     recentNotifications.map((notification) => {
                       const href =
-                        resolveNotificationHref(notification, user.role) ??
-                        "/notifications";
+                        resolveNotificationHref(notification, user.role, {
+                          enabledFeatures,
+                        }) ?? "/notifications";
                       return (
                         <Link
                           className={`block border-b border-slate-100 px-3 py-3 text-sm last:border-b-0 ${

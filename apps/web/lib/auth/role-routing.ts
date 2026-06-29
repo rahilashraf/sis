@@ -71,6 +71,15 @@ function isFeatureEnabledForPath(
     return isFeatureEnabled(enabledFeatures, accessVisibility, "NOTIFICATIONS");
   }
 
+  if (
+    pathMatches(pathname, "/admin/announcements") ||
+    pathMatches(pathname, "/teacher/announcements") ||
+    pathMatches(pathname, "/parent/announcements") ||
+    pathMatches(pathname, "/student/announcements")
+  ) {
+    return isFeatureEnabled(enabledFeatures, accessVisibility, "ANNOUNCEMENTS");
+  }
+
   if (pathMatches(pathname, "/admin/behavior") || pathMatches(pathname, "/teacher/behavior")) {
     return isFeatureEnabled(enabledFeatures, accessVisibility, "INCIDENT_REPORTS");
   }
@@ -331,6 +340,9 @@ export function getNavigationItems(role: UserRole, options?: NavigationOptions) 
       if (item.href === "/admin/behavior") {
         return isFeatureEnabled(enabledFeatures, accessVisibility, "INCIDENT_REPORTS");
       }
+      if (item.href === "/admin/announcements") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "ANNOUNCEMENTS");
+      }
       return true;
     });
 
@@ -374,6 +386,9 @@ export function getNavigationItems(role: UserRole, options?: NavigationOptions) 
       }
       if (item.href === "/admin/behavior") {
         return isFeatureEnabled(enabledFeatures, accessVisibility, "INCIDENT_REPORTS");
+      }
+      if (item.href === "/admin/announcements") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "ANNOUNCEMENTS");
       }
       return true;
     });
@@ -419,6 +434,9 @@ export function getNavigationItems(role: UserRole, options?: NavigationOptions) 
       if (item.href === "/admin/behavior") {
         return isFeatureEnabled(enabledFeatures, accessVisibility, "INCIDENT_REPORTS");
       }
+      if (item.href === "/admin/announcements") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "ANNOUNCEMENTS");
+      }
       return true;
     });
 
@@ -463,6 +481,9 @@ export function getNavigationItems(role: UserRole, options?: NavigationOptions) 
       if (item.href === "/admin/behavior") {
         return isFeatureEnabled(enabledFeatures, accessVisibility, "INCIDENT_REPORTS");
       }
+      if (item.href === "/admin/announcements") {
+        return isFeatureEnabled(enabledFeatures, accessVisibility, "ANNOUNCEMENTS");
+      }
       return true;
     });
 
@@ -481,9 +502,11 @@ export function getNavigationItems(role: UserRole, options?: NavigationOptions) 
     items.push(
       { href: "/teacher/timetable", label: "Timetable" },
       { href: "/teacher/classes", label: "Classes" },
-      { href: "/teacher/announcements", label: "Announcements" },
-      { href: "/teacher/interviews", label: "Interviews" },
     );
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "ANNOUNCEMENTS")) {
+      items.push({ href: "/teacher/announcements", label: "Announcements" });
+    }
+    items.push({ href: "/teacher/interviews", label: "Interviews" });
     if (isFeatureEnabled(enabledFeatures, accessVisibility, "GRADEBOOK")) {
       items.push({ href: "/teacher/gradebook", label: "Gradebook" });
     }
@@ -515,11 +538,11 @@ export function getNavigationItems(role: UserRole, options?: NavigationOptions) 
   }
 
   if (role === "PARENT") {
-    items.push(
-      { href: "/parent/account", label: "My Account" },
-      { href: "/parent/announcements", label: "Announcements" },
-      { href: "/parent/interviews", label: "Interviews" },
-    );
+    items.push({ href: "/parent/account", label: "My Account" });
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "ANNOUNCEMENTS")) {
+      items.push({ href: "/parent/announcements", label: "Announcements" });
+    }
+    items.push({ href: "/parent/interviews", label: "Interviews" });
     if (isFeatureEnabled(enabledFeatures, accessVisibility, "UNIFORM_ORDERS")) {
       items.push({ href: "/parent/uniform", label: "Uniform" });
     }
@@ -535,7 +558,9 @@ export function getNavigationItems(role: UserRole, options?: NavigationOptions) 
 
   if (role === "STUDENT") {
     items.push({ href: "/student/timetable", label: "Timetable" });
-    items.push({ href: "/student/announcements", label: "Announcements" });
+    if (isFeatureEnabled(enabledFeatures, accessVisibility, "ANNOUNCEMENTS")) {
+      items.push({ href: "/student/announcements", label: "Announcements" });
+    }
     if (isFeatureEnabled(enabledFeatures, accessVisibility, "LIBRARY")) {
       items.push({ href: "/student/library", label: "Library" });
     }

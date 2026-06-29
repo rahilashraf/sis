@@ -35,6 +35,7 @@ const featureDescriptions: Record<keyof SchoolFeatureToggles, string> = {
   LIBRARY: "Controls library pages and library workflows.",
   UNIFORM_ORDERS: "Controls uniform catalog/order pages.",
   NOTIFICATIONS: "Controls notifications nav entry and notifications page.",
+  ANNOUNCEMENTS: "Controls announcement pages, feeds, notifications, and emails.",
 };
 
 export function FeatureTogglesManagement() {

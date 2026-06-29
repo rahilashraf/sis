@@ -18,6 +18,7 @@ import {
   isBypassRole,
 } from '../common/access/school-access.util';
 import { getAccessibleSchoolIdsWithLegacyFallback } from '../common/access/school-membership.util';
+import { FeatureTogglesService } from '../feature-toggles/feature-toggles.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
@@ -32,6 +33,11 @@ type NormalizedTargets = {
   gradeLevelIds: string[];
   classIds: string[];
   studentIds: string[];
+};
+
+type RecipientAnnouncementScope = {
+  schoolIds: string[];
+  where: Prisma.AnnouncementWhereInput;
 };
 
 const announcementSelect = Prisma.validator<Prisma.AnnouncementSelect>()({
@@ -73,6 +79,7 @@ export class AnnouncementsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly featureTogglesService: FeatureTogglesService,
   ) {}
 
   private isAdminRole(role: UserRole) {
@@ -425,6 +432,60 @@ export class AnnouncementsService {
     }
   }
 
+  private async assertAnnouncementsEnabledForSchool(schoolId: string) {
+    await this.featureTogglesService.assertFeatureEnabledForSchool(
+      schoolId,
+      'ANNOUNCEMENTS',
+    );
+  }
+
+  private async getEnabledAnnouncementSchoolIds(
+    schoolIds: string[],
+    requestedSchoolId?: string,
+  ) {
+    const scopedSchoolIds = requestedSchoolId
+      ? schoolIds.filter((schoolId) => schoolId === requestedSchoolId)
+      : schoolIds;
+
+    if (scopedSchoolIds.length === 0) {
+      return [];
+    }
+
+    if (requestedSchoolId) {
+      await this.assertAnnouncementsEnabledForSchool(requestedSchoolId);
+      return scopedSchoolIds;
+    }
+
+    const disabledSchoolIds =
+      await this.featureTogglesService.getDisabledSchoolIdsForFeature(
+        'ANNOUNCEMENTS',
+        scopedSchoolIds,
+      );
+    const disabledSchoolIdSet = new Set(disabledSchoolIds);
+    return scopedSchoolIds.filter((schoolId) => !disabledSchoolIdSet.has(schoolId));
+  }
+
+  private async buildEnabledRecipientWhere(
+    scope: RecipientAnnouncementScope,
+    requestedSchoolId?: string,
+  ): Promise<Prisma.AnnouncementWhereInput | null> {
+    const enabledSchoolIds = await this.getEnabledAnnouncementSchoolIds(
+      scope.schoolIds,
+      requestedSchoolId,
+    );
+
+    if (enabledSchoolIds.length === 0) {
+      return null;
+    }
+
+    return {
+      ...scope.where,
+      schoolId: {
+        in: enabledSchoolIds,
+      },
+    };
+  }
+
   private async assertCanManageAnnouncement(
     actor: AuthenticatedUser,
     announcement: { schoolId: string; authorId: string },
@@ -469,7 +530,7 @@ export class AnnouncementsService {
 
   private async buildParentRecipientWhere(
     parentId: string,
-  ): Promise<Prisma.AnnouncementWhereInput | null> {
+  ): Promise<RecipientAnnouncementScope | null> {
     const links = await this.prisma.studentParentLink.findMany({
       where: { parentId },
       select: {
@@ -553,13 +614,18 @@ export class AnnouncementsService {
       });
     }
 
+    const scopedSchoolIds = [...schoolIds];
+
     return {
-      schoolId: {
-        in: [...schoolIds],
-      },
-      targets: {
-        some: {
-          OR: targetOr,
+      schoolIds: scopedSchoolIds,
+      where: {
+        schoolId: {
+          in: scopedSchoolIds,
+        },
+        targets: {
+          some: {
+            OR: targetOr,
+          },
         },
       },
     };
@@ -567,7 +633,7 @@ export class AnnouncementsService {
 
   private async buildStudentRecipientWhere(
     studentId: string,
-  ): Promise<Prisma.AnnouncementWhereInput | null> {
+  ): Promise<RecipientAnnouncementScope | null> {
     const student = await this.prisma.user.findUnique({
       where: { id: studentId },
       select: {
@@ -631,12 +697,15 @@ export class AnnouncementsService {
     }
 
     return {
-      schoolId: {
-        in: schoolIds,
-      },
-      targets: {
-        some: {
-          OR: targetOr,
+      schoolIds,
+      where: {
+        schoolId: {
+          in: schoolIds,
+        },
+        targets: {
+          some: {
+            OR: targetOr,
+          },
         },
       },
     };
@@ -664,6 +733,7 @@ export class AnnouncementsService {
     }
 
     const schoolId = await this.resolveSchoolIdForWrite(actor, body.schoolId);
+    await this.assertAnnouncementsEnabledForSchool(schoolId);
     const targets = this.normalizeTargets(body);
     this.assertHasAtLeastOneTarget(targets);
 
@@ -719,9 +789,18 @@ export class AnnouncementsService {
 
   async list(actor: AuthenticatedUser, query: ListAnnouncementsQueryDto) {
     const now = new Date();
+    const normalizedSchoolId = query.schoolId?.trim();
 
     if (actor.role === UserRole.PARENT) {
-      const recipientWhere = await this.buildParentRecipientWhere(actor.id);
+      const recipientScope = await this.buildParentRecipientWhere(actor.id);
+      if (!recipientScope) {
+        return [];
+      }
+
+      const recipientWhere = await this.buildEnabledRecipientWhere(
+        recipientScope,
+        normalizedSchoolId,
+      );
       if (!recipientWhere) {
         return [];
       }
@@ -742,7 +821,15 @@ export class AnnouncementsService {
     }
 
     if (actor.role === UserRole.STUDENT) {
-      const recipientWhere = await this.buildStudentRecipientWhere(actor.id);
+      const recipientScope = await this.buildStudentRecipientWhere(actor.id);
+      if (!recipientScope) {
+        return [];
+      }
+
+      const recipientWhere = await this.buildEnabledRecipientWhere(
+        recipientScope,
+        normalizedSchoolId,
+      );
       if (!recipientWhere) {
         return [];
       }
@@ -766,11 +853,20 @@ export class AnnouncementsService {
       throw new ForbiddenException('You do not have announcement access');
     }
 
-    const normalizedSchoolId = query.schoolId?.trim();
-
     if (normalizedSchoolId && !isBypassRole(actor.role)) {
       ensureUserHasSchoolAccess(actor, normalizedSchoolId);
     }
+
+    if (normalizedSchoolId) {
+      await this.assertAnnouncementsEnabledForSchool(normalizedSchoolId);
+    }
+
+    const disabledSchoolIds = normalizedSchoolId
+      ? []
+      : await this.featureTogglesService.getDisabledSchoolIdsForFeature(
+          'ANNOUNCEMENTS',
+          isBypassRole(actor.role) ? undefined : getAccessibleSchoolIds(actor),
+        );
 
     const targetFilters: Prisma.AnnouncementWhereInput[] = [];
 
@@ -814,6 +910,15 @@ export class AnnouncementsService {
       ...(query.audience ? { audience: query.audience } : {}),
       ...(query.pinned !== undefined ? { isPinned: query.pinned } : {}),
       ...(targetFilters.length > 0 ? { AND: targetFilters } : {}),
+      ...(disabledSchoolIds.length > 0
+        ? {
+            NOT: {
+              schoolId: {
+                in: disabledSchoolIds,
+              },
+            },
+          }
+        : {}),
       ...this.buildStatusWhere(query.status),
     };
 
@@ -829,7 +934,12 @@ export class AnnouncementsService {
     const now = new Date();
 
     if (actor.role === UserRole.PARENT) {
-      const recipientWhere = await this.buildParentRecipientWhere(actor.id);
+      const recipientScope = await this.buildParentRecipientWhere(actor.id);
+      if (!recipientScope) {
+        throw new NotFoundException('Announcement not found');
+      }
+
+      const recipientWhere = await this.buildEnabledRecipientWhere(recipientScope);
       if (!recipientWhere) {
         throw new NotFoundException('Announcement not found');
       }
@@ -855,7 +965,12 @@ export class AnnouncementsService {
     }
 
     if (actor.role === UserRole.STUDENT) {
-      const recipientWhere = await this.buildStudentRecipientWhere(actor.id);
+      const recipientScope = await this.buildStudentRecipientWhere(actor.id);
+      if (!recipientScope) {
+        throw new NotFoundException('Announcement not found');
+      }
+
+      const recipientWhere = await this.buildEnabledRecipientWhere(recipientScope);
       if (!recipientWhere) {
         throw new NotFoundException('Announcement not found');
       }
@@ -894,6 +1009,7 @@ export class AnnouncementsService {
     }
 
     await this.assertCanManageAnnouncement(actor, announcement);
+    await this.assertAnnouncementsEnabledForSchool(announcement.schoolId);
 
     return announcement;
   }
@@ -916,6 +1032,7 @@ export class AnnouncementsService {
       throw new NotFoundException('Announcement not found');
     }
 
+    await this.assertAnnouncementsEnabledForSchool(existing.schoolId);
     await this.assertCanManageAnnouncement(actor, existing);
 
     const expiresAt =
@@ -995,6 +1112,7 @@ export class AnnouncementsService {
       throw new NotFoundException('Announcement not found');
     }
 
+    await this.assertAnnouncementsEnabledForSchool(existing.schoolId);
     await this.assertCanManageAnnouncement(actor, existing);
 
     await this.prisma.announcement.delete({

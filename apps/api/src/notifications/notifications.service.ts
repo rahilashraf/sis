@@ -19,6 +19,7 @@ import {
   isBypassRole,
 } from '../common/access/school-access.util';
 import { EmailService } from '../email/email.service';
+import { FeatureTogglesService } from '../feature-toggles/feature-toggles.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateNotificationBroadcastDto } from './dto/create-notification-broadcast.dto';
 import { CreateStudentNotificationAlertDto } from './dto/create-student-notification-alert.dto';
@@ -70,6 +71,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
+    private readonly featureTogglesService: FeatureTogglesService,
   ) {}
 
   private canSendStudentAlerts(role: UserRole) {
@@ -273,6 +275,21 @@ export class NotificationsService {
   }
 
   async createAnnouncementNotifications(input: CreateAnnouncementNotificationInput) {
+    const announcementsEnabled =
+      await this.featureTogglesService.isFeatureEnabledForSchool(
+        input.schoolId,
+        'ANNOUNCEMENTS',
+      );
+
+    if (!announcementsEnabled) {
+      return {
+        count: 0,
+        recipients: 0,
+        announcementId: input.announcementId,
+        type: NotificationType.ANNOUNCEMENT,
+      };
+    }
+
     const includeParents = this.includesParents(input.audience);
     const includeStudents = this.includesStudents(input.audience);
 

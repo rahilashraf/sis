@@ -96,6 +96,7 @@ export class FeatureTogglesService {
       LIBRARY: dto.LIBRARY,
       UNIFORM_ORDERS: dto.UNIFORM_ORDERS,
       NOTIFICATIONS: dto.NOTIFICATIONS,
+      ANNOUNCEMENTS: dto.ANNOUNCEMENTS,
     };
 
     const entries = Object.entries(updates).filter(

@@ -48,6 +48,7 @@ describe('FeatureTogglesService', () => {
         LIBRARY: false,
         UNIFORM_ORDERS: false,
         NOTIFICATIONS: false,
+        ANNOUNCEMENTS: false,
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
 

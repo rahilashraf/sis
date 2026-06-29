@@ -8,6 +8,7 @@ export const SCHOOL_FEATURE_KEYS = [
   'LIBRARY',
   'UNIFORM_ORDERS',
   'NOTIFICATIONS',
+  'ANNOUNCEMENTS',
 ] as const;
 
 export type SchoolFeatureKey = (typeof SCHOOL_FEATURE_KEYS)[number];
@@ -24,6 +25,7 @@ export const DEFAULT_SCHOOL_FEATURE_TOGGLES: SchoolFeatureToggles = {
   LIBRARY: true,
   UNIFORM_ORDERS: true,
   NOTIFICATIONS: true,
+  ANNOUNCEMENTS: true,
 };
 
 export const SCHOOL_FEATURE_LABELS: Record<SchoolFeatureKey, string> = {
@@ -36,6 +38,7 @@ export const SCHOOL_FEATURE_LABELS: Record<SchoolFeatureKey, string> = {
   LIBRARY: 'Library',
   UNIFORM_ORDERS: 'Uniform Orders',
   NOTIFICATIONS: 'Notifications',
+  ANNOUNCEMENTS: 'Announcements',
 };
 
 export function withDefaultSchoolFeatureToggles(

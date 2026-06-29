@@ -29,6 +29,8 @@ import {
   type NotificationType,
   type Notification,
 } from "@/lib/api/notifications";
+import { getAccessVisibility } from "@/lib/api/settings";
+import type { SchoolFeatureToggles } from "@/lib/features/school-features";
 import { formatDateTimeLabel } from "@/lib/utils";
 
 function getTypeLabel(type: string): string {
@@ -70,6 +72,7 @@ type NotificationRowProps = {
   onMarkRead: (id: string) => void;
   isMarkingRead: boolean;
   role: UserRole | undefined;
+  enabledFeatures: SchoolFeatureToggles | null;
 };
 
 function NotificationRow({
@@ -77,9 +80,10 @@ function NotificationRow({
   onMarkRead,
   isMarkingRead,
   role,
+  enabledFeatures,
 }: NotificationRowProps) {
   const router = useRouter();
-  const href = resolveNotificationHref(notification, role);
+  const href = resolveNotificationHref(notification, role, { enabledFeatures });
 
   function handleClick() {
     if (!notification.isRead) {
@@ -190,6 +194,8 @@ export function NotificationsList() {
   const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [enabledFeatures, setEnabledFeatures] =
+    useState<SchoolFeatureToggles | null>(null);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const availableTypes = useMemo(() => {
@@ -230,6 +236,31 @@ export function NotificationsList() {
       cancelled = true;
     };
   }, [role, unreadOnly, typeFilter, refreshTick]);
+
+  useEffect(() => {
+    if (!selectedSchoolId) {
+      setEnabledFeatures(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    getAccessVisibility(selectedSchoolId)
+      .then((snapshot) => {
+        if (!cancelled) {
+          setEnabledFeatures(snapshot.features);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEnabledFeatures(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSchoolId]);
 
   async function handleMarkRead(id: string) {
     if (markingReadId) return;
@@ -475,6 +506,7 @@ export function NotificationsList() {
                   notification={notification}
                   onMarkRead={handleMarkRead}
                   role={role}
+                  enabledFeatures={enabledFeatures}
                 />
               ))}
             </div>

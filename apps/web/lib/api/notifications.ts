@@ -1,5 +1,9 @@
 import { apiFetch } from "./client";
 import type { UserRole } from "../auth/types";
+import {
+  isSchoolFeatureEnabled,
+  type SchoolFeatureToggles,
+} from "@/lib/features/school-features";
 
 export type NotificationType =
   | "ANNOUNCEMENT"
@@ -131,6 +135,7 @@ function getAnnouncementsRouteForRole(role?: UserRole | null) {
 export function resolveNotificationHref(
   notification: Notification,
   role?: UserRole | null,
+  options?: { enabledFeatures?: SchoolFeatureToggles | null },
 ): string | null {
   const { entityType, entityId } = notification;
 
@@ -160,6 +165,10 @@ export function resolveNotificationHref(
     entityType === "ANNOUNCEMENT" ||
     entityType === "Announcement"
   ) {
+    if (!isSchoolFeatureEnabled(options?.enabledFeatures, "ANNOUNCEMENTS")) {
+      return null;
+    }
+
     const baseRoute = getAnnouncementsRouteForRole(role);
     return entityId
       ? `${baseRoute}?announcementId=${encodeURIComponent(entityId)}`
