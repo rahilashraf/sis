@@ -287,14 +287,14 @@ export function Topbar({
           >
             <Image
               src="/aiok-logo.png"
-              alt="AIOK SIS"
+              alt="IOK SIS"
               width={32}
               height={32}
               className="h-8 w-auto object-contain"
               priority
             />
             <span className="text-sm font-semibold text-slate-900">
-              AIOK SIS
+              IOK SIS
             </span>
           </Link>
 
@@ -304,14 +304,14 @@ export function Topbar({
           >
             <Image
               src="/aiok-logo.png"
-              alt="AIOK SIS"
+              alt="IOK SIS"
               width={40}
               height={40}
               className="h-8 w-auto object-contain"
               priority
             />
             <div className="leading-tight">
-              <p className="text-sm font-semibold text-slate-900">AIOK SIS</p>
+              <p className="text-sm font-semibold text-slate-900">IOK SIS</p>
               <p className="text-xs text-slate-500 -mt-0.5">
                 {selectedSchoolName ?? "Student Information System"}
               </p>

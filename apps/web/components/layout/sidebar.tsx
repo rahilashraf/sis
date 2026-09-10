@@ -312,7 +312,7 @@ export function Sidebar({
               collapsed && "md:text-center md:tracking-[0.12em]",
             )}
           >
-            {collapsed ? "AIOK" : "AIOK (Darul Ilm) SIS"}
+            {collapsed ? "IOK" : "IOK SIS"}
           </p>
           <p
             className={cn(

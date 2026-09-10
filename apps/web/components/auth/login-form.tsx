@@ -13,6 +13,7 @@ import { login } from "@/lib/api/auth";
 export function LoginForm() {
   const router = useRouter();
   const { setSession, status } = useAuth();
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -55,34 +56,31 @@ export function LoginForm() {
 
   return (
     <Card className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/50 md:p-10">
-      {/* Logos */}
-      <div className="mb-8 mt-2 flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
+      {/* Logo */}
+      <div className="mb-8 mt-2 flex justify-center">
         <Image
-          src="/aiok-logo.png"
-          alt="AIOK (Darul Ilm)"
-          width={160}
-          height={60}
-          className="object-contain"
+          src="/iok-foundation-logo.png"
+          alt="Institute of Knowledge Foundation"
+          width={280}
+          height={100}
+          className="h-auto max-h-24 w-auto object-contain"
           priority
-        />
-
-        <div className="hidden sm:block h-10 w-px bg-slate-300" />
-
-        <Image
-          src="/iok-school-logo.png"
-          alt="IOK Islamic School"
-          width={140}
-          height={50}
-          className="object-contain opacity-90"
         />
       </div>
 
       {/* Title */}
-      <div className="mb-6 text-center space-y-2">
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900">
-          AIOK SIS
+      <div className="mb-6 text-center">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
+          INSTITUTE OF KNOWLEDGE FOUNDATION
+        </p>
+
+        <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+          Student Information System
         </h1>
-        <p className="text-sm text-slate-600">Sign in to access the system.</p>
+
+        <p className="mt-3 text-sm text-slate-600">
+          Sign in to access the system.
+        </p>
       </div>
 
       {/* Form */}
@@ -94,6 +92,7 @@ export function LoginForm() {
           >
             Username
           </label>
+
           <Input
             id="username"
             name="username"
@@ -112,6 +111,7 @@ export function LoginForm() {
           >
             Password
           </label>
+
           <Input
             id="password"
             name="password"
@@ -131,7 +131,7 @@ export function LoginForm() {
           </div>
         ) : null}
 
-        {/* Button + status */}
+        {/* Button + Status */}
         <div className="space-y-3 pt-1">
           <Button
             className="h-11 w-full rounded-xl"
@@ -150,7 +150,7 @@ export function LoginForm() {
 
           {showWakeMessage ? (
             <p className="text-center text-sm text-slate-500">
-              Waking up the server. The first login may take upto two minutes.
+              Waking up the server. The first login may take up to two minutes.
             </p>
           ) : null}
         </div>
