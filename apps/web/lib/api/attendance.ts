@@ -313,6 +313,49 @@ export type AttendanceClassSummary = {
   attendanceRate: number | null;
 };
 
+export type AttendanceClassSummaryDetails = {
+  classId: string;
+  className: string;
+  startDate: string;
+  endDate: string;
+  studentCount: number;
+  totalRecords: number;
+  presentCount: number;
+  absentCount: number;
+  lateCount: number;
+  attendanceRate: number | null;
+  students: Array<{
+    studentId: string;
+    student: AuthenticatedUser;
+    presentCount: number;
+    absentCount: number;
+    lateCount: number;
+    informationalCount: number;
+    attendancePercentage: number | null;
+    customStatusCounts: Array<{
+      id: string;
+      label: string;
+      count: number;
+      isActive: boolean;
+    }>;
+  }>;
+};
+
+export function getAttendanceClassSummaryDetails(options: {
+  classId: string;
+  startDate: string;
+  endDate: string;
+}) {
+  const query = new URLSearchParams({
+    startDate: options.startDate,
+    endDate: options.endDate,
+  });
+
+  return apiFetch<AttendanceClassSummaryDetails>(
+    `/attendance/classes/${options.classId}/summary/details?${query.toString()}`,
+  );
+}
+
 export function getAttendanceClassSummary(options: {
   classId: string;
   startDate?: string;

@@ -286,15 +286,15 @@ export function Topbar({
             className="flex items-center gap-2 transition hover:opacity-80 md:hidden"
           >
             <Image
-              src="/aiok-logo.png"
-              alt="IOK SIS"
-              width={32}
-              height={32}
-              className="h-8 w-auto object-contain"
+              src="/iok.png"
+              alt="Institute of Knowledge"
+              width={70}
+              height={70}
+              className="h-8 w-auto max-w-[70px] object-contain"
               priority
             />
             <span className="text-sm font-semibold text-slate-900">
-              IOK SIS
+              SIS
             </span>
           </Link>
 
@@ -303,15 +303,15 @@ export function Topbar({
             className="hidden items-center gap-2 transition hover:opacity-80 md:flex"
           >
             <Image
-              src="/aiok-logo.png"
-              alt="IOK SIS"
-              width={40}
-              height={40}
-              className="h-8 w-auto object-contain"
+              src="/iok.png"
+              alt="Institute of Knowledge"
+              width={70}
+              height={70}
+              className="h-9 w-auto max-w-[70px] object-contain"
               priority
             />
             <div className="leading-tight">
-              <p className="text-sm font-semibold text-slate-900">IOK SIS</p>
+              <p className="text-sm font-semibold text-slate-900">SIS</p>
               <p className="text-xs text-slate-500 -mt-0.5">
                 {selectedSchoolName ?? "Student Information System"}
               </p>

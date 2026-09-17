@@ -180,6 +180,25 @@ export class AttendanceController {
     );
   }
 
+  @Get('classes/:classId/summary/details')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
+  getClassSummaryDetails(
+    @Req() req: AuthenticatedRequest,
+    @Param('classId', NonEmptyStringPipe) classId: string,
+    @Query() query: GetClassSummaryQueryDto,
+  ) {
+    if (!query.startDate || !query.endDate) {
+      throw new BadRequestException('startDate and endDate are required');
+    }
+
+    return this.attendanceService.getClassSummaryDetails(
+      req.user,
+      classId,
+      query.startDate,
+      query.endDate,
+    );
+  }
+
   @Get('classes/:classId/records')
   @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF', 'TEACHER', 'SUPPLY_TEACHER')
   getClassRecordsByDateRange(
@@ -205,7 +224,7 @@ export class AttendanceController {
   }
 
   @Patch('status-rules/:status')
-  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('OWNER', 'SUPER_ADMIN', 'ADMIN')
   updateStatusRule(
     @Req() req: AuthenticatedRequest,
     @Param('status', NonEmptyStringPipe) status: string,

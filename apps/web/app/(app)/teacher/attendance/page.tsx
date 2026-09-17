@@ -1,5 +1,5 @@
-import { AttendanceWorkspace } from "@/components/attendance/attendance-workspace";
+import { DailyAttendanceWorkspace } from "@/components/attendance/daily-attendance-workspace";
 
 export default function TeacherAttendancePage() {
-  return <AttendanceWorkspace mode="teacher" />;
+  return <DailyAttendanceWorkspace mode="teacher" />;
 }

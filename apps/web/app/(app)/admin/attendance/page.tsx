@@ -1,5 +1,5 @@
-import { AttendanceWorkspace } from "@/components/attendance/attendance-workspace";
+import { DailyAttendanceWorkspace } from "@/components/attendance/daily-attendance-workspace";
 
 export default function AdminAttendancePage() {
-  return <AttendanceWorkspace mode="admin" />;
+  return <DailyAttendanceWorkspace mode="admin" />;
 }

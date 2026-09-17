@@ -59,11 +59,11 @@ export function LoginForm() {
       {/* Logo */}
       <div className="mb-8 mt-2 flex justify-center">
         <Image
-          src="/iok-foundation-logo.png"
-          alt="Institute of Knowledge Foundation"
-          width={280}
-          height={100}
-          className="h-auto max-h-24 w-auto object-contain"
+          src="/iok-school-masjid-logo.png"
+          alt="Institute of Knowledge Islamic School"
+          width={1478}
+          height={206}
+          className="h-auto w-full max-w-[420px] object-contain"
           priority
         />
       </div>
@@ -71,7 +71,7 @@ export function LoginForm() {
       {/* Title */}
       <div className="mb-6 text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
-          INSTITUTE OF KNOWLEDGE FOUNDATION
+          IOK SIS
         </p>
 
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">

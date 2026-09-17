@@ -142,7 +142,15 @@ function buildAdminBaseItems(): NavigationItem[] {
       ],
     },
     { href: "/admin/data-import", label: "Bulk Setup" },
-    { href: "/admin/attendance", label: "Attendance" },
+    {
+      href: "/admin/attendance",
+      label: "Attendance",
+      children: [
+        { href: "/admin/attendance", label: "Daily Attendance" },
+        { href: "/admin/attendance/summary", label: "Attendance Summary" },
+        { href: "/admin/attendance/settings", label: "Attendance Settings" },
+      ],
+    },
     {
       href: "/admin/classes",
       label: "Classes",
@@ -497,7 +505,14 @@ export function getNavigationItems(role: UserRole, options?: NavigationOptions) 
 
   if (role === "TEACHER") {
     if (isFeatureEnabled(enabledFeatures, accessVisibility, "ATTENDANCE")) {
-      items.push({ href: "/teacher/attendance", label: "Attendance" });
+      items.push({
+        href: "/teacher/attendance",
+        label: "Attendance",
+        children: [
+          { href: "/teacher/attendance", label: "Daily Attendance" },
+          { href: "/teacher/attendance/summary", label: "Attendance Summary" },
+        ],
+      });
     }
     items.push(
       { href: "/teacher/timetable", label: "Timetable" },
@@ -524,7 +539,14 @@ export function getNavigationItems(role: UserRole, options?: NavigationOptions) 
       isFeatureEnabled(enabledFeatures, accessVisibility, "ATTENDANCE") &&
       !items.some((item) => item.href === "/teacher/attendance")
     ) {
-      items.push({ href: "/teacher/attendance", label: "Attendance" });
+      items.push({
+        href: "/teacher/attendance",
+        label: "Attendance",
+        children: [
+          { href: "/teacher/attendance", label: "Daily Attendance" },
+          { href: "/teacher/attendance/summary", label: "Attendance Summary" },
+        ],
+      });
     }
 
     if (!items.some((item) => item.href === "/teacher/interviews")) {
@@ -585,6 +607,10 @@ export function isPathAllowedForRole(
     )
   ) {
     return false;
+  }
+
+  if (pathMatches(pathname, "/admin/attendance/settings")) {
+    return adminRoles.includes(role) && role !== "STAFF";
   }
 
   if (pathname.startsWith("/notifications")) {

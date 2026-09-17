@@ -6,7 +6,7 @@ import { AttendanceService } from './attendance.service';
 describe('AttendanceService access control', () => {
   let service: AttendanceService;
   let prisma: {
-    class: { findMany: jest.Mock };
+    class: { findMany: jest.Mock; findUnique: jest.Mock };
     schoolYear: { findUnique: jest.Mock };
     teacherClassAssignment: { findMany: jest.Mock; findFirst: jest.Mock };
     studentParentLink: { findUnique: jest.Mock };
@@ -27,6 +27,14 @@ describe('AttendanceService access control', () => {
     };
     attendanceStatusRule: {
       findMany: jest.Mock;
+      upsert: jest.Mock;
+    };
+    attendanceCustomStatus: {
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
     };
     user: {
       findUnique: jest.Mock;
@@ -39,7 +47,7 @@ describe('AttendanceService access control', () => {
 
   beforeEach(() => {
     prisma = {
-      class: { findMany: jest.fn() },
+      class: { findMany: jest.fn(), findUnique: jest.fn() },
       schoolYear: { findUnique: jest.fn() },
       teacherClassAssignment: { findMany: jest.fn(), findFirst: jest.fn() },
       studentParentLink: { findUnique: jest.fn() },
@@ -60,6 +68,14 @@ describe('AttendanceService access control', () => {
       },
       attendanceStatusRule: {
         findMany: jest.fn().mockResolvedValue([]),
+        upsert: jest.fn(),
+      },
+      attendanceCustomStatus: {
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
       },
       user: {
         findUnique: jest.fn(),
@@ -82,6 +98,194 @@ describe('AttendanceService access control', () => {
       auditService as unknown as AuditService,
     );
   });
+
+  it('aggregates class attendance details and retains inactive custom statuses', async () => {
+    prisma.class.findMany.mockResolvedValue([
+      { id: 'class-a', schoolId: 'school-1', takesAttendance: true },
+    ]);
+    prisma.class.findUnique.mockResolvedValue({
+      id: 'class-a',
+      schoolId: 'school-1',
+      name: 'Class A',
+    });
+
+    prisma.studentClassEnrollment.findMany.mockResolvedValue([
+      {
+        studentId: 'student-1',
+        student: {
+          id: 'student-1',
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          username: 'ada',
+        },
+      },
+      {
+        studentId: 'student-2',
+        student: {
+          id: 'student-2',
+          firstName: 'Grace',
+          lastName: 'Hopper',
+          username: 'grace',
+        },
+      },
+    ]);
+    prisma.attendanceRecord.findMany.mockResolvedValue([
+      {
+        studentId: 'student-1',
+        status: AttendanceStatus.PRESENT,
+        customStatus: null,
+        attendanceSession: { schoolId: 'school-1' },
+      },
+      {
+        studentId: 'student-1',
+        status: AttendanceStatus.EXCUSED,
+        customStatus: {
+          id: 'custom-1',
+          label: 'Excused',
+          behavior: 'INFORMATIONAL',
+          isActive: false,
+        },
+        attendanceSession: { schoolId: 'school-1' },
+      },
+    ]);
+
+    await expect(
+      service.getClassSummaryDetails(
+        {
+          id: 'owner-1',
+          role: UserRole.OWNER,
+          memberships: [],
+        } as never,
+        'class-a',
+        '2026-04-01',
+        '2026-04-03',
+      ),
+    ).resolves.toMatchObject({
+      classId: 'class-a',
+      studentCount: 2,
+      totalRecords: 2,
+      presentCount: 1,
+      absentCount: 0,
+      lateCount: 0,
+      attendanceRate: 100,
+      students: [
+        {
+          studentId: 'student-1',
+          presentCount: 1,
+          absentCount: 0,
+          lateCount: 0,
+          informationalCount: 1,
+          attendancePercentage: 100,
+          customStatusCounts: [
+            {
+              id: 'custom-1',
+              label: 'Excused',
+              count: 1,
+              isActive: false,
+            },
+          ],
+        },
+        {
+          studentId: 'student-2',
+          presentCount: 0,
+          absentCount: 0,
+          lateCount: 0,
+          informationalCount: 0,
+          attendancePercentage: null,
+          customStatusCounts: [],
+        },
+      ],
+    });
+  });
+
+  it.each([UserRole.STAFF, UserRole.TEACHER, UserRole.SUPPLY_TEACHER])(
+    'rejects %s from changing built-in attendance rules',
+    async (role) => {
+      await expect(
+        service.updateStatusRule(
+          {
+            id: 'user-1',
+            role,
+            memberships: [{ schoolId: 'school-1', isActive: true }],
+          } as never,
+          'school-1',
+          'PRESENT',
+          'ABSENT' as never,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(prisma.attendanceStatusRule.upsert).not.toHaveBeenCalled();
+    },
+  );
+
+  it('allows an admin to update a built-in attendance rule', async () => {
+    prisma.attendanceStatusRule.upsert.mockResolvedValue({
+      schoolId: 'school-1',
+      status: AttendanceStatus.PRESENT,
+      behavior: 'ABSENT',
+    });
+
+    await expect(
+      service.updateStatusRule(
+        {
+          id: 'admin-1',
+          role: UserRole.ADMIN,
+          memberships: [{ schoolId: 'school-1', isActive: true }],
+        } as never,
+        'school-1',
+        'PRESENT',
+        'ABSENT' as never,
+      ),
+    ).resolves.toMatchObject({
+      schoolId: 'school-1',
+      status: AttendanceStatus.PRESENT,
+      behavior: 'ABSENT',
+    });
+    expect(prisma.attendanceStatusRule.upsert).toHaveBeenCalled();
+  });
+
+  it.each([UserRole.STAFF, UserRole.TEACHER])(
+    'rejects %s from creating or updating custom attendance statuses',
+    async (role) => {
+      await expect(
+        service.createCustomStatus(
+          {
+            id: 'user-1',
+            role,
+            memberships: [{ schoolId: 'school-1', isActive: true }],
+          } as never,
+          {
+            schoolId: 'school-1',
+            label: 'Illness',
+            behavior: 'ABSENT' as never,
+          },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      prisma.attendanceCustomStatus.findUnique.mockResolvedValue({
+        id: 'custom-1',
+        schoolId: 'school-1',
+        label: 'Illness',
+        behavior: 'ABSENT',
+        isActive: true,
+      });
+
+      await expect(
+        service.updateCustomStatus(
+          {
+            id: 'user-1',
+            role,
+            memberships: [{ schoolId: 'school-1', isActive: true }],
+          } as never,
+          'custom-1',
+          { isActive: false },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(prisma.attendanceCustomStatus.create).not.toHaveBeenCalled();
+      expect(prisma.attendanceCustomStatus.update).not.toHaveBeenCalled();
+    },
+  );
 
   it('blocks attendance creation when the class does not take attendance', async () => {
     prisma.class.findMany

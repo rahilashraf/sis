@@ -541,7 +541,11 @@ export class AttendanceService {
     user: AuthUser,
     schoolId: string,
   ) {
-    if (!this.isAdminLike(user.role)) {
+    if (
+      user.role !== UserRole.OWNER &&
+      user.role !== UserRole.SUPER_ADMIN &&
+      user.role !== UserRole.ADMIN
+    ) {
       throw new ForbiddenException(
         'You do not have access to attendance status rules',
       );
@@ -2247,6 +2251,158 @@ export class AttendanceService {
       absentCount: summary.absentCount,
       lateCount: summary.lateCount,
       attendanceRate: summary.attendanceRate,
+    };
+  }
+
+  async getClassSummaryDetails(
+    user: AuthUser,
+    classId: string,
+    startDate: string,
+    endDate: string,
+  ) {
+    await this.ensureUserCanAccessClasses(user, [classId]);
+    const { normalizedStartDate, normalizedEndDate } = this.normalizeDateRange(
+      startDate,
+      endDate,
+    );
+
+    const [classContext, enrollments] = await Promise.all([
+      this.prisma.class.findUnique({
+        where: { id: classId },
+        select: { id: true, schoolId: true, name: true },
+      }),
+      this.prisma.studentClassEnrollment.findMany({
+        where: { classId },
+        select: {
+          studentId: true,
+          student: {
+            select: safeUserSelect,
+          },
+        },
+        orderBy: {
+          student: {
+            lastName: 'asc',
+          },
+        },
+      }),
+    ]);
+
+    if (!classContext) {
+      throw new NotFoundException('Class not found');
+    }
+
+    const records = await this.prisma.attendanceRecord.findMany({
+      where: {
+        date: {
+          gte: normalizedStartDate,
+          lte: normalizedEndDate,
+        },
+        attendanceSession: {
+          schoolId: classContext.schoolId,
+          classes: {
+            some: { classId },
+          },
+        },
+      },
+      select: {
+        studentId: true,
+        status: true,
+        customStatus: {
+          select: {
+            id: true,
+            label: true,
+            behavior: true,
+            isActive: true,
+          },
+        },
+        attendanceSession: {
+          select: {
+            schoolId: true,
+          },
+        },
+      },
+    });
+
+    const behaviorBySchoolId = await this.getStatusBehaviorMapsForSchools([
+      classContext.schoolId,
+    ]);
+    const summary = this.summarizeByStatusRules(
+      records.map((record) => ({
+        status: record.status,
+        schoolId: record.attendanceSession.schoolId,
+        customBehavior: record.customStatus?.behavior ?? null,
+      })),
+      behaviorBySchoolId,
+    );
+    const recordsByStudentId = new Map<string, typeof records>();
+
+    for (const record of records) {
+      const studentRecords = recordsByStudentId.get(record.studentId) ?? [];
+      studentRecords.push(record);
+      recordsByStudentId.set(record.studentId, studentRecords);
+    }
+
+    const students = enrollments.map((enrollment) => {
+      const studentRecords = recordsByStudentId.get(enrollment.studentId) ?? [];
+      const studentSummary = this.summarizeByStatusRules(
+        studentRecords.map((record) => ({
+          status: record.status,
+          schoolId: record.attendanceSession.schoolId,
+          customBehavior: record.customStatus?.behavior ?? null,
+        })),
+        behaviorBySchoolId,
+      );
+      const customStatusCounts = new Map<
+        string,
+        { label: string; count: number; isActive: boolean }
+      >();
+
+      for (const record of studentRecords) {
+        if (!record.customStatus) {
+          continue;
+        }
+
+        const current = customStatusCounts.get(record.customStatus.id);
+        customStatusCounts.set(record.customStatus.id, {
+          label: record.customStatus.label,
+          count: (current?.count ?? 0) + 1,
+          isActive: record.customStatus.isActive,
+        });
+      }
+
+      return {
+        studentId: enrollment.studentId,
+        student: enrollment.student,
+        presentCount: studentSummary.presentCount,
+        absentCount: studentSummary.absentCount,
+        lateCount: studentSummary.lateCount,
+        informationalCount: studentRecords.filter((record) => {
+          const behavior =
+            record.customStatus?.behavior ??
+            behaviorBySchoolId.get(record.attendanceSession.schoolId)?.get(record.status) ??
+            defaultStatusBehaviorByStatus[record.status];
+          return behavior === AttendanceStatusCountBehavior.INFORMATIONAL;
+        }).length,
+        attendancePercentage: studentSummary.attendancePercentage,
+        customStatusCounts: Array.from(customStatusCounts, ([id, value]) => ({
+          id,
+          ...value,
+        })),
+      };
+    });
+
+    return {
+      classId,
+      className: classContext.name,
+      startDate: formatDateOnly(normalizedStartDate),
+      endDate: formatDateOnly(normalizedEndDate),
+      studentCount: enrollments.length,
+      totalRecords: records.length,
+      presentCount: summary.presentCount,
+      absentCount: summary.absentCount,
+      lateCount: summary.lateCount,
+      attendanceRate: summary.attendanceRate,
+      students,
     };
   }
 
